@@ -1,0 +1,22 @@
+<div class="container-fluid">
+    {{template "fragments/pagination" (extendMap . "Top" true)}}
+    <div class="row messages">
+        {{range .Docs}}
+        <div class="message collapsed">
+            <div class="message_side">
+                <i class="bi bi-arrows-angle-expand expand" style="cursor: hand;"></i>
+            </div>
+            <pre>{{.}}</pre>
+        </div>
+        {{end}}
+    </div>
+    {{template "fragments/pagination" .}}
+</div>
+
+<script>
+    $(function () {
+        $(".message .expand").click(function (e) {
+            $(this).parents(".message").toggleClass('collapsed');
+        })
+    });
+</script>

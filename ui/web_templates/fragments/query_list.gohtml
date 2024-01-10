@@ -1,0 +1,17 @@
+<div class="container-fluid">
+    <div class="row">
+        <div class="col">
+            Saved Queries (evict in 24h):
+            <br><br>
+            {{range .}}
+                <div>
+                    <a href="/query/{{.QueryId}}">Open</a>
+                    <span style="background-color:gray; font-size:1rem;">{{.Query}}</span>
+                    <span class="text-muted" style="font-size:1rem;">{{if .From}}<br>From {{.From}}{{end}}</span>
+                    <span class="text-muted" style="font-size:1rem;">{{if .To}}<br>To {{.To}}{{end}}</span>
+                    <span class="text-muted" style="font-size:1rem;">{{.Count}} messages</span>
+                </div>
+            {{end}}
+        </div>
+    </div>
+</div>
