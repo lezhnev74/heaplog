@@ -10,7 +10,7 @@ require (
 	github.com/gofiber/fiber/v2 v2.52.0
 	github.com/gofiber/template/html/v2 v2.1.0
 	github.com/lezhnev74/go-iterators v0.0.0-20231110220559-11da674c9f90
-	github.com/marcboeker/go-duckdb v1.5.6
+	github.com/marcboeker/go-duckdb v1.5.5
 	github.com/pkg/errors v0.9.1
 	github.com/ronanh/intcomp v1.1.0
 	github.com/spf13/cobra v1.8.0

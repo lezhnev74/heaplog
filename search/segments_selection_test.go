@@ -40,7 +40,7 @@ func TestSelect(t *testing.T) {
 		},
 	}
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond * 1000)
 
 	slices.Sort(filenames)
 
