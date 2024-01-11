@@ -128,7 +128,7 @@ func (hc *HtmxController) CommandNew(c *fiber.Ctx) error {
 			return &fiber.Error{Code: fiber.StatusOK, Message: err.Error()}
 		}
 	} else {
-		err = hc.putResultsPage(c.Response().BodyWriter(), queryId, querySummary, 0, input.Pagesize)
+		err = hc.putResultsPage(c.Response().BodyWriter(), queryId, querySummary, 0, input.Pagesize, true)
 		if err != nil {
 			return &fiber.Error{Code: fiber.StatusOK, Message: err.Error()}
 		}
@@ -144,6 +144,7 @@ func (hc *HtmxController) CommandPage(c *fiber.Ctx) error {
 	queryId := c.Query("queryId")
 	page := c.QueryInt("page", 0)
 	pageSize := c.QueryInt("pagesize", 100)
+	freshLoad := c.QueryBool("freshLoad", false)
 
 	querySummary, err := hc.happ.QuerySummary(queryId)
 	if err != nil {
@@ -157,7 +158,7 @@ func (hc *HtmxController) CommandPage(c *fiber.Ctx) error {
 			return &fiber.Error{Code: fiber.StatusOK, Message: err.Error()}
 		}
 	} else {
-		err = hc.putResultsPage(c.Response().BodyWriter(), queryId, querySummary, page, pageSize)
+		err = hc.putResultsPage(c.Response().BodyWriter(), queryId, querySummary, page, pageSize, freshLoad)
 		if err != nil {
 			return &fiber.Error{Code: fiber.StatusOK, Message: err.Error()}
 		}
@@ -220,25 +221,13 @@ func (hc *HtmxController) CommandPaginationCheckComplete(c *fiber.Ctx) error {
 		return &fiber.Error{Code: fiber.StatusOK, Message: err.Error()}
 	}
 
-	return nil
-}
-
-func (hc *HtmxController) putFragment(out io.Writer, targetHtmlId, fragmentName string, payload fiber.Map) error {
-	tplBuf := bytes.NewBuffer(nil)
-	err := hc.viewEngine.Render(tplBuf, fragmentName, payload)
-	if err != nil {
-		return xerrors.Errorf("unable to render a fragment %s: %w", fragmentName, err)
-	}
-
-	_, err = fmt.Fprintf(out, "<div id=\"%s\" hx-swap-oob=\"true\">\n%s\n</div>", targetHtmlId, tplBuf.Bytes())
-	if err != nil {
-		return xerrors.Errorf("unable to render a fragment %s: %w", fragmentName, err)
-	}
-	return err
+	PageData["FromMilli"] = querySummary.MinDoc.UnixMilli()
+	PageData["ToMilli"] = querySummary.MaxDoc.UnixMilli()
+	return hc.putFragment(c.Response().BodyWriter(), "secondary_area", "fragments/timeline", PageData)
 }
 
 // page starts from 0
-func (hc *HtmxController) putResultsPage(out io.Writer, queryId string, querySummary common.QuerySummary, page int, pageSize int) error {
+func (hc *HtmxController) putResultsPage(out io.Writer, queryId string, querySummary common.QuerySummary, page int, pageSize int, loadTimeline bool) error {
 
 	// Read docs:
 	messages, err := hc.happ.QueryPage(queryId, page, pageSize)
@@ -286,9 +275,27 @@ func (hc *HtmxController) putResultsPage(out io.Writer, queryId string, querySum
 		return &fiber.Error{Code: fiber.StatusOK, Message: err.Error()}
 	}
 
-	PageData["FromMilli"] = querySummary.MinDoc.UnixMilli()
-	PageData["ToMilli"] = querySummary.MaxDoc.UnixMilli()
-	return hc.putFragment(out, "secondary_area", "fragments/timeline", PageData)
+	if loadTimeline {
+		PageData["FromMilli"] = querySummary.MinDoc.UnixMilli()
+		PageData["ToMilli"] = querySummary.MaxDoc.UnixMilli()
+		return hc.putFragment(out, "secondary_area", "fragments/timeline", PageData)
+	}
+
+	return nil
+}
+
+func (hc *HtmxController) putFragment(out io.Writer, targetHtmlId, fragmentName string, payload fiber.Map) error {
+	tplBuf := bytes.NewBuffer(nil)
+	err := hc.viewEngine.Render(tplBuf, fragmentName, payload)
+	if err != nil {
+		return xerrors.Errorf("unable to render a fragment %s: %w", fragmentName, err)
+	}
+
+	_, err = fmt.Fprintf(out, "<div id=\"%s\" hx-swap-oob=\"true\">\n%s\n</div>", targetHtmlId, tplBuf.Bytes())
+	if err != nil {
+		return xerrors.Errorf("unable to render a fragment %s: %w", fragmentName, err)
+	}
+	return err
 }
 
 func NewHtmxController(happ *heaplog.Heaplog, viewEngine *html.Engine) *HtmxController {

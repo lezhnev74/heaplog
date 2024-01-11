@@ -3,7 +3,7 @@
     {{if .QueryId}}
         {{/* load the page */}}
         <div
-                hx-get="/cmd/page?queryId={{.QueryId}}&page={{.Page}}"
+                hx-get="/cmd/page?queryId={{.QueryId}}&page={{.Page}}&freshLoad=1"
                 hx-trigger="load">
         </div>
     {{else if .Queries}}
