@@ -20,10 +20,10 @@ var (
 
 func TestInvalidQueryId(t *testing.T) {
 	hl := initHeaplog(t)
-	_, err := hl.QuerySummary("Unknown")
+	_, err := hl.QuerySummary("Unknown", nil, nil)
 	require.ErrorIs(t, err, storage.ErrNoData)
 
-	_, err = hl.QueryPage("Unknown", 1, 1)
+	_, err = hl.QueryPage("Unknown", 1, 1, nil, nil)
 	require.ErrorIs(t, err, storage.ErrNoData)
 }
 
@@ -109,7 +109,7 @@ func TestQuery(t *testing.T) {
 			time.Sleep(10 * time.Millisecond)
 
 			// 2. Request stats
-			summary, err := hl.QuerySummary(queryId)
+			summary, err := hl.QuerySummary(queryId, nil, nil)
 			require.NoError(t, err)
 
 			if tt.from != nil {
@@ -132,7 +132,7 @@ func TestQuery(t *testing.T) {
 
 			// 3. Read pages
 			for page, expectedMessages := range tt.expectedPages {
-				messages, err := hl.QueryPage(queryId, page, tt.pageSize)
+				messages, err := hl.QueryPage(queryId, page, tt.pageSize, nil, nil)
 				require.NoError(t, err)
 				require.Equal(t, expectedMessages, messages)
 			}

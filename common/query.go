@@ -18,8 +18,8 @@ func HashFile(filename string) DataSourceHash {
 
 type QuerySummary struct {
 	Text, QueryId     string
-	From, To, BuiltAt *time.Time
-	Complete          bool // if the query is still in-flight
+	From, To, BuiltAt *time.Time // time scope as given upon creation of the query (can be probably used for sub-query too)
+	Complete          bool       // if the query is still in-flight
 	Total             int
 	MinDoc, MaxDoc    *time.Time
 }

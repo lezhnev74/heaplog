@@ -94,6 +94,7 @@ func makeFiber(happ *heaplog.Heaplog, viewsDirectory string) *fiber.App {
 	//	Browse:     false,
 	// }))
 	app.Static("/static", "./ui/web_static")
+
 	app.Get("/", func(c *fiber.Ctx) error {
 		// read existing old queries
 		s, err := happ.AllQueriesSummaries()
@@ -122,9 +123,10 @@ func makeFiber(happ *heaplog.Heaplog, viewsDirectory string) *fiber.App {
 
 		return c.Render("home", fiber.Map{"Queries": qData}, "theme")
 	})
+
 	app.Get("/query/:queryId", func(c *fiber.Ctx) error {
 		queryId := c.Params("queryId")
-		querySummary, err := happ.QuerySummary(queryId)
+		querySummary, err := happ.QuerySummary(queryId, nil, nil)
 		if err != nil {
 			return &fiber.Error{Code: fiber.StatusOK, Message: err.Error()}
 		}
@@ -146,9 +148,10 @@ func makeFiber(happ *heaplog.Heaplog, viewsDirectory string) *fiber.App {
 
 		return c.Render("home", data, "theme")
 	})
+
 	app.Get("/query/:queryId/aggregate", func(c *fiber.Ctx) error {
 		queryId := c.Params("queryId")
-		querySummary, err := happ.QuerySummary(queryId)
+		querySummary, err := happ.QuerySummary(queryId, nil, nil)
 		if err != nil {
 			return &fiber.Error{Code: fiber.StatusOK, Message: err.Error()}
 		}
@@ -189,6 +192,7 @@ func makeFiber(happ *heaplog.Heaplog, viewsDirectory string) *fiber.App {
 
 		return c.SendString(string(jsonList))
 	})
+
 	app.Get("/cmd/:cmd", func(c *fiber.Ctx) error { return NewHtmxController(happ, viewsEngine).CommandFiber(c) })
 
 	return app

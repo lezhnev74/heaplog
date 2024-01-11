@@ -82,65 +82,94 @@ func TestQuerySummary(t *testing.T) {
 	defer os.RemoveAll(path)
 	defer s.Close()
 
-	s.CheckInFiles(map[string]int64{
-		"file1": 120,
-	})
-	ds := common.HashFile("file1")
+	// 1. Populate query messages
+	segmentId := populateIndexedMessagesForTest(t, s)
 
-	// 1. Ingest data
-	s1 := common.IndexedSegment{
-		DataSource: ds,
-		Messages: []common.IndexedMessage{
-			{Loc: common.Location{0, 100}, Date: test.MakeTimeV("2023-01-05 00:00:00.000000")},
-			{Loc: common.Location{100, 120}, Date: test.MakeTimeV("2023-01-06 00:00:00.000000")},
-		},
-	}
-	s1Id, err := s.CheckInSegment(s1, []string{})
-	require.NoError(t, err)
-
-	time.Sleep(30 * time.Millisecond)
-
-	// 2. Build a query and report matched messages
+	// 2. Make a query that matches all messages
 	queryText := "find me"
 	queryHash := "abc"
-	from := test.MakeTimeP("2023-01-01 12:00:00.000000")
-	require.NoError(t, s.CheckInQuery(queryHash, queryText, from, nil))
+	require.NoError(t, s.CheckInQuery(queryHash, queryText, nil, nil))
 
-	// test.DumpTable(s.GetDb(), "file_segments", 6)
-	// test.DumpTable(s.GetDb(), "file_segments_messages", 5)
-	potentialSegments, err := s.GetSegments([]int{s1Id}) // read back checked in segments
-	require.NoError(t, err)
-
-	matchedMessage := common.MatchedMessage{
-		Id:        potentialSegments[0].Messages[0].Id,
-		QueryHash: queryHash,
+	segments, _ := s.GetSegments([]int{segmentId})
+	for _, m := range segments[0].Messages {
+		s.CheckInQueryMessage(common.MatchedMessage{Id: m.Id, QueryHash: queryHash})
 	}
-	s.CheckInQueryMessage(matchedMessage)
 
-	// 3. Build Summary of the Query
-	time.Sleep(time.Millisecond * 50)
+	time.Sleep(50 * time.Millisecond) // wait for the flush
 
-	summary, err := s.GetQuerySummary(queryHash)
+	// 3.1 Test Full Summary (unbound)
+	summary, err := s.GetQuerySummary(queryHash, nil, nil)
 	require.NoError(t, err)
-
 	expectedSummary := common.QuerySummary{
 		QueryId:  queryHash,
 		Complete: false,
 		Text:     queryText,
-		From:     from,
+		From:     nil,
 		To:       nil,
-		Total:    1,
-		MinDoc:   test.MakeTimeP("2023-01-05 00:00:00.000000"),
-		MaxDoc:   test.MakeTimeP("2023-01-05 00:00:00.000000"),
+		Total:    14,
+		MinDoc:   test.MakeTimeP("2020-01-01 00:00:00.001000"),
+		MaxDoc:   test.MakeTimeP("2021-01-01 00:00:00.000000"),
 	}
+	summary.BuiltAt = nil
 	require.EqualValues(t, expectedSummary, summary)
 
+	// 3.2 Test Full Summary (complete query)
 	err = s.CheckInFinishedQuery(queryHash)
 	require.NoError(t, err)
 
-	summary, err = s.GetQuerySummary(queryHash)
+	summary, err = s.GetQuerySummary(queryHash, nil, nil)
 	require.NoError(t, err)
 	require.True(t, summary.Complete)
+
+	// 3.3 Test Bound summary (from)
+	from := test.MakeTimeP("2020-01-01 00:01:01.000000")
+	expectedSummary = common.QuerySummary{
+		QueryId:  queryHash,
+		Complete: true,
+		Text:     queryText,
+		From:     nil,
+		To:       nil,
+		Total:    7,
+		MinDoc:   test.MakeTimeP("2020-01-01 00:01:01.000000"),
+		MaxDoc:   test.MakeTimeP("2021-01-01 00:00:00.000000"),
+	}
+
+	summary, err = s.GetQuerySummary(queryHash, from, nil)
+	require.NoError(t, err)
+	summary.BuiltAt = nil
+	require.EqualValues(t, expectedSummary, summary)
+
+	// 3.3 Test Bound summary (top)
+	to := test.MakeTimeP("2020-01-01 00:00:00.002000")
+	expectedSummary = common.QuerySummary{
+		QueryId:  queryHash,
+		Complete: true,
+		Text:     queryText,
+		From:     nil,
+		To:       nil,
+		Total:    3,
+		MinDoc:   test.MakeTimeP("2020-01-01 00:00:00.001000"),
+		MaxDoc:   test.MakeTimeP("2020-01-01 00:00:00.002000"),
+	}
+
+	// 3.4 Test Bound summary (both)
+	from = test.MakeTimeP("2020-01-01 00:01:01.000000")
+	to = test.MakeTimeP("2020-01-02 01:00:00.000000")
+	expectedSummary = common.QuerySummary{
+		QueryId:  queryHash,
+		Complete: true,
+		Text:     queryText,
+		From:     nil,
+		To:       nil,
+		Total:    5,
+		MinDoc:   test.MakeTimeP("2020-01-01 00:01:01.000000"),
+		MaxDoc:   test.MakeTimeP("2020-01-02 00:00:00.000000"),
+	}
+
+	summary, err = s.GetQuerySummary(queryHash, from, to)
+	require.NoError(t, err)
+	summary.BuiltAt = nil
+	require.EqualValues(t, expectedSummary, summary)
 }
 
 func TestItRemovesObsoleteSegments(t *testing.T) {
@@ -274,34 +303,7 @@ func TestQueryAggregation(t *testing.T) {
 	defer s.Close()
 
 	// Populate query messages
-	s.CheckInFiles(map[string]int64{
-		"file1": 200,
-	})
-	ds := common.HashFile("file1")
-
-	s1 := common.IndexedSegment{
-		DataSource: ds,
-		Messages: []common.IndexedMessage{
-			{Loc: common.Location{10, 11}, Date: test.MakeTimeV("2020-01-01 00:00:00.001000")},
-			{Loc: common.Location{11, 12}, Date: test.MakeTimeV("2020-01-01 00:00:00.001000")},
-			{Loc: common.Location{12, 13}, Date: test.MakeTimeV("2020-01-01 00:00:00.002000")},
-			{Loc: common.Location{13, 14}, Date: test.MakeTimeV("2020-01-01 00:00:01.004000")},
-			{Loc: common.Location{14, 15}, Date: test.MakeTimeV("2020-01-01 00:00:01.005000")},
-			{Loc: common.Location{15, 16}, Date: test.MakeTimeV("2020-01-01 00:00:02.000000")},
-			{Loc: common.Location{16, 17}, Date: test.MakeTimeV("2020-01-01 00:01:00.000000")},
-			{Loc: common.Location{17, 18}, Date: test.MakeTimeV("2020-01-01 00:01:01.000000")},
-			{Loc: common.Location{18, 19}, Date: test.MakeTimeV("2020-01-01 01:00:00.000000")},
-			{Loc: common.Location{19, 20}, Date: test.MakeTimeV("2020-01-01 01:01:00.000000")},
-			{Loc: common.Location{20, 21}, Date: test.MakeTimeV("2020-01-01 01:01:01.000000")},
-			{Loc: common.Location{21, 22}, Date: test.MakeTimeV("2020-01-02 00:00:00.000000")},
-			{Loc: common.Location{22, 23}, Date: test.MakeTimeV("2020-02-01 00:00:00.000000")},
-			{Loc: common.Location{23, 24}, Date: test.MakeTimeV("2021-01-01 00:00:00.000000")},
-		},
-	}
-	segmentId, err := s.CheckInSegment(s1, []string{})
-	require.NoError(t, err)
-
-	time.Sleep(50 * time.Millisecond) // wait for the flush
+	segmentId := populateIndexedMessagesForTest(t, s)
 
 	// Make a query that matches all messages
 	queryText := "~.*"
@@ -407,6 +409,201 @@ func TestQueryAggregation(t *testing.T) {
 		})
 	}
 
+}
+
+func TestQueryPage(t *testing.T) {
+	path, s := prepareStorage(t)
+	defer os.RemoveAll(path)
+	defer s.Close()
+
+	// 1. Populate query messages
+	segmentId := populateIndexedMessagesForTest(t, s)
+
+	// 2. Make a query that matches all messages
+	queryText := "find me"
+	queryHash := "abc"
+	require.NoError(t, s.CheckInQuery(queryHash, queryText, nil, nil))
+
+	segments, _ := s.GetSegments([]int{segmentId})
+	for _, m := range segments[0].Messages {
+		s.CheckInQueryMessage(common.MatchedMessage{Id: m.Id, QueryHash: queryHash}) // All messages
+	}
+
+	time.Sleep(50 * time.Millisecond) // wait for the flush
+
+	// Tests
+	type pageTest struct {
+		name                  string
+		from, to              *time.Time
+		perPage               int
+		expectedDatesPerPages [][]time.Time
+	}
+
+	tests := []pageTest{
+		{
+			name:    "all unbound",
+			from:    nil,
+			to:      nil,
+			perPage: 20,
+			expectedDatesPerPages: [][]time.Time{
+				// page 0:
+				{
+					test.MakeTimeV("2020-01-01 00:00:00.001000"),
+					test.MakeTimeV("2020-01-01 00:00:00.001000"),
+					test.MakeTimeV("2020-01-01 00:00:00.002000"),
+					test.MakeTimeV("2020-01-01 00:00:01.004000"),
+					test.MakeTimeV("2020-01-01 00:00:01.005000"),
+					test.MakeTimeV("2020-01-01 00:00:02.000000"),
+					test.MakeTimeV("2020-01-01 00:01:00.000000"),
+					test.MakeTimeV("2020-01-01 00:01:01.000000"),
+					test.MakeTimeV("2020-01-01 01:00:00.000000"),
+					test.MakeTimeV("2020-01-01 01:01:00.000000"),
+					test.MakeTimeV("2020-01-01 01:01:01.000000"),
+					test.MakeTimeV("2020-01-02 00:00:00.000000"),
+					test.MakeTimeV("2020-02-01 00:00:00.000000"),
+					test.MakeTimeV("2021-01-01 00:00:00.000000"),
+				},
+			},
+		},
+		{
+			name:    "bound from",
+			from:    test.MakeTimeP("2020-01-01 00:00:01.005000"),
+			to:      nil,
+			perPage: 5,
+			expectedDatesPerPages: [][]time.Time{
+				// page 0:
+				{
+					// test.MakeTimeV("2020-01-01 00:00:00.001000"),
+					// test.MakeTimeV("2020-01-01 00:00:00.001000"),
+					// test.MakeTimeV("2020-01-01 00:00:00.002000"),
+					// test.MakeTimeV("2020-01-01 00:00:01.004000"),
+					test.MakeTimeV("2020-01-01 00:00:01.005000"),
+					test.MakeTimeV("2020-01-01 00:00:02.000000"),
+					test.MakeTimeV("2020-01-01 00:01:00.000000"),
+					test.MakeTimeV("2020-01-01 00:01:01.000000"),
+					test.MakeTimeV("2020-01-01 01:00:00.000000"),
+				},
+				// page1
+				{
+					test.MakeTimeV("2020-01-01 01:01:00.000000"),
+					test.MakeTimeV("2020-01-01 01:01:01.000000"),
+					test.MakeTimeV("2020-01-02 00:00:00.000000"),
+					test.MakeTimeV("2020-02-01 00:00:00.000000"),
+					test.MakeTimeV("2021-01-01 00:00:00.000000"),
+				},
+			},
+		},
+		{
+			name:    "bound to",
+			from:    nil,
+			to:      test.MakeTimeP("2020-01-02 01:00:00.000000"),
+			perPage: 5,
+			expectedDatesPerPages: [][]time.Time{
+				// page 0:
+				{
+					test.MakeTimeV("2020-01-01 00:00:00.001000"),
+					test.MakeTimeV("2020-01-01 00:00:00.001000"),
+					test.MakeTimeV("2020-01-01 00:00:00.002000"),
+					test.MakeTimeV("2020-01-01 00:00:01.004000"),
+					test.MakeTimeV("2020-01-01 00:00:01.005000"),
+				},
+				// page1
+				{
+					test.MakeTimeV("2020-01-01 00:00:02.000000"),
+					test.MakeTimeV("2020-01-01 00:01:00.000000"),
+					test.MakeTimeV("2020-01-01 00:01:01.000000"),
+					test.MakeTimeV("2020-01-01 01:00:00.000000"),
+					test.MakeTimeV("2020-01-01 01:01:00.000000"),
+				},
+				// page 2
+				{
+					test.MakeTimeV("2020-01-01 01:01:01.000000"),
+					test.MakeTimeV("2020-01-02 00:00:00.000000"),
+					// test.MakeTimeV("2020-02-01 00:00:00.000000"),
+					// test.MakeTimeV("2021-01-01 00:00:00.000000"),
+				},
+			},
+		},
+		{
+			name:    "bound both",
+			from:    test.MakeTimeP("2020-01-01 00:00:00.001001"),
+			to:      test.MakeTimeP("2020-01-02 01:00:00.000000"),
+			perPage: 4,
+			expectedDatesPerPages: [][]time.Time{
+				// page 0:
+				{
+					// test.MakeTimeV("2020-01-01 00:00:00.001000"),
+					// test.MakeTimeV("2020-01-01 00:00:00.001000"),
+					test.MakeTimeV("2020-01-01 00:00:00.002000"),
+					test.MakeTimeV("2020-01-01 00:00:01.004000"),
+					test.MakeTimeV("2020-01-01 00:00:01.005000"),
+					test.MakeTimeV("2020-01-01 00:00:02.000000"),
+				},
+				// page1
+				{
+					test.MakeTimeV("2020-01-01 00:01:00.000000"),
+					test.MakeTimeV("2020-01-01 00:01:01.000000"),
+					test.MakeTimeV("2020-01-01 01:00:00.000000"),
+					test.MakeTimeV("2020-01-01 01:01:00.000000"),
+				},
+				// page 2
+				{
+					test.MakeTimeV("2020-01-01 01:01:01.000000"),
+					test.MakeTimeV("2020-01-02 00:00:00.000000"),
+					// test.MakeTimeV("2020-02-01 00:00:00.000000"),
+					// test.MakeTimeV("2021-01-01 00:00:00.000000"),
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for page, expectedDates := range tt.expectedDatesPerPages {
+				actualMessagse, err := s.GetMessagePage(queryHash, tt.perPage, page, tt.from, tt.to)
+				require.NoError(t, err)
+				actualDates := make([]time.Time, 0)
+				for _, m := range actualMessagse {
+					actualDates = append(actualDates, m.Date)
+				}
+
+				require.Equal(t, expectedDates, actualDates)
+			}
+		})
+	}
+
+}
+
+func populateIndexedMessagesForTest(t *testing.T, s *storage.Storage) int {
+	s.CheckInFiles(map[string]int64{
+		"file1": 200,
+	})
+	ds := common.HashFile("file1")
+
+	s1 := common.IndexedSegment{
+		DataSource: ds,
+		Messages: []common.IndexedMessage{
+			{Loc: common.Location{10, 11}, Date: test.MakeTimeV("2020-01-01 00:00:00.001000")},
+			{Loc: common.Location{11, 12}, Date: test.MakeTimeV("2020-01-01 00:00:00.001000")},
+			{Loc: common.Location{12, 13}, Date: test.MakeTimeV("2020-01-01 00:00:00.002000")},
+			{Loc: common.Location{13, 14}, Date: test.MakeTimeV("2020-01-01 00:00:01.004000")},
+			{Loc: common.Location{14, 15}, Date: test.MakeTimeV("2020-01-01 00:00:01.005000")},
+			{Loc: common.Location{15, 16}, Date: test.MakeTimeV("2020-01-01 00:00:02.000000")},
+			{Loc: common.Location{16, 17}, Date: test.MakeTimeV("2020-01-01 00:01:00.000000")},
+			{Loc: common.Location{17, 18}, Date: test.MakeTimeV("2020-01-01 00:01:01.000000")},
+			{Loc: common.Location{18, 19}, Date: test.MakeTimeV("2020-01-01 01:00:00.000000")},
+			{Loc: common.Location{19, 20}, Date: test.MakeTimeV("2020-01-01 01:01:00.000000")},
+			{Loc: common.Location{20, 21}, Date: test.MakeTimeV("2020-01-01 01:01:01.000000")},
+			{Loc: common.Location{21, 22}, Date: test.MakeTimeV("2020-01-02 00:00:00.000000")},
+			{Loc: common.Location{22, 23}, Date: test.MakeTimeV("2020-02-01 00:00:00.000000")},
+			{Loc: common.Location{23, 24}, Date: test.MakeTimeV("2021-01-01 00:00:00.000000")},
+		},
+	}
+	segmentId, err := s.CheckInSegment(s1, []string{})
+	require.NoError(t, err)
+
+	time.Sleep(50 * time.Millisecond) // wait for the flush
+	return segmentId
 }
 
 func prepareStorage(t *testing.T) (path string, s *storage.Storage) {

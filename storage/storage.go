@@ -584,12 +584,24 @@ func (s *Storage) ReadIndexedLocations(fileHash common.DataSourceHash) ([]common
 	return indexedLocations, nil
 }
 
-func (s *Storage) GetMessagePage(queryHash string, pageSize, page int) ([]common.MatchedMessage, error) {
+func (s *Storage) GetMessagePage(queryHash string, pageSize, page int, from, to *time.Time) ([]common.MatchedMessage, error) {
 
 	// make sure query exists, to distinguish empty page and missing query
-	_, err := s.GetQuerySummary(queryHash)
+	_, err := s.GetQuerySummary(queryHash, nil, nil)
 	if err != nil {
 		return nil, err
+	}
+
+	// respect sub-query bounds
+	timeBound := []string{}
+	if from != nil {
+		timeBound = append(timeBound, fmt.Sprintf("fsm.date >= %d", from.UnixMicro()))
+	}
+	if to != nil {
+		timeBound = append(timeBound, fmt.Sprintf("fsm.date <= %d", to.UnixMicro()))
+	}
+	if len(timeBound) == 0 {
+		timeBound = append(timeBound, "1=1")
 	}
 
 	sqlSelect := `
@@ -598,10 +610,11 @@ func (s *Storage) GetMessagePage(queryHash string, pageSize, page int) ([]common
 		JOIN queries q ON q.queryHash=r.queryHash
 		JOIN file_segments_messages fsm ON fsm.id=r.message_id		    
 	    JOIN file_segments fs ON fs.id=fsm.segment_id
-		WHERE r.queryHash=? 
+		WHERE r.queryHash=? AND %s
 		ORDER BY fsm.date ASC 
 		LIMIT ? OFFSET ?
 		`
+	sqlSelect = fmt.Sprintf(sqlSelect, strings.Join(timeBound, " AND "))
 
 	r, err := s.db.Query(sqlSelect, queryHash, pageSize, page*pageSize)
 	if err != nil {
@@ -712,7 +725,7 @@ func (s *Storage) GetQueriesSummaries() (summaries []common.QuerySummary, err er
 	var queryHash string
 	for r.Next() {
 		r.Scan(&queryHash)
-		summ, err := s.GetQuerySummary(queryHash)
+		summ, err := s.GetQuerySummary(queryHash, nil, nil)
 		if err != nil {
 			err = xerrors.Errorf("unable to read query summary: %w", err)
 		}
@@ -722,9 +735,21 @@ func (s *Storage) GetQueriesSummaries() (summaries []common.QuerySummary, err er
 	return
 }
 
-func (s *Storage) GetQuerySummary(hash string) (common.QuerySummary, error) {
+func (s *Storage) GetQuerySummary(hash string, from, to *time.Time) (common.QuerySummary, error) {
 	summary := common.QuerySummary{
 		QueryId: hash,
+	}
+
+	// respect sub-query bounds
+	timeBound := []string{}
+	if from != nil {
+		timeBound = append(timeBound, fmt.Sprintf("file_segments_messages.date >= %d", from.UnixMicro()))
+	}
+	if to != nil {
+		timeBound = append(timeBound, fmt.Sprintf("file_segments_messages.date <= %d", to.UnixMicro()))
+	}
+	if len(timeBound) == 0 {
+		timeBound = append(timeBound, "1=1")
 	}
 
 	selectSQL := `
@@ -739,9 +764,11 @@ func (s *Storage) GetQuerySummary(hash string) (common.QuerySummary, error) {
 	FROM queries
 	LEFT JOIN query_results ON query_results.queryHash=queries.queryHash
 	LEFT JOIN file_segments_messages ON query_results.message_id=file_segments_messages.id
-	WHERE queries.queryHash=?
+	WHERE queries.queryHash=? AND %s
 	GROUP BY query, dateMin, dateMax, builtDate
 `
+	selectSQL = fmt.Sprintf(selectSQL, strings.Join(timeBound, " AND "))
+
 	r := s.db.QueryRow(selectSQL, hash)
 
 	var dateMin, dateMax, builtDate, docMin, docMax *int64

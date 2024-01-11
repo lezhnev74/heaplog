@@ -10,7 +10,7 @@
         start = {{.FromMilli}}; // default query scope that we cannot leave
         end = {{.ToMilli}};
 
-        function startFetch({chart}) {
+        function startFetch({chart}, shouldNotRefreshResults) {
             const {min, max} = chart.scales.x;
             data = fetchData(min, max);
             chart.data.datasets[0].data = data
@@ -21,6 +21,21 @@
             }
             chart.stop(); // make sure animations are not running
             chart.update('none'); // <-- UPDATE
+
+
+            if (!shouldNotRefreshResults) {
+                // Reload the results in the main area with the new query scope:
+                url = "/cmd/page";
+                target = "#query_results";
+                htmx.ajax('GET', url, {
+                    target: target,
+                    values: {
+                        queryId: '{{.QueryId}}',
+                        from: Math.trunc(min),
+                        to: Math.trunc(max) + 1, // on server times are micro, so round up to the next milli for that
+                    }
+                })
+            }
         }
 
         function fetchData(x1, x2) {
@@ -30,7 +45,7 @@
                 url: '/query/{{.QueryId}}/aggregate',
                 data: {
                     from: Math.trunc(x1),
-                    to: Math.trunc(x2),
+                    to: Math.trunc(x2) + 1, // on server times are micro, so round up to the next milli for that
                     discretization: d,
                 },
                 success: function (r) {
@@ -136,7 +151,7 @@
 
         // cleanup previous instance
         c = new Chart(document.getElementById('plot'), config);
-        startFetch(c.$context) // initiate fetching data
+        startFetch(c.$context, true) // initiate fetching data
         $(window).resize(function () {
             var width = $("#plot").parent().width();
             var height = $("#plot").parent().height();
@@ -145,10 +160,15 @@
         });
 
         $("#plot_reset").click(function () {
+
+            if (c.options.scales.x.min == start && c.options.scales.x.max == end) {
+                return false;
+            }
+
             c.options.scales.x.min = start
             c.options.scales.x.max = end
             c.update('none')
-            startFetch({chart:c})
+            startFetch({chart: c})
 
             return false;
         });

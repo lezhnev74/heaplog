@@ -154,7 +154,7 @@ func TestBuildQuerySuccess(t *testing.T) {
 
 			time.Sleep(20 * time.Millisecond) // flush appenders
 
-			actualMessages, err := selector.storage.GetMessagePage(queryHash, 1000, 0)
+			actualMessages, err := selector.storage.GetMessagePage(queryHash, 1000, 0, nil, nil)
 			require.NoError(t, err)
 			require.EqualValues(t, len(tt.expectedMessages), len(actualMessages))
 
@@ -222,7 +222,7 @@ func TestQueryIdempotency(t *testing.T) {
 				time.Sleep(100 * time.Millisecond) // flush appenders
 			}
 
-			actualMessages, err := selector.storage.GetMessagePage(queryHash, 1000, 0)
+			actualMessages, err := selector.storage.GetMessagePage(queryHash, 1000, 0, nil, nil)
 			require.NoError(t, err)
 			require.EqualValues(t, len(tt.expectedMessages), len(actualMessages))
 

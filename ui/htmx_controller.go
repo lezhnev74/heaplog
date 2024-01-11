@@ -110,7 +110,7 @@ func (hc *HtmxController) CommandNew(c *fiber.Ctx) error {
 	// Render Page
 	var querySummary common.QuerySummary
 	for i := 0; i < 3; i++ {
-		querySummary, err = hc.happ.QuerySummary(queryId)
+		querySummary, err = hc.happ.QuerySummary(queryId, nil, nil)
 		if errors.Is(err, storage.ErrNoData) || querySummary.Total == 0 {
 			// wait a bit until matched messages are flushed to the storage
 			time.Sleep(100 * time.Millisecond)
@@ -128,7 +128,7 @@ func (hc *HtmxController) CommandNew(c *fiber.Ctx) error {
 			return &fiber.Error{Code: fiber.StatusOK, Message: err.Error()}
 		}
 	} else {
-		err = hc.putResultsPage(c.Response().BodyWriter(), queryId, querySummary, 0, input.Pagesize, true)
+		err = hc.putResultsPage(c.Response().BodyWriter(), queryId, querySummary, 0, input.Pagesize, nil, nil, true)
 		if err != nil {
 			return &fiber.Error{Code: fiber.StatusOK, Message: err.Error()}
 		}
@@ -146,7 +146,20 @@ func (hc *HtmxController) CommandPage(c *fiber.Ctx) error {
 	pageSize := c.QueryInt("pagesize", 100)
 	freshLoad := c.QueryBool("freshLoad", false)
 
-	querySummary, err := hc.happ.QuerySummary(queryId)
+	// Respect the sub-query scope
+	var from, to *time.Time
+	queryFrom := int64(c.QueryInt("from", -1))
+	if queryFrom > 0 {
+		t := time.UnixMilli(queryFrom)
+		from = &t
+	}
+	queryTo := int64(c.QueryInt("to", -1))
+	if queryTo > 0 {
+		t := time.UnixMilli(queryTo)
+		to = &t
+	}
+
+	querySummary, err := hc.happ.QuerySummary(queryId, from, to)
 	if err != nil {
 		return &fiber.Error{Code: fiber.StatusOK, Message: err.Error()}
 	}
@@ -158,7 +171,7 @@ func (hc *HtmxController) CommandPage(c *fiber.Ctx) error {
 			return &fiber.Error{Code: fiber.StatusOK, Message: err.Error()}
 		}
 	} else {
-		err = hc.putResultsPage(c.Response().BodyWriter(), queryId, querySummary, page, pageSize, freshLoad)
+		err = hc.putResultsPage(c.Response().BodyWriter(), queryId, querySummary, page, pageSize, from, to, freshLoad)
 		if err != nil {
 			return &fiber.Error{Code: fiber.StatusOK, Message: err.Error()}
 		}
@@ -174,7 +187,7 @@ func (hc *HtmxController) CommandPaginationCheckComplete(c *fiber.Ctx) error {
 	page := c.QueryInt("page", 0)
 	pageSize := c.QueryInt("pagesize", 100)
 
-	querySummary, err := hc.happ.QuerySummary(queryId)
+	querySummary, err := hc.happ.QuerySummary(queryId, nil, nil)
 	if err != nil {
 		return &fiber.Error{Code: fiber.StatusOK, Message: err.Error()}
 	}
@@ -227,10 +240,18 @@ func (hc *HtmxController) CommandPaginationCheckComplete(c *fiber.Ctx) error {
 }
 
 // page starts from 0
-func (hc *HtmxController) putResultsPage(out io.Writer, queryId string, querySummary common.QuerySummary, page int, pageSize int, loadTimeline bool) error {
+func (hc *HtmxController) putResultsPage(
+	out io.Writer,
+	queryId string,
+	querySummary common.QuerySummary,
+	page int,
+	pageSize int,
+	from, to *time.Time,
+	loadTimeline bool,
+) error {
 
 	// Read docs:
-	messages, err := hc.happ.QueryPage(queryId, page, pageSize)
+	messages, err := hc.happ.QueryPage(queryId, page, pageSize, from, to)
 	if err != nil {
 		return &fiber.Error{Code: fiber.StatusOK, Message: err.Error()}
 	}

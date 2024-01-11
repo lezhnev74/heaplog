@@ -90,8 +90,8 @@ func (h *Heaplog) NewQuery(text string, pageSize int, from *time.Time, to *time.
 	return
 }
 
-func (h *Heaplog) QuerySummary(id string) (common.QuerySummary, error) {
-	summary, err := h.storage.GetQuerySummary(id)
+func (h *Heaplog) QuerySummary(id string, from, to *time.Time) (common.QuerySummary, error) {
+	summary, err := h.storage.GetQuerySummary(id, from, to)
 	if err != nil {
 		err = xerrors.Errorf("query summary failed: %w", err)
 	}
@@ -106,8 +106,8 @@ func (h *Heaplog) AllQueriesSummaries() ([]common.QuerySummary, error) {
 	return summaries, err
 }
 
-func (h *Heaplog) QueryPage(id string, page int, pageSize int) ([][]byte, error) {
-	messageLocations, err := h.storage.GetMessagePage(id, pageSize, page)
+func (h *Heaplog) QueryPage(id string, page, pageSize int, from, to *time.Time) ([][]byte, error) {
+	messageLocations, err := h.storage.GetMessagePage(id, pageSize, page, from, to)
 	if err != nil {
 		err = xerrors.Errorf("query page failed: %w", err)
 		return nil, err
