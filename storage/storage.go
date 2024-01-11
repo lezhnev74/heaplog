@@ -703,7 +703,7 @@ func (s *Storage) EvictQueries() error {
 // GetQueriesSummaries returns summary for all queries in the DB
 func (s *Storage) GetQueriesSummaries() (summaries []common.QuerySummary, err error) {
 
-	selectSQL := "SELECT queryHash FROM queries ORDER BY lastRead DESC"
+	selectSQL := "SELECT queryHash FROM queries ORDER BY builtDate DESC"
 	r, err := s.db.Query(selectSQL)
 	if err != nil {
 		err = xerrors.Errorf("unable to read queries: %w", err)
