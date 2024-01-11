@@ -6,18 +6,21 @@ import (
 	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/filesystem"
 	"github.com/gofiber/template/html/v2"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/maps"
 	"heaplog/heaplog"
+	"io/fs"
 	"log"
 	"math"
+	"net/http"
 	"sort"
 	"time"
 )
 
-// //go:embed ../web_templates
-// var webTemplate embed.FS
+//go:embed web_templates/*
+var webTemplate embed.FS
 
 //go:embed web_static
 var webStatic embed.FS
@@ -44,9 +47,11 @@ func defaultErrorHandler(ctx *fiber.Ctx, err error) error {
 }
 
 func makeFiber(happ *heaplog.Heaplog, viewsDirectory string) *fiber.App {
-	// viewsEngine := html.NewFileSystem(ui.FS(webTemplate), ".html")
 
-	// todo: replace later with an embed static FS
+	// viewsEngine := html.New(viewsDirectory, ".gohtml")
+	subFS, _ := fs.Sub(webTemplate, "web_templates") // that is to not include the parent directory to the tpl paths
+	viewsEngine := html.NewFileSystem(http.FS(subFS), ".gohtml")
+
 	viewFuncs := map[string]any{
 		// extend the map in the first argument with values
 		"extendMap": func(m any, pairs ...any) (fiber.Map, error) {
@@ -75,25 +80,27 @@ func makeFiber(happ *heaplog.Heaplog, viewsDirectory string) *fiber.App {
 			return targetCopy, nil
 		},
 	}
-	viewsEngine := html.New(viewsDirectory, ".gohtml")
 	viewsEngine.AddFuncMap(viewFuncs)
-	viewsEngine.Reload(true)
 
 	app := fiber.New(fiber.Config{
-		Views:        viewsEngine,
-		ErrorHandler: defaultErrorHandler,
+		Views:                 viewsEngine,
+		ErrorHandler:          defaultErrorHandler,
+		DisableStartupMessage: true,
 	})
 
 	c := cors.ConfigDefault
 	c.ExposeHeaders = "*"
 	app.Use(cors.New(c))
 
-	// app.Use("/static", filesystem.New(filesystem.Config{
-	//	Root:       ui.FS(webStatic),
-	//	PathPrefix: "web_static",
-	//	Browse:     false,
-	// }))
-	app.Static("/static", "./ui/web_static")
+	app.Use("/static", filesystem.New(filesystem.Config{
+		Root:       http.FS(webStatic),
+		PathPrefix: "web_static",
+		Browse:     false,
+	}))
+
+	// DEBUGGING:
+	// app.Static("/static", "./ui/web_static")
+	// viewsEngine.Reload(true)
 
 	app.Get("/", func(c *fiber.Ctx) error {
 		// read existing old queries
@@ -200,5 +207,6 @@ func makeFiber(happ *heaplog.Heaplog, viewsDirectory string) *fiber.App {
 
 func StartWebServer(happ *heaplog.Heaplog, viewsDirectory string) {
 	app := makeFiber(happ, viewsDirectory)
+	log.Printf("Listening on port 8393")
 	log.Fatal(app.Listen(":8393"))
 }

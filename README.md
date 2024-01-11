@@ -1,10 +1,9 @@
 # Search For Local Log Files
 
-<div style="text-align:center;">
 ![Heaplog logo](Heaplog.png)
 
 [![Go](https://github.com/lezhnev74/heaplog/actions/workflows/go.yml/badge.svg)](https://github.com/lezhnev74/heaplog/actions/workflows/go.yml)
-</div>
+
 Heaplog is a program that runs in the background, scans and indexes your log files, and allows to search it via Web UI.
 It aims to take small disk space and allow fast searches using its query language (see below).
 
