@@ -301,8 +301,6 @@ func TestQueryAggregation(t *testing.T) {
 	segmentId, err := s.CheckInSegment(s1, []string{})
 	require.NoError(t, err)
 
-	time.Sleep(10 * time.Millisecond) // wait for the flush
-
 	// Make a query that matches all messages
 	queryText := "~.*"
 	queryHash := "abc"
@@ -312,6 +310,8 @@ func TestQueryAggregation(t *testing.T) {
 	for _, m := range segments[0].Messages {
 		s.CheckInQueryMessage(common.MatchedMessage{Id: m.Id, QueryHash: queryHash})
 	}
+
+	time.Sleep(30 * time.Millisecond) // wait for the flush
 
 	// Now make expectations on aggregated values
 	type expect struct {
@@ -376,7 +376,7 @@ func TestQueryAggregation(t *testing.T) {
 			testName: "bound hours",
 			unit:     "hour",
 			from:     test.MakeTimeV("2020-01-01 00:00:00.000000"),
-			to:       test.MakeTimeV("2020-01-02 00:00:00.000000"),
+			to:       test.MakeTimeV("2020-01-01 23:59:00.000000"),
 			expectedResult: map[int64]int64{
 				test.MakeTimeV("2020-01-01 00:00:00.000000").UnixMilli(): 8,
 				test.MakeTimeV("2020-01-01 01:00:00.000000").UnixMilli(): 3,

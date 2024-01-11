@@ -84,9 +84,6 @@ func (s *QuerySearch) NewQuery(
 	}
 	queryHash := common.HashString(fmt.Sprintf("%s%d%d", expr.Hash(), minDateMicro, maxDateMicro))
 
-	log.Printf("query %s: %s", queryHash, query)
-	log.Printf("query %s: [%v,%v]", minDate, maxDate)
-
 	// check if the query exists already
 	_, err = s.storage.GetQuerySummary(queryHash)
 	if err == nil {
