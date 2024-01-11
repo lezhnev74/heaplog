@@ -123,7 +123,10 @@ func (hc *HtmxController) CommandNew(c *fiber.Ctx) error {
 
 	if querySummary.Total == 0 {
 		// Empty result set:
-		err = hc.putFragment(c.Response().BodyWriter(), "query_results", "fragments/query_no_results", nil)
+		data := fiber.Map{
+			"RemoveTimeline": true,
+		}
+		err = hc.putFragment(c.Response().BodyWriter(), "query_results", "fragments/query_no_results", data)
 		if err != nil {
 			return &fiber.Error{Code: fiber.StatusOK, Message: err.Error()}
 		}
@@ -160,16 +163,14 @@ func (hc *HtmxController) CommandPage(c *fiber.Ctx) error {
 	}
 
 	querySummary, err := hc.happ.QuerySummary(queryId, from, to)
-	if err != nil {
-		return &fiber.Error{Code: fiber.StatusOK, Message: err.Error()}
-	}
-
-	if querySummary.Total == 0 {
+	if querySummary.Total == 0 || errors.Is(err, storage.ErrNoData) {
 		// Empty result set:
 		err = hc.putFragment(c.Response().BodyWriter(), "query_results", "fragments/query_no_results", nil)
 		if err != nil {
 			return &fiber.Error{Code: fiber.StatusOK, Message: err.Error()}
 		}
+	} else if err != nil {
+		return &fiber.Error{Code: fiber.StatusOK, Message: err.Error()}
 	} else {
 		err = hc.putResultsPage(c.Response().BodyWriter(), queryId, querySummary, page, pageSize, from, to, freshLoad)
 		if err != nil {
