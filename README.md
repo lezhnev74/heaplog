@@ -2,7 +2,7 @@
 
 ![Heaplog logo](Heaplog.jpg)
 
-// main branch build status
+[![Go](https://github.com/lezhnev74/heaplog/actions/workflows/go.yml/badge.svg)](https://github.com/lezhnev74/heaplog/actions/workflows/go.yml)
 
 Heaplog is a program that runs in the background, scans and indexes your log files, and allows to search it via Web UI.
 It aims to take small disk space and allow fast searches using its query language (see below).
