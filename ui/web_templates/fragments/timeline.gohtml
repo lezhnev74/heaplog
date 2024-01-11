@@ -1,7 +1,8 @@
 <div style="height:150px;position: relative;">
     <canvas id="plot"></canvas>
     <div style="text-align: right;">
-        <a href="#" class="text-muted" style="" id="plot_reset">reset zoom</a>
+        Mouse wheel to zoom.
+        <a href="#" class="text-muted" style="" id="plot_reset">Reset Zoom</a>
     </div>
 </div>
 <script>
@@ -21,7 +22,6 @@
             }
             chart.stop(); // make sure animations are not running
             chart.update('none'); // <-- UPDATE
-
 
             if (!shouldNotRefreshResults) {
                 // Reload the results in the main area with the new query scope:
@@ -91,6 +91,10 @@
             y: {
                 type: 'linear',
                 position: 'left',
+                ticks: {
+                    beginAtZero: true,
+                    callback: function(value) {if (value % 1 === 0) {return value;}}
+                }
             },
         };
         const zoomOptions = {
@@ -116,11 +120,9 @@
                     borderColor: "#000",
                     backgroundColor: "#000",
                     hoverBackgroundColor: "#999999",
-                    minBarLength: 5,
-                    // barThickness: 'flex', // 4
+                    minBarLength: 10,
+                    barThickness: 'flex',
                     maxBarThickness: 6,
-                    // categoryPercentage: 1.0,
-                    // barPercentage: 0.7,
                     grouped: true,
                     data: [],
                 }]
@@ -155,7 +157,6 @@
         $(window).resize(function () {
             var width = $("#plot").parent().width();
             var height = $("#plot").parent().height();
-            console.log(width);
             c.resize(width, height);
         });
 

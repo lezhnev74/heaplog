@@ -149,6 +149,11 @@
 
         // pre-process dates before sending:
         document.body.addEventListener('htmx:configRequest', function (evt) {
+            if(evt.detail.path != "/cmd/new") {
+                // only provide the below attribute for the form requests
+                return
+            }
+
             if ($("#query_from_input").val()) {
                 evt.detail.parameters['From'] = $("#query_from_input").val()
             }

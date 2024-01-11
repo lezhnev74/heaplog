@@ -275,9 +275,19 @@ func (hc *HtmxController) putResultsPage(
 		PagePrevExists = false
 	}
 
+	var fromMilli, toMilli int64
+	if from != nil {
+		fromMilli = from.UnixMilli()
+	}
+	if to != nil {
+		toMilli = to.UnixMilli()
+	}
+
 	PageData := fiber.Map{
 		// query:
-		"QueryId": queryId,
+		"QueryId":   queryId,
+		"FromMilli": fromMilli,
+		"ToMilli":   toMilli,
 		// results:
 		"PageSize":        pageSize,
 		"Pages":           pages,

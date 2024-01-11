@@ -139,16 +139,15 @@
     document.body.addEventListener('htmx:configRequest', function (evt) {
         // default pagesize if not given (load from the localstorage)
         if (!evt.detail.parameters.hasOwnProperty("pagesize")) {
-            console.log(evt)
             evt.detail.parameters["pagesize"] = localStorage.getItem("pagesize") || "100";
         }
     });
 
     htmx.on("htmx:beforeRequest", function(){
-        $("#load").show();
+        $("title").html($("title").html() + ' Loading...')
     });
     htmx.on("htmx:afterRequest", function(){
-        $("#load").hide();
+        $("title").html($("title").html().replace(/ Loading...$/, ''))
     });
 </script>
 </body>

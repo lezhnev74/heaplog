@@ -16,7 +16,7 @@
                     <li
                             class="page-item {{if .PagePrevExists}}{{else}}disabled{{end}}"
                             {{if .PagePrevExists}}
-                                hx-get="/cmd/page/?queryId={{.QueryId}}&page={{.PagePrev}}"
+                                hx-get="/cmd/page/?queryId={{.QueryId}}&page={{.PagePrev}}{{if .FromMilli}}&from={{.FromMilli}}{{end}}{{if .ToMilli}}&to={{.ToMilli}}{{end}}"
                             {{end}}
                     >
                         <a class="page-link" href="#">Previous</a>
@@ -29,7 +29,7 @@
                     <li
                             class="page-item {{if .PageNextExists}}{{else}}disabled{{end}}"
                             {{if .PageNextExists}}
-                                hx-get="/cmd/page/?queryId={{.QueryId}}&page={{.PageNext}}"
+                                hx-get="/cmd/page/?queryId={{.QueryId}}&page={{.PageNext}}{{if .FromMilli}}&from={{.FromMilli}}{{end}}{{if .ToMilli}}&to={{.ToMilli}}{{end}}"
                             {{end}}
                     >
                         <a class="page-link" href="#">Next</a>
@@ -46,7 +46,7 @@
                                 class="form-select"
                                 name="pagesize"
                                 id="pagesize"
-                                hx-get="/cmd/page/?queryId={{.QueryId}}&page=0"
+                                hx-get="/cmd/page/?queryId={{.QueryId}}{{if .FromMilli}}&from={{.FromMilli}}{{end}}{{if .ToMilli}}&to={{.ToMilli}}{{end}}"
                         >
                             <option value="10">10</option>
                             <option value="100">100</option>
