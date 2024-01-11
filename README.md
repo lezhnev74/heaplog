@@ -1,6 +1,6 @@
 # Search For Local Log Files
 
-![Heaplog logo](Heaplog.jpg)
+![Heaplog logo](Heaplog.png)
 
 [![Go](https://github.com/lezhnev74/heaplog/actions/workflows/go.yml/badge.svg)](https://github.com/lezhnev74/heaplog/actions/workflows/go.yml)
 
