@@ -117,10 +117,6 @@ Samples:
 | `!~error`                                                                     | Inversion of a regular expression.                                                                                                                      |
 | `report ~report\d+`                                                           | Combine exact match with the RE to use the index and improve search performance.                                                                        |
 
-## Design
-
-See more about design ideas in this blog post.
-
 ## Licence
 
 MIT
