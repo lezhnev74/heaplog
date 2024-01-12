@@ -43,9 +43,11 @@ type Storage struct {
 	// Checking In Segments:
 	termsDir *TermsDir
 
-	incomingSegmentTermsLastFlush time.Time
-	incomingSegmentTerms          chan appendSegmentTerm // row values for the appender
-	segmentTermsAppender          *duckdb.Appender
+	incomingSegmentTermsLastFlush     time.Time
+	incomingSegmentTermsLastFlushLock sync.RWMutex
+
+	incomingSegmentTerms chan appendSegmentTerm // row values for the appender
+	segmentTermsAppender *duckdb.Appender
 
 	incomingSegmentMessageLastFlush time.Time
 	incomingSegmentMessage          chan appendSegmentMessage // row values for the appender
@@ -387,8 +389,10 @@ WaitLoop:
 			tick.Stop()
 			break WaitLoop
 		case <-tick.C: // try every tick in case the system is under load
+			s.incomingSegmentTermsLastFlushLock.RLock()
 			messagesFlushed := len(segment.Messages) > 0 && now.After(s.incomingSegmentTermsLastFlush)
 			termsFlushed := len(terms) > 0 && now.After(s.incomingSegmentTermsLastFlush)
+			s.incomingSegmentTermsLastFlushLock.RUnlock()
 			if messagesFlushed && termsFlushed {
 				tick.Stop()
 				break WaitLoop
@@ -470,7 +474,9 @@ func (s *Storage) ingestSegmentTerms(flushInterval time.Duration) {
 			log.Printf("unable to ingest a segment term: %v", err)
 		}
 		lastFlushed = counter
+		s.incomingSegmentTermsLastFlushLock.Lock()
 		s.incomingSegmentTermsLastFlush = time.Now()
+		s.incomingSegmentTermsLastFlushLock.Unlock()
 	}
 
 	for {
