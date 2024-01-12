@@ -12,8 +12,10 @@ It aims to take small disk space and allow fast searches using its query languag
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [Query Language](#query-language)
-- [Design](#design)
+- [Design Ideas](#design)
 - [License](#licence)
+
+<a href="https://github.com/lezhnev74/heaplog/blob/main/HeaplogScreenshot.png"><img src="HeaplogScreenshot.png" style="width:400px;"></a>
 
 ## Installation
 
@@ -138,6 +140,15 @@ Samples:
 | `~.*`, `~error`, `~(error \d+)`                                               | `~` - **Regular Expression** operator. Everything after `~` is used as a regular expression. Matches against every messaged. It does not use the index. |
 | `!~error`                                                                     | Inversion of a regular expression.                                                                                                                      |
 | `report ~report\d+`                                                           | Combine exact match with the RE to use the index and improve search performance.                                                                        |
+
+## Access Control
+
+Heaplog does not include any access control features. That is by design. You could use it by tunneling its port to your local machine over SSH.
+Or use your existing app to authorize access and then redirect to Heaplog (example: via [nginx internal redirect](https://nginx.org/en/docs/http/ngx_http_internal_redirect_module.html)).
+
+## Design
+
+Read more details about how it works in [this blog post](https://lessthan12ms.com/heaplog.html).
 
 ## Licence
 
