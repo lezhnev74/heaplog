@@ -3,15 +3,28 @@
         <div class="col">
             Saved Queries (evict in 24h):
             <br><br>
-            {{range .}}
-                <div>
-                    <a href="/query/{{.QueryId}}">Open</a>
-                    <span style="background-color:gray; font-size:1rem;">{{.Query}}</span>
-                    <span class="text-muted" style="font-size:1rem;">{{if .From}}<br>From {{.From}}{{end}}</span>
-                    <span class="text-muted" style="font-size:1rem;">{{if .To}}<br>To {{.To}}{{end}}</span>
-                    <span class="text-muted" style="font-size:1rem;">{{.Count}} messages</span>
-                </div>
-            {{end}}
         </div>
     </div>
+
+    {{range .}}
+    <div class="row query_list">
+        <div class="col">
+                <div class="query_line">
+                    <a href="/query/{{.QueryId}}">Query {{.QueryId}}</a>,
+                    <span class="text-muted" style="font-size:1rem;"> found {{.Count}} messages</span>
+
+                    {{if .From}}
+                    <div class="text-muted" style="font-size:1rem;">From {{.From}}</div>
+                    {{end}}
+
+                    {{if .To}}
+                    <div class="text-muted" style="font-size:1rem;">To {{.To}}</div>
+                    {{end}}
+
+                    <pre>{{.Query}}</pre>
+                </div>
+
+        </div>
+    </div>
+    {{end}}
 </div>

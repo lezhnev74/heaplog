@@ -48,9 +48,12 @@ func defaultErrorHandler(ctx *fiber.Ctx, err error) error {
 
 func makeFiber(happ *heaplog.Heaplog, viewsDirectory string) *fiber.App {
 
-	// viewsEngine := html.New(viewsDirectory, ".gohtml")
 	subFS, _ := fs.Sub(webTemplate, "web_templates") // that is to not include the parent directory to the tpl paths
 	viewsEngine := html.NewFileSystem(http.FS(subFS), ".gohtml")
+
+	// DEBUGGING:
+	viewsEngine = html.New(viewsDirectory, ".gohtml")
+	viewsEngine.Reload(true)
 
 	viewFuncs := map[string]any{
 		// extend the map in the first argument with values
@@ -97,10 +100,6 @@ func makeFiber(happ *heaplog.Heaplog, viewsDirectory string) *fiber.App {
 		PathPrefix: "web_static",
 		Browse:     false,
 	}))
-
-	// DEBUGGING:
-	// app.Static("/static", "./ui/web_static")
-	// viewsEngine.Reload(true)
 
 	app.Get("/", func(c *fiber.Ctx) error {
 		// read existing old queries
