@@ -19,7 +19,29 @@ It aims to take small disk space and allow fast searches using its query languag
 
 ### Docker Image
 
-TODO
+The program comes as a docker image `lezhnev74/heaplog`.
+Here is a sample docker-compose config file:
+```yaml
+services:
+  heaplog:
+    image: lezhnev74/heaplog
+    working_dir: /app
+    volumes:
+      - /host/path/to/logs:/app/logs:ro
+      - /host/path/to/storage:/app/storage:rw
+      - ./heaplog.yml:/app/heaplog.yml:ro
+    entrypoint: ["/heaplog", "run"]
+    ports:
+      - 8393:8393
+```
+
+Assuming your `heaplog.yml` contains these lines:
+```yaml
+FilesGlobPattern: /app/logs/*.log # this is a path within docker image (see mounted volume) 
+StoragePath: /app/storage # this is a path within docker image (see mounted volume)
+```
+
+Now you can run the program with `docker-compose up heaplog` and access the UI at `http://localhost:8393`.
 
 ### Build From Source
 
