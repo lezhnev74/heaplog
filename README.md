@@ -7,6 +7,10 @@
 Heaplog is a program that runs in the background, scans and indexes your log files, and allows to search it via Web UI.
 It aims to take small disk space and allow fast searches using its query language (see below).
 
+It builds a small separate index (in its storage directory) from your files.
+It does not contain your log messages, only some meta information to help find where the messages are, 
+using your logs as "heapfiles" (hence the name). 
+
 **Table of content:**
 
 - [Installation](#installation)
@@ -23,6 +27,7 @@ It aims to take small disk space and allow fast searches using its query languag
 
 The program comes as a docker image `lezhnev74/heaplog`.
 Here is a sample docker-compose config file:
+
 ```yaml
 services:
   heaplog:
@@ -32,12 +37,13 @@ services:
       - /host/path/to/logs:/app/logs:ro
       - /host/path/to/storage:/app/storage:rw
       - ./heaplog.yml:/app/heaplog.yml:ro
-    entrypoint: ["/heaplog", "run"]
+    entrypoint: [ "/heaplog", "run" ]
     ports:
       - 8393:8393
 ```
 
 Assuming your `heaplog.yml` contains these lines:
+
 ```yaml
 FilesGlobPattern: /app/logs/*.log # this is a path within docker image (see mounted volume) 
 StoragePath: /app/storage # this is a path within docker image (see mounted volume)
@@ -132,19 +138,20 @@ Samples:
 | Query (UTF-8)                                                                 | Description                                                                                                                                             |
 |-------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `error`                                                                       | **Case-insensitive exact match**. Will find all messages with this sequence of bytes anywhere in it.                                                    |
-| `error failure`, the same as `failure error`, the same as `error AND failure` | Looks for the presence of both exact matches `error` and `failure`. `AND` operator is assumed for literals. **No order is preserved.**                  |
 | `"error failure"`, the same as `'error failure'`                              | Quoted exact match. Used to provide a literal with space-like symbols.                                                                                  |
+| `error failure`, the same as `failure error`, the same as `error AND failure` | Looks for the presence of both exact matches `error` and `failure`. `AND` operator is assumed for literals. **No order is preserved.**                  |
 | `error OR failure`, the same as `failure OR error`                            | OR-union for exact match.                                                                                                                               |
 | `(error failure) OR success`                                                  | Supports parenthesis to group literals.                                                                                                                 |
-| `!error`, `!(error OR failure)`                                               | Inversion of the query expression.                                                                                                                      |
+| `!error`, `!(error OR failure)`                                               | Inversion of the expression.                                                                                                                            |
 | `~.*`, `~error`, `~(error \d+)`                                               | `~` - **Regular Expression** operator. Everything after `~` is used as a regular expression. Matches against every messaged. It does not use the index. |
-| `!~error`                                                                     | Inversion of a regular expression.                                                                                                                      |
 | `report ~report\d+`                                                           | Combine exact match with the RE to use the index and improve search performance.                                                                        |
 
 ## Access Control
 
-Heaplog does not include any access control features. That is by design. You could use it by tunneling its port to your local machine over SSH.
-Or use your existing app to authorize access and then redirect to Heaplog (example: via [nginx internal redirect](https://nginx.org/en/docs/http/ngx_http_internal_redirect_module.html)).
+Heaplog does not include any access control features. That is by design. You could use it by tunneling its port to your
+local machine over SSH.
+Or use your existing app to authorize access and then redirect to Heaplog (example:
+via [nginx internal redirect](https://nginx.org/en/docs/http/ngx_http_internal_redirect_module.html)).
 
 ## Design
 

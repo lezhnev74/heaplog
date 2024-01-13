@@ -50,11 +50,9 @@ func makeFiber(happ *heaplog.Heaplog, viewsDirectory string) *fiber.App {
 
 	subFS, _ := fs.Sub(webTemplate, "web_templates") // that is to not include the parent directory to the tpl paths
 	viewsEngine := html.NewFileSystem(http.FS(subFS), ".gohtml")
-
 	// DEBUGGING:
-	viewsEngine = html.New(viewsDirectory, ".gohtml")
-	viewsEngine.Reload(true)
-
+	// viewsEngine = html.New(viewsDirectory, ".gohtml")
+	// viewsEngine.Reload(true)
 	viewFuncs := map[string]any{
 		// extend the map in the first argument with values
 		"extendMap": func(m any, pairs ...any) (fiber.Map, error) {
