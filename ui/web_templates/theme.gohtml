@@ -112,12 +112,21 @@
         }
     });
 
+    // Manage a WIP label:
+    isWIP = 0
     htmx.on("htmx:beforeRequest", function(){
-        $("title").html($("title").html() + ' Loading...')
+        isWIP++
+        $("title").html($("title").html() + ' Loading...');
     });
-    htmx.on("htmx:afterRequest", function(){
-        $("title").html($("title").html().replace(/ Loading...$/, ''))
+    htmx.on("htmx:afterSettle", function(){
+        isWIP--
     });
+    setInterval(function(){
+        if(isWIP > 0) {
+            return;
+        }
+        $("title").html($("title").html().replace(/ Loading...$/, ''));
+    }, 500)
 </script>
 </body>
 </html>
