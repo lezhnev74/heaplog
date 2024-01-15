@@ -21,6 +21,13 @@ using your logs as "heapfiles" (hence the name).
 
 <a href="https://github.com/lezhnev74/heaplog/blob/main/HeaplogScreenshot.png"><img src="HeaplogScreenshot.png" style="width:400px;"></a>
 
+## Features
+- Supports append-only files (logs and such).
+- Supports multi-line log messages.
+- Runs as a background service: exposes Web UI, runs indexing workers.
+- Modest on disk space (uses [DuckDB](https://duckdb.org/) + [FST](https://blog.burntsushi.net/transducers/) for terms).
+- UI timeline widget supports zooming in results.
+
 ## Installation
 
 ### Docker Image
