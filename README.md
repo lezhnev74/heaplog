@@ -27,6 +27,7 @@ using your logs as "heapfiles" (hence the name).
 - Runs as a background service: exposes Web UI, runs indexing workers.
 - Modest on disk space (uses [DuckDB](https://duckdb.org/) + [FST](https://blog.burntsushi.net/transducers/) for terms).
 - UI timeline widget supports zooming in results.
+- Query language supports fast exact matching as well as regular expressions. 
 
 ## Installation
 
