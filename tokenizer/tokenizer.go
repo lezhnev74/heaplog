@@ -6,6 +6,7 @@ import (
 	"heaplog/common"
 	"log"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode"
 )
@@ -14,6 +15,8 @@ var (
 	removeSymbols      = regexp.MustCompile(`[^\p{L}\p{N}]+`)
 	removeDoubleSpaces = regexp.MustCompile(`\s{2,}`)
 )
+
+type Tokenizer func(string, int, int) []string
 
 // Tokenize normalizes the input string (punctuations, diacritics,...)
 // Splits by spaces and produces tokens of sizes [minSize,maxSize]
@@ -44,9 +47,9 @@ func Tokenize(input string, minSize, maxSize int) []string {
 	return tokens
 }
 
-// TokenizeF works as Tokenize but do not use regexp and thus does not remove diacritics and is less "picky".
+// TokenizeS works as Tokenize but do not use regexp and thus does not remove diacritics and is less "picky".
 // It only uses string manipulations to greatly reduce the cost of the call.
-func TokenizeF(input string, minSize, maxSize int) []string {
+func TokenizeS(input string, minSize, maxSize int) []string {
 
 	if minSize <= 0 {
 		log.Fatalf("tokenizer min token size is set to %d", minSize)
@@ -62,14 +65,36 @@ func TokenizeF(input string, minSize, maxSize int) []string {
 	return tokens
 }
 
+// TokenizeS2 is an optimized TokenizeS
+func TokenizeS2(input string, minSize, maxSize int) []string {
+
+	if minSize <= 0 {
+		log.Fatalf("tokenizer min token size is set to %d", minSize)
+	}
+
+	input = strings.ToLower(input)
+	tokens := splitString(input, "\r\n!()-[]{};:'\"\\,<>./?@#$%^&*_~ ")
+	tokens = filterShortTokensInPlaceCutLongTokens(tokens, minSize, maxSize)
+	tokens = filterDuplicatedTokensInPlaceNoAlloc(tokens)
+
+	return tokens
+}
+
+func filterShortTokensInPlaceCutLongTokens(tokens []string, minSize, maxSize int) []string {
+	var x, l int
+	for _, t := range tokens {
+		l = len(t)
+		if l >= minSize {
+			tokens[x] = t[:min(maxSize, l)]
+			x++
+		}
+	}
+	return tokens[:x]
+}
+
 func splitString(s string, separators string) []string {
 	f := func(r rune) bool {
-		for _, s := range separators {
-			if r == s {
-				return true
-			}
-		}
-		return false
+		return strings.ContainsRune(separators, r)
 	}
 	return strings.FieldsFunc(s, f)
 
@@ -98,7 +123,7 @@ func removeDiacritics(input string) string {
 }
 
 func filterDuplicatedTokensInPlace(tokens []string) []string {
-	found := map[string]int{}
+	found := make(map[string]int, len(tokens))
 	for i, token := range tokens {
 		if _, ok := found[token]; !ok {
 			found[token] = i
@@ -111,6 +136,22 @@ func filterDuplicatedTokensInPlace(tokens []string) []string {
 		return ok
 	}
 	return common.FilterSliceInPlace(tokens, filter)
+}
+
+func filterDuplicatedTokensInPlaceNoAlloc(tokens []string) []string {
+	n := 0
+	for _, token := range tokens {
+
+		// binary search
+		exists := slices.Contains(tokens[:n], token)
+		if exists {
+			continue
+		}
+
+		tokens[n] = token
+		n++
+	}
+	return tokens[:n]
 }
 
 func filterShortTokensInPlace(tokens []string, minLen int) []string {

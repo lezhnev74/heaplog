@@ -19,8 +19,8 @@ import (
 
 func buildHeaplog(cfg Config) *heaplog.Heaplog {
 	maxTokenLen := 20
-	tokenizerFunc := func(input string) []string { return tokenizer.TokenizeF(input, 4, maxTokenLen) }
-	unboundTokenizerFunc := func(input string) []string { return tokenizer.TokenizeF(input, 1, maxTokenLen) }
+	tokenizerFunc := func(input string) []string { return tokenizer.TokenizeS2(input, 4, maxTokenLen) }
+	unboundTokenizerFunc := func(input string) []string { return tokenizer.TokenizeS2(input, 1, maxTokenLen) }
 
 	hl, err := heaplog.NewHeaplog(
 		cfg.StoragePath,

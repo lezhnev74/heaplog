@@ -4,8 +4,38 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/require"
 	"sort"
+	"strings"
 	"testing"
 )
+
+var tokens []string
+
+func BenchmarkTokenizers(b *testing.B) {
+	input := `
+There is no way to avoid or replace the hard work of thinking. When you write a test you are thinking about how to specify behavior. When you make the test pass you are thinking about how to implement that specification. When you refactor you are thinking about how to communicate both the specification and implementation to others.
+You cannot replace any of these thought processes with tools. You cannot generate the code from tests, or the tests from code, because that would cause you to abandon a critical thought process. And may God help you if you use a tool to do the refactoring for you.
+The purpose of a tool is to enable and facilitate thought; not to replace it.
+`
+	bigInput := strings.Repeat(input, 1)
+
+	benchmarks := []struct {
+		name      string
+		tokenizer func(input string, min, max int) []string
+	}{
+		{"Tokenize", Tokenize},
+		{"TokenizeS", TokenizeS},
+		{"TokenizeS2", TokenizeS2},
+	}
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			var lTokens []string
+			for i := 0; i < b.N; i++ {
+				lTokens = bm.tokenizer(bigInput, 4, 20)
+			}
+			tokens = lTokens
+		})
+	}
+}
 
 func TestTokenizer(t *testing.T) {
 
@@ -74,7 +104,7 @@ BING ADS response (recorded):
 	}
 }
 
-func TestTokenizerF(t *testing.T) {
+func TestTokenizerFx(t *testing.T) {
 
 	type test struct {
 		input                      string
@@ -124,13 +154,19 @@ BING ADS response (recorded):
 		},
 	}
 
-	for i, tt := range tests {
-		t.Run(fmt.Sprintf("test %d", i), func(t *testing.T) {
-			actualTokens := TokenizeF(tt.input, tt.minTokenSize, tt.maxTokenSize)
+	tokenizerFuncs := map[string]Tokenizer{
+		"TokenizeS":  TokenizeS,
+		"TokenizeS2": TokenizeS2,
+	}
 
-			sort.Strings(tt.expectedTokens)
-			sort.Strings(actualTokens)
-			require.Equal(t, tt.expectedTokens, actualTokens)
-		})
+	for i, tt := range tests {
+		for tn, tf := range tokenizerFuncs {
+			t.Run(fmt.Sprintf("test %d - %s", i, tn), func(t *testing.T) {
+				actualTokens := tf(tt.input, tt.minTokenSize, tt.maxTokenSize)
+				sort.Strings(tt.expectedTokens)
+				sort.Strings(actualTokens)
+				require.Equal(t, tt.expectedTokens, actualTokens)
+			})
+		}
 	}
 }
