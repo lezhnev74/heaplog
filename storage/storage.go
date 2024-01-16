@@ -63,7 +63,7 @@ type appendSegmentMessage struct {
 }
 type appendSegmentTerm struct {
 	tid uint32
-	sid uint64
+	sid uint32
 }
 
 func (s *Storage) GetDb() *sql.DB { return s.db }
@@ -291,7 +291,7 @@ func (s *Storage) UpdateTailMessage(messageId int, newLoc common.Location, terms
 	messageTids = messageTids[:x]
 
 	for _, messageTid := range messageTids {
-		s.incomingSegmentTerms <- appendSegmentTerm{messageTid, uint64(segmentId)}
+		s.incomingSegmentTerms <- appendSegmentTerm{messageTid, uint32(segmentId)}
 	}
 
 	return nil
@@ -377,7 +377,7 @@ func (s *Storage) CheckInSegment(segment common.IndexedSegment, terms []string) 
 		return segmentId, err
 	}
 	for _, tid := range tids {
-		s.incomingSegmentTerms <- appendSegmentTerm{tid, uint64(segmentId)}
+		s.incomingSegmentTerms <- appendSegmentTerm{tid, uint32(segmentId)}
 	}
 
 	// block and confirm both messages and terms are persisted...
@@ -1301,7 +1301,7 @@ func NewStorage(storagePath string, messageFlushTick time.Duration) (*Storage, e
 	duckOptions := map[string]string{
 		"memory_limit":               "1Gb",
 		"temp_directory":             storagePath,
-		"wal_autocheckpoint":         "1Gb",
+		"wal_autocheckpoint":         "100Mb",
 		"immediate_transaction_mode": "true",
 	}
 	duckFile += "?"

@@ -8,7 +8,7 @@ CREATE TABLE files
 CREATE SEQUENCE segment_ids;
 CREATE TABLE file_segments
 (
-    id       BIGINT NOT NULL, -- unique id of every segment
+    id       UINTEGER NOT NULL, -- unique id of every segment
     fileHash STRING NOT NULL, -- hash of the file path
     posFrom  BIGINT NOT NULL,
     posTo    BIGINT NOT NULL,
@@ -19,7 +19,7 @@ CREATE TABLE file_segments
 CREATE TABLE file_segments_messages
 (
     id         BIGINT NOT NULL,
-    segment_id BIGINT NOT NULL,
+    segment_id UINTEGER NOT NULL,
     posFrom    BIGINT NOT NULL,
     posTo      BIGINT NOT NULL,
     date       BIGINT NOT NULL,
@@ -32,8 +32,8 @@ CREATE TABLE file_segments_messages_tail
 
 CREATE TABLE file_segments_terms -- II
 (
-    term_id    BIGINT NOT NULL, -- unique id of every term (assigned in the Terms)
-    segment_id BIGINT NOT NULL, -- file_segments.id
+    term_id    UINTEGER NOT NULL, -- unique id of every term (assigned in the Terms)
+    segment_id UINTEGER   NOT NULL, -- file_segments.id
 );
 
 CREATE TABLE queries
