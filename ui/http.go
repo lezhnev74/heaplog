@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
 	"github.com/gofiber/template/html/v2"
@@ -92,6 +93,10 @@ func makeFiber(happ *heaplog.Heaplog, viewsDirectory string) *fiber.App {
 	c := cors.ConfigDefault
 	c.ExposeHeaders = "*"
 	app.Use(cors.New(c))
+	app.Use(compress.New())
+	// app.Use(cache.New(cache.Config{
+	// 	Expiration: 30 * time.Minute,
+	// }))
 
 	app.Use("/static", filesystem.New(filesystem.Config{
 		Root:       http.FS(webStatic),
