@@ -25,71 +25,33 @@ type TermsDir struct {
 	mainList   *TermsFileList
 	mergedList *TermsFileList
 
-	fsts      []*vellum.FST
-	maxTermId uint64
+	fsts []*vellum.FST
 }
 
 // Put must assign unique ids for all new terms, so it must synchronise access
-func (d *TermsDir) Put(terms []string) (ids []uint64, err error) {
-	ids = make([]uint64, 0, len(terms))
-	newTerms := make([]termId, 0, len(terms))
+func (d *TermsDir) Put(terms []string) (err error) {
 
-	// sync to allocate unique ids:
-	d.mainList.safeWrite(func() {
-		var (
-			tid uint64
-			ok  bool
-		)
-		for _, term := range terms {
-
-			// read term id
-			for _, tf := range d.mainList.files {
-				tid, ok, err = tf.fst.Get([]byte(term))
-				if ok {
-					break
-				}
-			}
-
-			if err != nil {
-				return
-			}
-			if ok {
-				// term exists, skip
-				ids = append(ids, tid)
-				continue
-			}
-
-			d.maxTermId++ // allocate a new unique id
-			newTerms = append(newTerms, termId{term, d.maxTermId})
-			ids = append(ids, d.maxTermId)
-		}
-	})
-	if err != nil {
-		return nil, xerrors.Errorf("failed to read a term: %w", err)
-	}
-
-	if len(newTerms) == 0 {
-		return // all terms are already in the system
+	if len(terms) == 0 {
+		return nil
 	}
 
 	// Build a new FST:
-
-	slices.SortFunc(newTerms, func(a, b termId) int { return cmp.Compare(a.term, b.term) }) // prepare for FST
+	slices.Sort(terms) // prepare for FST
 
 	buf := bytes.NewBuffer(nil)
 	b, err := vellum.New(buf, nil)
 	if err != nil {
-		return nil, xerrors.Errorf("failed FST: %w", err)
+		return xerrors.Errorf("failed FST: %w", err)
 	}
-	for _, n := range newTerms {
-		err = b.Insert([]byte(n.term), n.id)
+	for _, term := range terms {
+		err = b.Insert([]byte(term), 0)
 		if err != nil {
-			return nil, xerrors.Errorf("failed FST: %w", err)
+			return xerrors.Errorf("failed FST: %w", err)
 		}
 	}
 	err = b.Close()
 	if err != nil {
-		return nil, xerrors.Errorf("failed FST: %w", err)
+		return xerrors.Errorf("failed FST: %w", err)
 	}
 
 	err = d.newTermsFileFromFSTBytes(buf.Bytes())
@@ -101,7 +63,7 @@ func (d *TermsDir) Put(terms []string) (ids []uint64, err error) {
 }
 
 // All is only used in tests for assertion
-func (d *TermsDir) All() (all []termId, err error) {
+func (d *TermsDir) All() (all []string, err error) {
 	d.mainList.safeRead(func() {
 		var it vellum.Iterator
 		for _, tf := range d.mainList.files {
@@ -110,8 +72,8 @@ func (d *TermsDir) All() (all []termId, err error) {
 				return
 			}
 			for err == nil {
-				term, id := it.Current()
-				all = append(all, termId{string(term), id})
+				term, _ := it.Current()
+				all = append(all, string(term))
 				err = it.Next()
 			}
 			if errors.Is(err, vellum.ErrIteratorDone) {
@@ -122,7 +84,7 @@ func (d *TermsDir) All() (all []termId, err error) {
 	})
 
 	if err == nil {
-		slices.SortFunc(all, func(a, b termId) int { return cmp.Compare(a.term, b.term) })
+		slices.Sort(all)
 		all = slices.Compact(all)
 	}
 
@@ -196,6 +158,7 @@ func (d *TermsDir) Merge() error {
 		})
 	}
 
+	var maxTermId uint64
 	for {
 		tid, err := tree.Next()
 		if errors.Is(err, go_iterators.EmptyIterator) {
@@ -208,6 +171,7 @@ func (d *TermsDir) Merge() error {
 		if err != nil {
 			return xerrors.Errorf("merge fail: %w", err)
 		}
+		maxTermId = max(maxTermId, tid.id)
 	}
 
 	err = b.Close()
@@ -268,7 +232,7 @@ func (d *TermsDir) newTermsFileFromFSTBytes(buf []byte) error {
 	return nil
 }
 
-func (d *TermsDir) GetMatchedTermIds(match func(term string) bool) (ids []uint64, err error) {
+func (d *TermsDir) GetMatchedTermIds(match func(term string) bool) (terms []string, err error) {
 
 	fsts := make([]*vellum.FST, 0)
 	d.mainList.safeRead(func() {
@@ -284,9 +248,9 @@ func (d *TermsDir) GetMatchedTermIds(match func(term string) bool) (ids []uint64
 			return
 		}
 		for err == nil {
-			term, id := it.Current()
+			term, _ := it.Current()
 			if match(string(term)) {
-				ids = append(ids, id)
+				terms = append(terms, string(term))
 			}
 			err = it.Next()
 		}
@@ -295,10 +259,10 @@ func (d *TermsDir) GetMatchedTermIds(match func(term string) bool) (ids []uint64
 		}
 		it.Close()
 	}
-	slices.Sort(ids)
-	ids = slices.Compact(ids)
+	slices.Sort(terms)
+	terms = slices.Compact(terms)
 
-	return ids, nil
+	return terms, nil
 }
 
 func NewTermsDir(dir string) (*TermsDir, error) {
@@ -337,21 +301,6 @@ func NewTermsDir(dir string) (*TermsDir, error) {
 			len:  int64(len(fb)),
 			fst:  fst,
 		})
-	}
-
-	// find max id
-	for _, tf := range d.mainList.files {
-		it, err := tf.fst.Iterator(nil, nil)
-		if err != nil {
-			it.Close()
-			return nil, xerrors.Errorf("failed FST: %w", err)
-		}
-		for err == nil {
-			_, tid := it.Current()
-			d.maxTermId = max(d.maxTermId, tid)
-			err = it.Next()
-		}
-		it.Close()
 	}
 
 	return d, nil

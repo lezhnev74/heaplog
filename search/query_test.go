@@ -5,46 +5,59 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 	"heaplog/common"
+	"heaplog/indexer"
+	"heaplog/ingest"
+	"heaplog/scanner"
 	"heaplog/test"
+	"heaplog/tokenizer"
+	"os"
+	"regexp"
 	"slices"
 	"testing"
 	"time"
 )
 
-//
-// func TestQueryPerformance(t *testing.T) {
-//
-// 	storage, _, _ := test.PrepareServices(t)
-//
-// 	files := map[string]int64{
-// 		"/home/dmitry/Code/go/src/heaplog2/local/logs/500Mb.log": 500_000_000,
-// 	}
-// 	_, _, err := storage.CheckInFiles(files)
-// 	require.NoError(t, err)
-//
-// 	messageStartPattern := regexp.MustCompile(`(?m)^\[(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}\.?(\d{6}([+-]\d\d:\d\d)?)?)]`)
-// 	dateLayout := "2006-01-02T15:04:05.000000-07:00"
-// 	_scanner := scanner.NewScanner(dateLayout, messageStartPattern, 1_000_000, 50_000_000)
-//
-// 	tokenizerFunc := func(input string) []string {
-// 		return tokenizer.TokenizeF(input, 4, 40)
-// 	}
-// 	_indexer := indexer.NewIndexer(_scanner, tokenizerFunc)
-//
-// 	ingestor := ingest.NewIngestor(storage, _indexer, 50_000_000, 10)
-//
-// 	require.NoError(t, ingestor.Ingest())
-//
-// 	// _, unboundTokenizerFunc := test.PrepareTokenizers()
-// 	// _selector := NewSegmentSelector(storage, unboundTokenizerFunc, tokenizerFunc)
-// 	// querySearch := NewQuerySearch(_selector, _selector.storage, _scanner)
-// 	//
-// 	// _, c, err := querySearch.NewQuery("error !debug", nil, nil, 100)
-// 	// require.NoError(t, err)
-// 	// <-c
-//
-// 	time.Sleep(5 * time.Second)
-// }
+func TestQueryPerformance(t *testing.T) {
+
+	segmentSize := int64(50_000_000)
+
+	storage, _, storageRoot := test.PrepareServices(t, segmentSize)
+	defer os.Remove(storageRoot)
+
+	files := map[string]int64{
+		"/home/dmitry/Code/go/src/heaplog2/local/logs/5001.log": 1000_000_000,
+		// "/home/dmitry/Code/go/src/heaplog2/local/logs/5002.log": 2905976243,
+		// "/home/dmitry/Code/go/src/heaplog2/local/logs/5003.log":  2905976243,
+		// "/home/dmitry/Code/go/src/heaplog2/local/logs/5004.log":  2905976243,
+		// "/home/dmitry/Code/go/src/heaplog2/local/logs/5005.log":  2905976243,
+		// "/home/dmitry/Code/go/src/heaplog2/local/logs/500Mb.log": 2905976243,
+	}
+	_, _, err := storage.CheckInFiles(files)
+	require.NoError(t, err)
+
+	messageStartPattern := regexp.MustCompile(`(?m)^\[(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}\.?(\d{6}([+-]\d\d:\d\d)?)?)]`)
+	dateLayout := "2006-01-02T15:04:05.000000-07:00"
+	_scanner := scanner.NewScanner(dateLayout, messageStartPattern, 1_000_000, 50_000_000)
+
+	tokenizerFunc := func(input string) []string {
+		return tokenizer.TokenizeS2(input, 4, 40)
+	}
+	_indexer := indexer.NewIndexer(_scanner, tokenizerFunc)
+
+	ingestor := ingest.NewIngestor(storage, _indexer, segmentSize, 10)
+
+	require.NoError(t, ingestor.Ingest())
+
+	// _, unboundTokenizerFunc := test.PrepareTokenizers()
+	// _selector := NewSegmentSelector(storage, unboundTokenizerFunc, tokenizerFunc)
+	// querySearch := NewQuerySearch(_selector, _selector.storage, _scanner)
+	//
+	// _, c, err := querySearch.NewQuery("error !debug", nil, nil, 100)
+	// require.NoError(t, err)
+	// <-c
+
+	time.Sleep(5 * time.Second)
+}
 
 func TestBuildQuerySuccess(t *testing.T) {
 	selector, files := ingestFiles(t, 10)

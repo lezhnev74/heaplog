@@ -251,7 +251,7 @@ func (s *SegmentsSelector) selectTermSegments(
 	}
 
 	// the rest of the algorithm is done concurrently per-file
-	var similarTerms map[string][]uint64
+	var similarTerms map[string][]uint32
 	similarTerms, err = s.storage.ReadTermsLike(literals)
 	if err != nil {
 		return nil, xerrors.Errorf("select term segments: %w", err)

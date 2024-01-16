@@ -9,6 +9,7 @@ import (
 	"github.com/marcboeker/go-duckdb"
 	"golang.org/x/exp/maps"
 	"golang.org/x/xerrors"
+	"hash/crc32"
 	"heaplog/common"
 	"io"
 	"log"
@@ -28,6 +29,7 @@ import (
 var migrationFS embed.FS
 
 var ErrNoData error = xerrors.Errorf("no data available")
+var crc32c = crc32.MakeTable(crc32.Castagnoli)
 
 type Storage struct {
 	db *sql.DB // duckdb connection
@@ -60,7 +62,8 @@ type appendSegmentMessage struct {
 	isTail                                              bool
 }
 type appendSegmentTerm struct {
-	tid, sid uint64
+	tid uint32
+	sid uint64
 }
 
 func (s *Storage) GetDb() *sql.DB { return s.db }
@@ -223,7 +226,7 @@ func (s *Storage) ReadFileByHash(ds common.DataSourceHash) (path string, err err
 func (s *Storage) UpdateTailMessage(messageId int, newLoc common.Location, terms []string) error {
 	var (
 		segmentId, segmentPosTo int64
-		tid                     uint64
+		tid                     uint32
 	)
 
 	r := s.db.QueryRow(
@@ -254,13 +257,13 @@ func (s *Storage) UpdateTailMessage(messageId int, newLoc common.Location, terms
 	}
 
 	// 2. Checkin terms
-	messageTids, err := s.termsDir.Put(terms)
+	messageTids, err := s.checkInTerms(terms)
 	if err != nil {
 		return err
 	}
 
 	// 3. Add missing terms for the segment
-	segmentTids := make([]uint64, 0)
+	segmentTids := make([]uint32, 0)
 	rr, err := s.db.Query("SELECT term_id FROM file_segments_terms WHERE segment_id=?", segmentId)
 	if err != nil {
 		return err
@@ -369,9 +372,9 @@ func (s *Storage) CheckInSegment(segment common.IndexedSegment, terms []string) 
 	// it is a bottleneck as it is single threaded service, I could run N terms instances to parallel indexing.
 	// but it only is a problem for cold start, when a lot of segments are indexing concurrently,
 	// multiple instances management would be more complex anyway.
-	tids, err := s.termsDir.Put(terms)
+	tids, err := s.checkInTerms(terms)
 	if err != nil {
-		return segmentId, xerrors.Errorf("unable to check in segments: put terms: %w", err)
+		return segmentId, err
 	}
 	for _, tid := range tids {
 		s.incomingSegmentTerms <- appendSegmentTerm{tid, uint64(segmentId)}
@@ -921,7 +924,7 @@ func (s *Storage) GetSegments(segmentIds []int) ([]common.IndexedSegment, error)
 
 // ReadSegmentIdsFromTerms returns all segment Ids for the terms provided.
 // It filters out segments based on min/max segments.
-func (s *Storage) ReadSegmentIdsFromTerms(termIds []uint64, minSegment uint64, maxSegment uint64) (segments []uint64, err error) {
+func (s *Storage) ReadSegmentIdsFromTerms(termIds []uint32, minSegment uint64, maxSegment uint64) (segments []uint64, err error) {
 	if len(termIds) == 0 {
 		return segments, nil
 	}
@@ -1023,20 +1026,20 @@ func (s *Storage) ReadSegmentsInfo(segmentIds []int) ([]common.IndexedSegmentInf
 // Returns a map "rr"->["error","recurring",...]. (but with term ids)
 // This lookup is used during the 1st phase of query building, to expand the list of relevant terms.
 // The terms in the resulting map are not sorted, but they are deduplicated.
-func (s *Storage) ReadTermsLike(likeTerms []string) (map[string][]uint64, error) {
-	ret := make(map[string][]uint64)
+func (s *Storage) ReadTermsLike(likeTerms []string) (map[string][]uint32, error) {
+	ret := make(map[string][]uint32)
 	for _, lt := range likeTerms {
 		ret[lt] = nil
 	}
 
 	for _, lt := range likeTerms {
-		simIds, err := s.termsDir.GetMatchedTermIds(func(term string) bool {
+		simTerms, err := s.termsDir.GetMatchedTermIds(func(term string) bool {
 			return strings.Contains(term, lt) // <-- note that "similar" means "contains"
 		})
 		if err != nil {
 			return nil, xerrors.Errorf("read similar terms failed: %w", err)
 		}
-		ret[lt] = append(ret[lt], simIds...)
+		ret[lt] = append(ret[lt], s.hashTerms(simTerms)...)
 	}
 
 	return ret, nil
@@ -1238,6 +1241,27 @@ FROM query_results qr
 	}
 
 	return
+}
+
+// hashTerms uses crc32 to hash a term, so each term owns its identity, so we can remove uniqueness checks during ingestion).
+// btw, crc32 is well optimized on CPU instructions level and used in many dbs as hashing algo.
+// see https://hpi.de/fileadmin/user_upload/fachgebiete/plattner/publications/papers/martinboissier/hash_index_sap_hana_dexa.pdf
+func (s *Storage) hashTerms(terms []string) []uint32 {
+	tids := make([]uint32, len(terms))
+	for i, term := range terms {
+		tids[i] = crc32.Checksum([]byte(term), crc32c)
+	}
+	return tids
+}
+
+// checkInTerms is a non-blocking call during ingestion,
+// it dumps the terms to FST, and makes term ids via hashes
+func (s *Storage) checkInTerms(terms []string) ([]uint32, error) {
+	err := s.termsDir.Put(terms)
+	if err != nil {
+		return nil, xerrors.Errorf("check in terms failed: put terms: %w", err)
+	}
+	return s.hashTerms(terms), nil
 }
 
 func NewStorage(storagePath string, messageFlushTick time.Duration) (*Storage, error) {

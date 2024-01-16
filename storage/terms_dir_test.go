@@ -23,29 +23,24 @@ func TestMultiplePut(t *testing.T) {
 	termsDir, err := NewTermsDir(dir)
 	require.NoError(t, err)
 
-	ids1, err := termsDir.Put(terms1)
+	err = termsDir.Put(terms1)
 	require.NoError(t, err)
-	require.Equal(t, uint64(1), ids1[0])
-	require.Equal(t, uint64(2), ids1[1])
 
-	ids2, err := termsDir.Put(terms2)
+	err = termsDir.Put(terms2)
 	require.NoError(t, err)
-	require.Equal(t, uint64(3), ids2[0])
-	require.Equal(t, uint64(2), ids2[1])
-	require.Equal(t, uint64(4), ids2[2])
 
 	// 2. Read all terms: combine reading from 2 files
-	alltermIds, err := termsDir.All()
+	allTerms, err := termsDir.All()
 	require.NoError(t, err)
 
 	// 3. Assert all terms are returned, make sure ids are consistent
-	expectedTerms := []termId{
-		{"term0", 3},
-		{"term1", 1},
-		{"term2", 2},
-		{"term3", 4},
+	expectedTerms := []string{
+		"term0",
+		"term1",
+		"term2",
+		"term3",
 	}
-	require.Equal(t, expectedTerms, alltermIds)
+	require.Equal(t, expectedTerms, allTerms)
 }
 
 func TestGetMatching(t *testing.T) {
@@ -57,11 +52,11 @@ func TestGetMatching(t *testing.T) {
 	termsDir.Put([]string{"abc", "bce"}) // 1, 2
 	termsDir.Put([]string{"ce"})         // 3
 
-	matchIds, err := termsDir.GetMatchedTermIds(func(term string) bool {
+	matchTerms, err := termsDir.GetMatchedTermIds(func(term string) bool {
 		return strings.Contains(term, "ce")
 	})
 	require.NoError(t, err)
-	require.Equal(t, []uint64{2, 3}, matchIds)
+	require.Equal(t, []string{"bce", "ce"}, matchTerms)
 }
 
 func TestPutMerge(t *testing.T) {
@@ -80,10 +75,10 @@ func TestPutMerge(t *testing.T) {
 	termsDir, err := NewTermsDir(dir)
 	require.NoError(t, err)
 
-	_, err = termsDir.Put(terms1)
+	err = termsDir.Put(terms1)
 	require.NoError(t, err)
 
-	_, err = termsDir.Put(terms2)
+	err = termsDir.Put(terms2)
 	require.NoError(t, err)
 
 	// 2. Merge terms
@@ -95,11 +90,11 @@ func TestPutMerge(t *testing.T) {
 	// 3. Read again and make sure results are predictable
 	alltermIds, err := termsDir.All()
 	require.NoError(t, err)
-	expectedTerms := []termId{
-		{"term0", 3},
-		{"term1", 1},
-		{"term2", 2},
-		{"term3", 4},
+	expectedTerms := []string{
+		"term0",
+		"term1",
+		"term2",
+		"term3",
 	}
 	require.Equal(t, expectedTerms, alltermIds)
 }
