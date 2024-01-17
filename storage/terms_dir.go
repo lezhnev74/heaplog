@@ -1,13 +1,14 @@
 package storage
 
 import (
-	"bytes"
+	"bufio"
 	"cmp"
 	"errors"
 	"fmt"
 	"github.com/blevesearch/vellum"
 	go_iterators "github.com/lezhnev74/go-iterators"
 	"golang.org/x/xerrors"
+	"io"
 	"log"
 	"os"
 	"path"
@@ -30,36 +31,29 @@ type TermsDir struct {
 
 // Put must assign unique ids for all new terms, so it must synchronise access
 func (d *TermsDir) Put(terms []string) (err error) {
-
 	if len(terms) == 0 {
 		return nil
 	}
 
-	// Build a new FST:
-	slices.Sort(terms) // prepare for FST
-
-	buf := bytes.NewBuffer(nil)
-	b, err := vellum.New(buf, nil)
-	if err != nil {
-		return xerrors.Errorf("failed FST: %w", err)
-	}
-	for _, term := range terms {
-		err = b.Insert([]byte(term), 0)
+	return d.writeNewFile(func(w io.Writer) error {
+		// Build a new FST:
+		slices.Sort(terms) // prepare for FST
+		b, err := vellum.New(w, nil)
 		if err != nil {
 			return xerrors.Errorf("failed FST: %w", err)
 		}
-	}
-	err = b.Close()
-	if err != nil {
-		return xerrors.Errorf("failed FST: %w", err)
-	}
-
-	err = d.newTermsFileFromFSTBytes(buf.Bytes())
-	if err != nil {
-		err = xerrors.Errorf("failed to add a new fst file: %w", err)
-	}
-
-	return
+		for _, term := range terms {
+			err = b.Insert([]byte(term), 0)
+			if err != nil {
+				return xerrors.Errorf("failed FST: %w", err)
+			}
+		}
+		err = b.Close()
+		if err != nil {
+			return xerrors.Errorf("failed FST: %w", err)
+		}
+		return nil
+	})
 }
 
 // All is only used in tests for assertion
@@ -67,7 +61,11 @@ func (d *TermsDir) All() (all []string, err error) {
 	d.mainList.safeRead(func() {
 		var it vellum.Iterator
 		for _, tf := range d.mainList.files {
-			it, err = tf.fst.Iterator(nil, nil)
+			fst, err := vellum.Open(tf.path)
+			if err != nil {
+				return
+			}
+			it, err = fst.Iterator(nil, nil)
 			if err != nil {
 				return
 			}
@@ -80,6 +78,7 @@ func (d *TermsDir) All() (all []string, err error) {
 				err = nil
 			}
 			it.Close()
+			fst.Close()
 		}
 	})
 
@@ -116,71 +115,69 @@ func (d *TermsDir) Merge() error {
 		return nil // nothing to merge
 	}
 
-	// make new fst:
-	fstBuf := bytes.NewBuffer(nil)
-	b, err := vellum.New(fstBuf, nil)
-	if err != nil {
-		return xerrors.Errorf("merge fail: %w", err)
-	}
-
-	var totalTerms int
-	for _, tf := range mergeFiles {
-		totalTerms += tf.fst.Len()
-	}
-
-	tree := go_iterators.NewSliceIterator([]termId{})
-	defer tree.Close()
-	for _, tf := range mergeFiles {
-		it, err := tf.fst.Iterator(nil, nil)
-		if err != nil {
-			it.Close()
-			return xerrors.Errorf("merge fail: %w", err)
-		}
-
-		fileIt := go_iterators.NewCallbackIterator[termId](
-			func() (termId, error) {
-				if errors.Is(err, vellum.ErrIteratorDone) {
-					return termId{}, go_iterators.EmptyIterator
-				} else if err != nil {
-					return termId{}, err
-				}
-				tb, tv := it.Current()
-				stb := string(tb)
-				err = it.Next()
-				return termId{stb, tv}, nil
-			},
-			func() error {
-				return it.Close()
-			},
-		)
-		tree = go_iterators.NewUniqueSelectingIterator(tree, fileIt, func(a, b termId) int {
-			return cmp.Compare(a.term, b.term)
-		})
-	}
-
-	var maxTermId uint64
-	for {
-		tid, err := tree.Next()
-		if errors.Is(err, go_iterators.EmptyIterator) {
-			break
-		} else if err != nil {
-			return xerrors.Errorf("merge fail: %w", err)
-		}
-
-		err = b.Insert([]byte(tid.term), tid.id)
-		if err != nil {
-			return xerrors.Errorf("merge fail: %w", err)
-		}
-		maxTermId = max(maxTermId, tid.id)
-	}
-
-	err = b.Close()
-	if err != nil {
-		return xerrors.Errorf("failed FST: %w", err)
-	}
-
 	// update index:
-	err = d.newTermsFileFromFSTBytes(fstBuf.Bytes())
+	err := d.writeNewFile(func(w io.Writer) error {
+
+		// Build a selection tree from multiple FSTs:
+		tree := go_iterators.NewSliceIterator([]termId{})
+		defer tree.Close()
+
+		for _, tf := range mergeFiles {
+			fst, err := vellum.Open(tf.path)
+			if err != nil {
+				return xerrors.Errorf("merge fail: %w", err)
+			}
+			defer fst.Close()
+
+			it, err := fst.Iterator(nil, nil)
+			if err != nil {
+				return xerrors.Errorf("merge fail: %w", err)
+			}
+
+			fileIt := go_iterators.NewCallbackIterator[termId](
+				func() (termId, error) {
+					if errors.Is(err, vellum.ErrIteratorDone) {
+						return termId{}, go_iterators.EmptyIterator
+					} else if err != nil {
+						return termId{}, err
+					}
+					tb, tv := it.Current()
+					stb := string(tb)
+					err = it.Next()
+					return termId{stb, tv}, nil
+				},
+				func() error {
+					return it.Close()
+				},
+			)
+			tree = go_iterators.NewUniqueSelectingIterator(tree, fileIt, func(a, b termId) int {
+				return cmp.Compare(a.term, b.term)
+			})
+		}
+
+		// Stram to a new fst:
+		mergedFst, err := vellum.New(w, nil)
+		if err != nil {
+			return xerrors.Errorf("merge fail: %w", err)
+		}
+		defer mergedFst.Close()
+
+		for {
+			tid, err := tree.Next()
+			if errors.Is(err, go_iterators.EmptyIterator) {
+				break
+			} else if err != nil {
+				return xerrors.Errorf("merge fail: %w", err)
+			}
+
+			err = mergedFst.Insert([]byte(tid.term), tid.id)
+			if err != nil {
+				return xerrors.Errorf("merge fail: %w", err)
+			}
+		}
+
+		return nil
+	})
 	if err != nil {
 		err = xerrors.Errorf("failed to add a new fst file: %w", err)
 	}
@@ -206,38 +203,16 @@ func (d *TermsDir) Merge() error {
 	return nil
 }
 
-// internal method used in adding and merging terms as FST
-func (d *TermsDir) newTermsFileFromFSTBytes(buf []byte) error {
-	fst, err := vellum.Load(buf)
-	if err != nil {
-		return xerrors.Errorf("failed FST: %w", err)
-	}
-
-	// Write a file
-	filename := path.Join(d.dir, fmt.Sprintf("%d.fst", time.Now().UnixNano()))
-	err = os.WriteFile(filename, buf, 0666)
-	if err != nil {
-		return xerrors.Errorf("failed writing term file: %w", err)
-	}
-
-	// Insert to the main list:
-	d.mainList.safeWrite(func() {
-		d.mainList.putFile(&termsFile{
-			path: filename,
-			len:  int64(len(buf)),
-			fst:  fst,
-		})
-	})
-
-	return nil
-}
-
 func (d *TermsDir) GetMatchedTermIds(match func(term string) bool) (terms []string, err error) {
 
 	fsts := make([]*vellum.FST, 0)
 	d.mainList.safeRead(func() {
 		for _, tf := range d.mainList.files {
-			fsts = append(fsts, tf.fst)
+			fst, _ := vellum.Open(tf.path)
+			if err != nil {
+				return
+			}
+			fsts = append(fsts, fst)
 		}
 	})
 
@@ -258,11 +233,41 @@ func (d *TermsDir) GetMatchedTermIds(match func(term string) bool) (terms []stri
 			err = nil
 		}
 		it.Close()
+		fst.Close()
 	}
 	slices.Sort(terms)
 	terms = slices.Compact(terms)
 
 	return terms, nil
+}
+
+func (d *TermsDir) writeNewFile(writeF func(w io.Writer) error) error {
+	targetFilePath := path.Join(d.dir, fmt.Sprintf("%d.fst", time.Now().UnixNano()))
+	f, err := os.Create(targetFilePath)
+	if err != nil {
+		return xerrors.Errorf("terms: unable to put to a file: %w", err)
+	}
+	w := bufio.NewWriterSize(f, 4096*100)
+	defer func() {
+		_ = w.Flush()
+
+		var fStat os.FileInfo
+		fStat, err = f.Stat()
+		_ = f.Close()
+		if err != nil {
+			_ = os.Remove(targetFilePath)
+		} else {
+			// Insert to the main list:
+			d.mainList.safeWrite(func() {
+				d.mainList.putFile(&termsFile{
+					path: targetFilePath,
+					len:  fStat.Size(),
+				})
+			})
+		}
+	}()
+
+	return writeF(w)
 }
 
 func NewTermsDir(dir string) (*TermsDir, error) {
@@ -292,14 +297,9 @@ func NewTermsDir(dir string) (*TermsDir, error) {
 		if err != nil {
 			return nil, xerrors.Errorf("unable to read terms from %s: %w", fstFile, err)
 		}
-		fst, err := vellum.Load(fb)
-		if err != nil {
-			return nil, xerrors.Errorf("unable to load terms from %s: %w", fstFile, err)
-		}
 		d.mainList.putFile(&termsFile{
 			path: fstFile,
 			len:  int64(len(fb)),
-			fst:  fst,
 		})
 	}
 

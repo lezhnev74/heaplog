@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"github.com/blevesearch/vellum"
 	"slices"
 	"sync"
 )
@@ -12,8 +11,6 @@ type termsFile struct {
 	path string
 	// len is used in merging policy to merge the smallest files first
 	len int64
-	// associated FST is kept in-memory for quick lookups and merges
-	fst *vellum.FST
 }
 
 func (f *termsFile) safeRead(fn func()) {

@@ -49,8 +49,10 @@ func TestGetMatching(t *testing.T) {
 	termsDir, err := NewTermsDir(dir)
 	require.NoError(t, err)
 
-	termsDir.Put([]string{"abc", "bce"}) // 1, 2
-	termsDir.Put([]string{"ce"})         // 3
+	err = termsDir.Put([]string{"abc", "bce"}) // 1, 2
+	require.NoError(t, err)
+	err = termsDir.Put([]string{"ce"}) // 3
+	require.NoError(t, err)
 
 	matchTerms, err := termsDir.GetMatchedTermIds(func(term string) bool {
 		return strings.Contains(term, "ce")
