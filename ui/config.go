@@ -85,8 +85,11 @@ func LoadConfig(loadFile bool) (cfg Config) {
 
 	cfgValidate := validator.New()
 	err = cfgValidate.RegisterValidation("path_exists", func(fl validator.FieldLevel) bool {
-		cwd, _ := os.Getwd()
-		path := filepath.Join(cwd, fl.Field().String())
+		path := fl.Field().String()
+		if !filepath.IsAbs(path) {
+			cwd, _ := os.Getwd()
+			path = filepath.Join(cwd, path)
+		}
 		_, err := os.Stat(path)
 		return err == nil
 	})

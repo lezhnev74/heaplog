@@ -1269,7 +1269,7 @@ func (s *Storage) checkInTerms(terms []string) ([]uint32, error) {
 	return s.hashTerms(terms), nil
 }
 
-func NewStorage(storagePath string, messageFlushTick time.Duration) (*Storage, error) {
+func NewStorage(storagePath string, ingestFlushTick, searchFlushTick time.Duration) (*Storage, error) {
 	duckFile := filepath.Join(storagePath, "db.docs")
 
 	termsDirPath := filepath.Join(storagePath, "terms")
@@ -1323,7 +1323,7 @@ func NewStorage(storagePath string, messageFlushTick time.Duration) (*Storage, e
 		db: sql.OpenDB(connector),
 
 		termsDir:               termsDir,
-		appendersFlushInterval: messageFlushTick,
+		appendersFlushInterval: ingestFlushTick,
 	}
 
 	err = s.Migrate()
@@ -1355,7 +1355,7 @@ func NewStorage(storagePath string, messageFlushTick time.Duration) (*Storage, e
 	s.segmentMessagesTailsAppender = appender
 
 	s.incomingSegmentMessage = make(chan appendSegmentMessage)
-	go s.ingestSegmentMessages(messageFlushTick)
+	go s.ingestSegmentMessages(ingestFlushTick)
 
 	appender, err = duckdb.NewAppenderFromConn(conn, "", "file_segments_terms")
 	if err != nil {
@@ -1363,10 +1363,10 @@ func NewStorage(storagePath string, messageFlushTick time.Duration) (*Storage, e
 	}
 	s.segmentTermsAppender = appender
 	s.incomingSegmentTerms = make(chan appendSegmentTerm)
-	go s.ingestSegmentTerms(messageFlushTick)
+	go s.ingestSegmentTerms(ingestFlushTick)
 
 	s.incomingQueryMessages = make(chan common.MatchedMessage)
-	go s.ingestQueryMessages(time.Millisecond * 100)
+	go s.ingestQueryMessages(searchFlushTick)
 
 	return s, nil
 }

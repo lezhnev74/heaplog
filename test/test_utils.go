@@ -70,7 +70,7 @@ func PrepareServices(t *testing.T, segmentSize int64) (
 	indexer = _indexer
 
 	// DuckDB:
-	s, err = storage.NewStorage(storageRoot, time.Millisecond)
+	s, err = storage.NewStorage(storageRoot, time.Millisecond, time.Millisecond)
 	require.NoError(t, err)
 
 	return

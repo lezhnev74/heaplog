@@ -26,7 +26,7 @@ func TestItDiscoversFiles(t *testing.T) {
 	storageRoot, err := os.MkdirTemp("", "")
 	require.NoError(t, err)
 
-	storage, err := storage.NewStorage(storageRoot, time.Second)
+	_storage, err := storage.NewStorage(storageRoot, time.Second, time.Second)
 	require.NoError(t, err)
 
 	files := []string{
@@ -41,12 +41,12 @@ func TestItDiscoversFiles(t *testing.T) {
 	// 2. Call "discover"
 	discovery := NewDiscover(
 		[]string{fmt.Sprintf("%s/*.log", storageRoot)}, // glob
-		storage,
+		_storage,
 	)
 	require.NoError(t, discovery.DiscoverFiles())
 
 	// 3. See the files
-	actualFiles, err := storage.AllFiles()
+	actualFiles, err := _storage.AllFiles()
 	require.NoError(t, err)
 
 	actualFilenames := maps.Keys(actualFiles)
@@ -65,7 +65,7 @@ func TestItDiscoversFiles(t *testing.T) {
 	require.NoError(t, discovery.DiscoverFiles()) // + idempotency test
 
 	// 6. See the files
-	actualFiles, err = storage.AllFiles()
+	actualFiles, err = _storage.AllFiles()
 	require.NoError(t, err)
 
 	actualFilenames = maps.Keys(actualFiles)

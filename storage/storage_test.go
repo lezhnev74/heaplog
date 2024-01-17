@@ -20,7 +20,7 @@ func TestOpenStorage(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dirPath)
 
-	s, err := storage.NewStorage(dirPath, time.Millisecond)
+	s, err := storage.NewStorage(dirPath, time.Millisecond, time.Millisecond)
 	require.NoError(t, err)
 	require.NoError(t, s.Close())
 }
@@ -610,7 +610,7 @@ func prepareStorage(t *testing.T) (path string, s *storage.Storage) {
 	path, err := os.MkdirTemp("", "")
 	require.NoError(t, err)
 
-	s, err = storage.NewStorage(path, time.Millisecond)
+	s, err = storage.NewStorage(path, time.Millisecond, time.Millisecond)
 	require.NoError(t, err)
 
 	return

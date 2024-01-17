@@ -174,6 +174,7 @@ func initHeaplog(t *testing.T) *Heaplog {
 		dateLayout,
 		globs,
 		time.Millisecond,
+		time.Millisecond,
 		boundTokenizerFunc,
 		unboundTokenizerFunc,
 		80, // small segments will contain a single message

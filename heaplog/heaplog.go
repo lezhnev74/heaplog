@@ -29,12 +29,12 @@ func NewHeaplog(
 	messageStartPattern *regexp.Regexp,
 	dateLayout string,
 	globs []string,
-	flushMessagesEvery time.Duration, // its part
+	ingestFlushTick, searchFlushTick time.Duration, // its part
 	tokenizerFunc func(input string) []string,
 	unboundTokenizerFunc func(input string) []string,
 	indexSegmentSize int64,
 ) (*Heaplog, error) {
-	s, err := storage.NewStorage(storageRoot, flushMessagesEvery)
+	s, err := storage.NewStorage(storageRoot, ingestFlushTick, searchFlushTick)
 	if err != nil {
 		err = xerrors.Errorf("storage init failed: %w", err)
 		return nil, err
