@@ -27,7 +27,7 @@ func buildHeaplog(cfg Config) *heaplog.Heaplog {
 		regexp.MustCompile(cfg.MessageStartRE),
 		cfg.DateFormat,
 		strings.Split(cfg.FilesGlobPattern, ","),
-		time.Millisecond*100,
+		time.Millisecond*1_000,
 		tokenizerFunc,
 		unboundTokenizerFunc,
 		50_000_000,

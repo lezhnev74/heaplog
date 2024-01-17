@@ -95,7 +95,7 @@ func TestQuerySummary(t *testing.T) {
 		s.CheckInQueryMessage(common.MatchedMessage{Id: m.Id, QueryHash: queryHash})
 	}
 
-	time.Sleep(50 * time.Millisecond) // wait for the flush
+	time.Sleep(time.Millisecond * 100)
 
 	// 3.1 Test Full Summary (unbound)
 	summary, err := s.GetQuerySummary(queryHash, nil, nil)

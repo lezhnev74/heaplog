@@ -55,6 +55,8 @@ type Storage struct {
 	incomingSegmentMessage          chan appendSegmentMessage // row values for the appender
 	segmentMessagesAppender         *duckdb.Appender
 	segmentMessagesTailsAppender    *duckdb.Appender
+
+	appendersFlushInterval time.Duration
 }
 
 type appendSegmentMessage struct {
@@ -373,6 +375,7 @@ func (s *Storage) CheckInSegment(segment common.IndexedSegment, terms []string) 
 	if err != nil {
 		return segmentId, err
 	}
+
 	for _, tid := range tids {
 		s.incomingSegmentTerms <- appendSegmentTerm{tid, uint32(segmentId)}
 	}
@@ -381,17 +384,14 @@ func (s *Storage) CheckInSegment(segment common.IndexedSegment, terms []string) 
 	// that is to avoid data corruption on killing the app
 	now := time.Now()
 	tick := time.NewTicker(time.Millisecond * 10)
-	deadline := time.NewTimer(time.Millisecond * 50)
+	defer tick.Stop()
 WaitLoop:
 	for {
 		select {
-		case <-deadline.C: // maybe save for fast, and happened before we reached here, in this case wait a bit anyway
-			tick.Stop()
-			break WaitLoop
 		case <-tick.C: // try every tick in case the system is under load
 			s.incomingSegmentTermsLastFlushLock.RLock()
-			messagesFlushed := len(segment.Messages) > 0 && now.After(s.incomingSegmentTermsLastFlush)
-			termsFlushed := len(terms) > 0 && now.After(s.incomingSegmentTermsLastFlush)
+			messagesFlushed := len(segment.Messages) > 0 && s.incomingSegmentTermsLastFlush.After(now)
+			termsFlushed := len(terms) > 0 && s.incomingSegmentTermsLastFlush.After(now)
 			s.incomingSegmentTermsLastFlushLock.RUnlock()
 			if messagesFlushed && termsFlushed {
 				tick.Stop()
@@ -412,6 +412,10 @@ func (s *Storage) ingestSegmentMessages(flushInterval time.Duration) {
 
 	flushTick := time.Tick(flushInterval) // how often to flush the appender to the disk
 	flush := func() {
+		defer func() {
+			s.incomingSegmentMessageLastFlush = time.Now()
+		}()
+
 		if lastFlushed == counter {
 			return
 		}
@@ -427,7 +431,6 @@ func (s *Storage) ingestSegmentMessages(flushInterval time.Duration) {
 		}
 
 		lastFlushed = counter
-		s.incomingSegmentMessageLastFlush = time.Now()
 	}
 
 	// read the latest message id, to start from there:
@@ -437,7 +440,7 @@ func (s *Storage) ingestSegmentMessages(flushInterval time.Duration) {
 	err = r.Scan(&lastMessageId)
 	if err != nil {
 		lastMessageId = time.Now().UnixNano()
-		log.Printf("fail to read the max message id, revert to unixnano as a seed value")
+		log.Printf("fail to read the max message id, revert to unixnano as a seed value: %s", err)
 	}
 
 	for {
@@ -461,11 +464,7 @@ func (s *Storage) ingestSegmentMessages(flushInterval time.Duration) {
 				}
 			}
 
-			// occasionally flush the appender
 			counter++
-			if counter%1000 == 0 {
-				flush()
-			}
 		case <-flushTick:
 			flush()
 		}
@@ -481,6 +480,12 @@ func (s *Storage) ingestSegmentTerms(flushInterval time.Duration) {
 
 	flushTick := time.Tick(flushInterval) // how often to flush the appender to the disk
 	flush := func() {
+		defer func() {
+			s.incomingSegmentTermsLastFlushLock.Lock()
+			s.incomingSegmentTermsLastFlush = time.Now()
+			s.incomingSegmentTermsLastFlushLock.Unlock()
+		}()
+
 		if lastFlushed == counter {
 			return
 		}
@@ -490,9 +495,6 @@ func (s *Storage) ingestSegmentTerms(flushInterval time.Duration) {
 			log.Printf("unable to ingest a segment term: %v", err)
 		}
 		lastFlushed = counter
-		s.incomingSegmentTermsLastFlushLock.Lock()
-		s.incomingSegmentTermsLastFlush = time.Now()
-		s.incomingSegmentTermsLastFlushLock.Unlock()
 	}
 
 	for {
@@ -502,12 +504,7 @@ func (s *Storage) ingestSegmentTerms(flushInterval time.Duration) {
 			if err != nil {
 				log.Printf("unable to ingest a segment term: %v", err)
 			}
-
-			// occasionally flush the appender
 			counter++
-			if counter%1000 == 0 {
-				flush()
-			}
 		case <-flushTick:
 			flush()
 		}
@@ -864,12 +861,7 @@ func (s *Storage) ingestMessages(messageFlushTick time.Duration) {
 			if err != nil {
 				log.Printf("unable to ingest a message: %v", err)
 			}
-
-			// occasionally flush the appender
 			counter++
-			if counter%1000 == 0 {
-				flush()
-			}
 		case <-flushTick:
 			flush()
 		}
@@ -1330,7 +1322,8 @@ func NewStorage(storagePath string, messageFlushTick time.Duration) (*Storage, e
 	s := &Storage{
 		db: sql.OpenDB(connector),
 
-		termsDir: termsDir,
+		termsDir:               termsDir,
+		appendersFlushInterval: messageFlushTick,
 	}
 
 	err = s.Migrate()
@@ -1361,7 +1354,7 @@ func NewStorage(storagePath string, messageFlushTick time.Duration) (*Storage, e
 	}
 	s.segmentMessagesTailsAppender = appender
 
-	s.incomingSegmentMessage = make(chan appendSegmentMessage, 1_000)
+	s.incomingSegmentMessage = make(chan appendSegmentMessage)
 	go s.ingestSegmentMessages(messageFlushTick)
 
 	appender, err = duckdb.NewAppenderFromConn(conn, "", "file_segments_terms")
@@ -1369,7 +1362,7 @@ func NewStorage(storagePath string, messageFlushTick time.Duration) (*Storage, e
 		return nil, err
 	}
 	s.segmentTermsAppender = appender
-	s.incomingSegmentTerms = make(chan appendSegmentTerm, 100_000)
+	s.incomingSegmentTerms = make(chan appendSegmentTerm)
 	go s.ingestSegmentTerms(messageFlushTick)
 
 	s.incomingMessages = make(chan common.MatchedMessage)
