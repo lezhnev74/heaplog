@@ -430,7 +430,15 @@ func (s *Storage) ingestSegmentMessages(flushInterval time.Duration) {
 		s.incomingSegmentMessageLastFlush = time.Now()
 	}
 
-	lastMessageId := time.Now().UnixNano()
+	// read the latest message id, to start from there:
+	var lastMessageId int64
+	selectSql := `SELECT max(id) FROM file_segments_messages`
+	r := s.db.QueryRow(selectSql)
+	err = r.Scan(&lastMessageId)
+	if err != nil {
+		lastMessageId = time.Now().UnixNano()
+		log.Printf("fail to read the max message id, revert to unixnano as a seed value")
+	}
 
 	for {
 		select {
