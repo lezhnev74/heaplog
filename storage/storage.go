@@ -432,7 +432,7 @@ func (s *Storage) ingestSegmentMessages(flushInterval time.Duration) {
 
 	// read the latest message id, to start from there:
 	var lastMessageId int64
-	selectSql := `SELECT max(id) FROM file_segments_messages`
+	selectSql := `SELECT COALESCE(max(id), 0) FROM file_segments_messages`
 	r := s.db.QueryRow(selectSql)
 	err = r.Scan(&lastMessageId)
 	if err != nil {
