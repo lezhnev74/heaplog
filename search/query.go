@@ -207,7 +207,7 @@ func (s *QuerySearch) NewQuery(
 			matchedMessages := 0
 			for _, m := range segment.Messages {
 				sm := scanner.ScannedMessage{
-					Body:     segmentBuf[m.Loc.Min-si.From : m.Loc.Max-si.From],
+					Body:     segmentBuf[m.Loc.Min-si.From : m.Loc.Max-si.From], // position within the segment
 					Date:     nil,
 					Pos:      int(m.Loc.Min),
 					DateTime: m.Date,

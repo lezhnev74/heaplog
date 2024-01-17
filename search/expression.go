@@ -252,6 +252,7 @@ func (qe *Expression) getMatcher() func(string) bool {
 				// RE option:
 				// re := regexp.MustCompile(fmt.Sprintf("(?i)%s", regexp.QuoteMeta(o))) // exact match (case-insensitive)
 				// operandFunc = re.MatchString
+
 				// String option:
 				o = strings.ToLower(o)
 				operandFunc = func(s string) bool {

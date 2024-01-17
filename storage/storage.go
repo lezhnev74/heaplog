@@ -341,11 +341,8 @@ func (s *Storage) CheckInSegment(segment common.IndexedSegment, terms []string) 
 
 	// Ingest messages via an appender
 	for _, m := range segment.Messages {
-
-		messageId := time.Now().UnixNano()
-
 		s.incomingSegmentMessage <- appendSegmentMessage{
-			messageId,
+			0, // message id will be assigned during writing to the db
 			int64(segmentId),
 			m.Loc.Min,
 			m.Loc.Max,
@@ -433,9 +430,17 @@ func (s *Storage) ingestSegmentMessages(flushInterval time.Duration) {
 		s.incomingSegmentMessageLastFlush = time.Now()
 	}
 
+	lastMessageId := time.Now().UnixNano()
+
 	for {
 		select {
 		case m := <-s.incomingSegmentMessage:
+
+			// Assigning ids is happening here (a single goroutine) to prevent collisions.
+			// it simply increments by one for each new message, starting from some arbitrary value.
+			lastMessageId++
+			m.messageId = lastMessageId
+
 			err = s.segmentMessagesAppender.AppendRow(m.messageId, m.segmentId, m.locMin, m.locMax, m.dateUnixMicro)
 			if err != nil {
 				log.Printf("unable to ingest a segment message: %v", err)
