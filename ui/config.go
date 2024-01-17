@@ -23,6 +23,9 @@ type Config struct {
 	// the pattern of a date in a message
 	// see https://go.dev/src/time/format.go
 	DateFormat string `validate:"required" yaml:"DateFormat"`
+	// sets parallel degree of ingesting.
+	// defaults to the number of cores is omitted or 0.
+	IngestWorkers uint
 }
 
 var DefaultCfg = Config{

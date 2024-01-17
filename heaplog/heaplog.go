@@ -10,7 +10,6 @@ import (
 	"heaplog/storage"
 	"log"
 	"regexp"
-	"runtime"
 	"time"
 )
 
@@ -33,6 +32,7 @@ func NewHeaplog(
 	tokenizerFunc func(input string) []string,
 	unboundTokenizerFunc func(input string) []string,
 	indexSegmentSize int64,
+	ingestWorkers int,
 ) (*Heaplog, error) {
 	s, err := storage.NewStorage(storageRoot, ingestFlushTick, searchFlushTick)
 	if err != nil {
@@ -42,7 +42,7 @@ func NewHeaplog(
 
 	_scanner := scanner.NewScanner(dateLayout, messageStartPattern, 10_000_000, 100_000_000)
 	_indexer := indexer.NewIndexer(_scanner, tokenizerFunc)
-	ingestor := ingest.NewIngestor(s, _indexer, indexSegmentSize, runtime.NumCPU())
+	ingestor := ingest.NewIngestor(s, _indexer, indexSegmentSize, ingestWorkers)
 	discover := ingest.NewDiscover(globs, s)
 
 	_selector := search.NewSegmentSelector(s, unboundTokenizerFunc, tokenizerFunc)

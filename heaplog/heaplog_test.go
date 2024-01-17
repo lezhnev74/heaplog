@@ -7,6 +7,7 @@ import (
 	"heaplog/test"
 	"os"
 	"regexp"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -178,6 +179,7 @@ func initHeaplog(t *testing.T) *Heaplog {
 		boundTokenizerFunc,
 		unboundTokenizerFunc,
 		80, // small segments will contain a single message
+		runtime.NumCPU(),
 	)
 	require.NoError(t, err)
 

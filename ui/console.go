@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -21,6 +22,11 @@ func buildHeaplog(cfg Config) *heaplog.Heaplog {
 	maxTokenLen := 20
 	tokenizerFunc := func(input string) []string { return tokenizer.TokenizeS2(input, 4, maxTokenLen) }
 	unboundTokenizerFunc := func(input string) []string { return tokenizer.TokenizeS2(input, 1, maxTokenLen) }
+
+	ingestWorkers := int(cfg.IngestWorkers)
+	if ingestWorkers == 0 {
+		ingestWorkers = runtime.NumCPU()
+	}
 
 	hl, err := heaplog.NewHeaplog(
 		cfg.StoragePath,
@@ -32,6 +38,7 @@ func buildHeaplog(cfg Config) *heaplog.Heaplog {
 		tokenizerFunc,
 		unboundTokenizerFunc,
 		50_000_000,
+		ingestWorkers,
 	)
 
 	if err != nil {
@@ -54,6 +61,20 @@ var runCmd = &cobra.Command{
 	Short:  "Run heaplog daemon",
 	PreRun: allowConfigFlags,
 	Run: func(cmd *cobra.Command, args []string) {
+
+		// // -- Start Tracing
+		// traceFile, _ := os.Create("trace")
+		// trace.Start(traceFile)
+		// c := make(chan os.Signal, 1)
+		// signal.Notify(c, os.Interrupt)
+		// go func() {
+		// 	<-c
+		// 	trace.Stop()
+		// 	traceFile.Close()
+		// 	os.Exit(0)
+		// }()
+		// // -- End Tracing
+
 		hl := buildHeaplog(LoadConfig(true))
 		go hl.Background()
 
