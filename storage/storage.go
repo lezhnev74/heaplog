@@ -34,10 +34,10 @@ var crc32c = crc32.MakeTable(crc32.Castagnoli)
 type Storage struct {
 	db *sql.DB // duckdb connection
 
-	// incomingMessages come from the ingestion flow
-	incomingMessages chan common.MatchedMessage
-	// messageAppender accepts matched messages from the search flow
-	messageAppender *duckdb.Appender
+	// incomingQueryMessages come from the ingestion flow
+	incomingQueryMessages chan common.MatchedMessage
+	// queryMessageAppender accepts matched messages from the search flow
+	queryMessageAppender *duckdb.Appender
 
 	// this lock synchronises access to "files" table while check-ins
 	filesLock sync.Mutex
@@ -831,11 +831,11 @@ func (s *Storage) GetQuerySummary(hash string, from, to *time.Time) (common.Quer
 // that is for performance considerations.
 // A message is a link to a location in a file.
 func (s *Storage) CheckInQueryMessage(message common.MatchedMessage) {
-	s.incomingMessages <- message
+	s.incomingQueryMessages <- message
 }
 
-// ingestMessages waits for incoming data to flush to the storage via duckdb appender
-func (s *Storage) ingestMessages(messageFlushTick time.Duration) {
+// ingestQueryMessages waits for incoming data to flush to the storage via duckdb appender
+func (s *Storage) ingestQueryMessages(messageFlushTick time.Duration) {
 	var (
 		err                  error
 		counter, lastFlushed uint64
@@ -847,7 +847,7 @@ func (s *Storage) ingestMessages(messageFlushTick time.Duration) {
 			return
 		}
 
-		err = s.messageAppender.Flush()
+		err = s.queryMessageAppender.Flush()
 		if err != nil {
 			log.Printf("unable to ingest a message: %v", err)
 		}
@@ -856,8 +856,8 @@ func (s *Storage) ingestMessages(messageFlushTick time.Duration) {
 
 	for {
 		select {
-		case m := <-s.incomingMessages:
-			err = s.messageAppender.AppendRow(m.QueryHash, m.Id)
+		case m := <-s.incomingQueryMessages:
+			err = s.queryMessageAppender.AppendRow(m.QueryHash, m.Id)
 			if err != nil {
 				log.Printf("unable to ingest a message: %v", err)
 			}
@@ -1340,7 +1340,7 @@ func NewStorage(storagePath string, messageFlushTick time.Duration) (*Storage, e
 	if err != nil {
 		return nil, err
 	}
-	s.messageAppender = appender
+	s.queryMessageAppender = appender
 
 	appender, err = duckdb.NewAppenderFromConn(conn, "", "file_segments_messages")
 	if err != nil {
@@ -1365,8 +1365,8 @@ func NewStorage(storagePath string, messageFlushTick time.Duration) (*Storage, e
 	s.incomingSegmentTerms = make(chan appendSegmentTerm)
 	go s.ingestSegmentTerms(messageFlushTick)
 
-	s.incomingMessages = make(chan common.MatchedMessage)
-	go s.ingestMessages(messageFlushTick)
+	s.incomingQueryMessages = make(chan common.MatchedMessage)
+	go s.ingestQueryMessages(time.Millisecond * 100)
 
 	return s, nil
 }

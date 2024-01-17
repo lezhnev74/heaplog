@@ -50,12 +50,7 @@ func NewQuerySearch(
 // - if the error happened (the query is discarded and search stops)
 // - when the first page is ready (that is to help send results to the user early)
 // - when search is done and all results are available for reading.
-func (s *QuerySearch) NewQuery(
-	query string,
-	minDate,
-	maxDate *time.Time,
-	pageSize int,
-) (
+func (s *QuerySearch) NewQuery(query string, minDate, maxDate *time.Time, pageSize int) (
 	string,
 	<-chan QueryBuildingResult,
 	error,
