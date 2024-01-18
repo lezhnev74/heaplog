@@ -126,6 +126,7 @@ func (s *Storage) CheckInFiles(files map[string]int64) (obsoleteFiles []string, 
 	if err != nil {
 		return
 	}
+	defer r.Close()
 
 	for r.Next() {
 		err = r.Scan(&path)
@@ -270,6 +271,7 @@ func (s *Storage) UpdateTailMessage(messageId int, newLoc common.Location, terms
 	if err != nil {
 		return err
 	}
+	defer rr.Close()
 	for rr.Next() {
 		err = rr.Scan(&tid)
 		if err != nil {
@@ -535,6 +537,7 @@ func (s *Storage) AllSegmentIds(minDate, maxDate *time.Time) ([]int, error) {
 	if err != nil {
 		return nil, xerrors.Errorf("unable to read existing segments: %w", err)
 	}
+	defer r.Close()
 
 	var segmentId int
 	segmentIds := make([]int, 0, 100)
@@ -590,6 +593,7 @@ func (s *Storage) ReadIndexedLocations(fileHash common.DataSourceHash) ([]common
 	if err != nil {
 		return nil, xerrors.Errorf("unable to read existing file segments: %w", err)
 	}
+	defer r.Close()
 
 	indexedLocations := make([]common.Location, 0, 100)
 	for r.Next() {
@@ -642,6 +646,7 @@ func (s *Storage) GetMessagePage(queryHash string, pageSize, page int, from, to 
 		}
 		return nil, xerrors.Errorf("unable to read existing file segments: %w", err)
 	}
+	defer r.Close()
 
 	messages := make([]common.MatchedMessage, 0, pageSize)
 	var date int64
@@ -741,6 +746,7 @@ func (s *Storage) GetQueriesSummaries() (summaries []common.QuerySummary, err er
 		err = xerrors.Errorf("unable to read queries: %w", err)
 		return
 	}
+	defer r.Close()
 	var queryHash string
 	for r.Next() {
 		r.Scan(&queryHash)
@@ -890,6 +896,7 @@ func (s *Storage) GetSegments(segmentIds []int) ([]common.IndexedSegment, error)
 	if err != nil {
 		return nil, err
 	}
+	defer r.Close()
 
 	var (
 		lastSegmentId, segmentId, messageId int64
@@ -942,6 +949,7 @@ func (s *Storage) ReadSegmentIdsFromTerms(termIds []uint32, minSegment uint64, m
 	if err != nil {
 		return nil, fmt.Errorf("select term segments fail: %w", err)
 	}
+	defer r.Close()
 
 	var segmentId uint64
 	for r.Next() {
@@ -1001,6 +1009,7 @@ func (s *Storage) ReadSegmentsInfo(segmentIds []int) ([]common.IndexedSegmentInf
 	if err != nil {
 		return nil, err
 	}
+	defer r.Close()
 
 	var (
 		segmentId, dateMin, dateMax, posFrom, posTo, messages int64
@@ -1234,6 +1243,7 @@ FROM query_results qr
 		err = xerrors.Errorf("unable to aggregate message rows: %w", err)
 		return
 	}
+	defer r.Close()
 
 	timeline = make(map[int64]int64)
 	var (

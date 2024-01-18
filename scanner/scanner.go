@@ -7,6 +7,7 @@ import (
 	"io"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -43,6 +44,11 @@ type Scanner struct {
 	// if no message found it will read again and again until a message found or maxBufSize reached.
 	// After each read it runs a RE to find the next message start.
 	readSize, maxBufSize int
+
+	// buffers are used in concurrent environment.
+	// allows reusing memory for multiple reads
+	buffers     [][]byte
+	buffersLock sync.Mutex
 }
 
 func NewScanner(
@@ -87,18 +93,34 @@ func (sc *Scanner) Scan(
 	src io.Reader,
 	found func(message *ScannedMessage) (shouldStop bool), // call on each found message, if returns false -> iteration stops
 ) error {
-	// Allocate a buffer for copying data From the reader
-	buf := make([]byte, sc.readSize)
+	// The read buffer is reusable, bellow snippet manages that part:
+	var buf []byte
+	sc.buffersLock.Lock()
+	if len(sc.buffers) > 0 {
+		buf, sc.buffers = sc.buffers[0], sc.buffers[1:]
+	} else {
+		buf = make([]byte, sc.readSize)
+	}
+	sc.buffersLock.Unlock()
+	buf = buf[:sc.readSize] // reset a reusable buffer
+	defer func() {
+		sc.buffersLock.Lock()
+		sc.buffers = append(sc.buffers, buf)
+		sc.buffersLock.Unlock()
+	}()
+	// end buffer management
 
-	// workable area is buf's area that contains unprocessed data
-	var msgStartPos, // last detected message start in the workable area
+	var (
+		// workable area is buf's area that contains unprocessed data
+		msgStartPos, // last detected message start in the workable area
 		msgStartMatchEnd, // detected msg's pattern match end
 		dateStartPos, // last message's date start relatively to the message
 		dateStartMatchEnd, // last message's date end relatively to the message
 		bufLen, // len of workable area
 		bytesProcessed, // bytes that were processed before the workable area
 		msgsProcessed, readBytes int
-	var detectedMessage *ScannedMessage
+		detectedMessage *ScannedMessage
+	)
 
 	// 1. Read initial data To the buffer
 	bufLen, err := src.Read(buf)

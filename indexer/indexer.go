@@ -27,10 +27,7 @@ func NewIndexer(scanner *scanner.Scanner, tokenizer func(string) []string) *Inde
 // IndexSegment analyzes all messages within one location in the stream
 // It returns the indexed segment aligned to message boundaries (even if extends originally given location)
 // Location is related to the stream.
-func (indexer *Indexer) IndexSegment(
-	stream io.ReadSeeker,
-	location common.Location,
-) (
+func (indexer *Indexer) IndexSegment(stream io.ReadSeeker, location common.Location) (
 	segment common.IndexedSegment,
 	terms []string,
 	err error,
