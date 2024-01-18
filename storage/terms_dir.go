@@ -9,7 +9,6 @@ import (
 	go_iterators "github.com/lezhnev74/go-iterators"
 	"golang.org/x/xerrors"
 	"io"
-	"log"
 	"os"
 	"path"
 	"slices"
@@ -101,8 +100,6 @@ func (d *TermsDir) Cleanup() error {
 }
 
 func (d *TermsDir) Merge() error {
-
-	t1 := time.Now()
 
 	// select files:
 	mergeFiles := make([]*termsFile, 10)
@@ -197,8 +194,6 @@ func (d *TermsDir) Merge() error {
 			}
 		}
 	})
-
-	log.Printf("merged %d terms files in %s", len(mergeFiles), time.Now().Sub(t1).String())
 
 	return nil
 }

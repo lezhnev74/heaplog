@@ -12,6 +12,7 @@ import (
 	"log"
 	"sync"
 	"time"
+	"unsafe"
 )
 
 var (
@@ -101,7 +102,8 @@ func (s *QuerySearch) NewQuery(query string, minDate, maxDate *time.Time, pageSi
 			return false
 		}
 
-		return bodyMatcher(string(sm.Body))
+		bodyString := unsafe.String(unsafe.SliceData(sm.Body), len(sm.Body))
+		return bodyMatcher(bodyString)
 	}
 
 	err = s.storage.CheckInQuery(queryHash, query, minDate, maxDate)

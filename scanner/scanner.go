@@ -5,12 +5,12 @@ import (
 	"github.com/araddon/dateparse"
 	"golang.org/x/xerrors"
 	"io"
-	"log"
 	"regexp"
 	"strings"
 	"time"
 	"unicode"
 	"unicode/utf8"
+	"unsafe"
 )
 
 /*
@@ -26,11 +26,12 @@ var (
 )
 
 type ScannedMessage struct {
-	Body, Date []byte
-	Pos        int // position in the stream
-	DateTime   time.Time
-	IsTail     bool // sets to true if message ended with EOF
-	Err        error
+	Body, Date       []byte
+	Pos, Len         int // body in the stream
+	DateFrom, DateTo int // [from,to) in the body
+	DateTime         time.Time
+	IsTail           bool // sets to true if message ended with EOF
+	Err              error
 }
 
 type Scanner struct {
@@ -57,77 +58,82 @@ func NewScanner(
 	}
 }
 
-func (sc *Scanner) newError(err error) *ScannedMessage { return &ScannedMessage{Err: err} }
-
-func (sc *Scanner) newMessage(body []byte, pos int, date []byte, isTail bool) *ScannedMessage {
-	d, err := sc.parseDate(date)
+func (sc *Scanner) newMessage(body []byte, pos int, dateFrom, dateTo int, isTail bool) (*ScannedMessage, error) {
+	// avoid allocation for the date string:
+	dateSlice := body[dateFrom:dateTo]
+	dateString := unsafe.String(unsafe.SliceData(dateSlice), len(dateSlice))
+	d, err := time.Parse(sc.dateLayout, dateString)
 	if err != nil {
-		return sc.newError(xerrors.Errorf("date parsing fail: %w", err))
+		return nil, xerrors.Errorf("date parsing fail: %w", err)
 	}
 
 	return &ScannedMessage{
-		Body:     append([]byte{}, body...), // body must be copied as it points to the shared buf
-		Date:     date,                      // while the Date is copied already to a dedicated buf
+		// note that the body and the date are pointing to the shared buf
+		// must be used before the scanner moves on and reuses the buffer for other data
+		Body: body,
+		Date: dateSlice,
+
+		DateFrom: dateFrom,
+		DateTo:   dateTo,
 		Pos:      pos,
+		Len:      len(body),
 		DateTime: d,
 		IsTail:   isTail,
-	}
+	}, nil
 }
 
-// parseDate is a configured function that recognizes formatted date string
-func (sc *Scanner) parseDate(date []byte) (time.Time, error) {
-	return time.Parse(sc.dateLayout, string(date))
-}
-
-// scan is the main code that extracts messages. It is meant to be called in a separate goroutine.
-// a function is provided to stop the execution earlier.
-func (sc *Scanner) scan(
+// Scan is the main code that extracts messages.
+func (sc *Scanner) Scan(
 	src io.Reader,
-	messages chan<- *ScannedMessage,
-	shouldStop func(*ScannedMessage) bool,
-) {
-	defer close(messages)
+	found func(message *ScannedMessage) (shouldStop bool), // call on each found message, if returns false -> iteration stops
+) error {
 	// Allocate a buffer for copying data From the reader
 	buf := make([]byte, sc.readSize)
 
 	// workable area is buf's area that contains unprocessed data
 	var msgStartPos, // last detected message start in the workable area
 		msgStartMatchEnd, // detected msg's pattern match end
+		dateStartPos, // last message's date start relatively to the message
+		dateStartMatchEnd, // last message's date end relatively to the message
 		bufLen, // len of workable area
 		bytesProcessed, // bytes that were processed before the workable area
-		msgsProcessed int
+		msgsProcessed, readBytes int
+	var detectedMessage *ScannedMessage
 
 	// 1. Read initial data To the buffer
 	bufLen, err := src.Read(buf)
 	if bufLen == 0 && err != nil { // (bufLen == 0 and err == nil)?
-		messages <- sc.newError(err)
-		return
+		return err
 	}
 
 	// 2. Find the start of a message in the workable space
 	m := sc.messageStart.FindSubmatchIndex(buf[:bufLen])
 	if m == nil {
 		err = xerrors.Errorf("%w: checked %d bytes", NoMessageStartFound, bufLen)
-		messages <- sc.newError(err)
-		return
+		return err
 	}
 	msgStartPos, msgStartMatchEnd = m[0], m[1]
-	msgDate := append([]byte{}, buf[m[2]:m[3]]...)
+	dateStartPos, dateStartMatchEnd = m[2]-m[0], m[3]-m[0]
+	// msgDate := append([]byte{}, buf[m[2]:m[3]]...)
 	for {
 		// Find the start of a message since msgStart+msgStartMatchEnd
 		m = sc.messageStart.FindSubmatchIndex(buf[msgStartMatchEnd:bufLen])
 		if m != nil {
-			detectedMessage := sc.newMessage(
+			detectedMessage, err = sc.newMessage(
 				buf[msgStartPos:msgStartMatchEnd+m[0]],
 				bytesProcessed+msgStartPos,
-				msgDate,
+				dateStartPos,
+				dateStartMatchEnd,
 				false,
 			)
-			if shouldStop(detectedMessage) {
-				return // halt scanning BEFORE returning a message
+			if err != nil {
+				return xerrors.Errorf("message make: %w", err)
 			}
-			messages <- detectedMessage                                                     // found
-			msgDate = append([]byte{}, buf[msgStartMatchEnd+m[2]:msgStartMatchEnd+m[3]]...) // copy Date
+			if found(detectedMessage) { // should stop?
+				return nil // halt scanning BEFORE returning a message
+			}
+
+			dateStartPos, dateStartMatchEnd = m[2]-m[0], m[3]-m[0]
 			msgStartPos, msgStartMatchEnd = msgStartMatchEnd+m[0], msgStartMatchEnd+m[1]
 			msgsProcessed++
 			continue
@@ -146,10 +152,7 @@ func (sc *Scanner) scan(
 		if bufLen == cap(buf) {
 			// respect max buf size
 			if len(buf) >= sc.maxBufSize {
-				err = xerrors.Errorf("%w: %d bytes (consider increasing the max buffer size)", MaxBufSizeReached, sc.maxBufSize)
-				log.Printf("%v", err)
-				messages <- sc.newError(err)
-				return
+				return xerrors.Errorf("%w: %d bytes (consider increasing the max buffer size)", MaxBufSizeReached, sc.maxBufSize)
 			}
 			// Extend the buf
 			buf2 := make([]byte, len(buf)+sc.readSize)
@@ -157,45 +160,44 @@ func (sc *Scanner) scan(
 			buf = buf2
 		}
 		// try To extend the workable area with new data
-		readBytes, err := src.Read(buf[bufLen:])
+		readBytes, err = src.Read(buf[bufLen:])
 		if readBytes == 0 && err == io.EOF { // (bufLen == 0 and err == nil)?
 			// here if EOF found it will be used as the right ScannedMessage boundary,
 			// however if the writing is not atomic, we could only capture part of the ScannedMessage
 			// due To seeing EOF between writes
-			lastMessage := sc.newMessage(buf[msgStartPos:bufLen], bytesProcessed+msgStartPos, msgDate, true)
-			if shouldStop(lastMessage) {
-				return // halt scanning BEFORE returning a message
+			detectedMessage, err = sc.newMessage(
+				buf[msgStartPos:bufLen],
+				bytesProcessed+msgStartPos,
+				dateStartPos,
+				dateStartMatchEnd,
+				true,
+			)
+			if err != nil {
+				return xerrors.Errorf("message make: %w", err)
 			}
-			messages <- lastMessage // found
+			if found(detectedMessage) { // should stop?
+				return nil // halt scanning BEFORE returning a message
+			}
 			msgsProcessed++
-			return
+			return nil
 		}
 		bufLen += readBytes
 		continue
 	}
 }
 
-// ScanAllMessages reads out all data From the reader and returns matching messages
-// it uses messageStart To delimit messages in the stream
-// it stops when no more bytes available in the reader
-func (sc *Scanner) ScanAllMessages(s io.Reader) <-chan *ScannedMessage {
-	messages := make(chan *ScannedMessage)
-
-	// Start a go-routine To keep reading From the reader and finding messages
-	go sc.scan(s, messages, func(*ScannedMessage) bool { return false })
-
-	return messages
-}
-
-// ScanMessagesCond does the same as ScanAllMessages but has a mean to stop scanning
-// this is used when only a part of the stream must be scanned.
-func (sc *Scanner) ScanMessagesCond(s io.Reader, shouldStop func(*ScannedMessage) bool) <-chan *ScannedMessage {
-	messages := make(chan *ScannedMessage)
-
-	// Start a go-routine To keep reading From the reader and finding messages
-	go sc.scan(s, messages, shouldStop)
-
-	return messages
+// ScanAll reads out all data From the reader and returns matching messages
+// it uses messageStart pattern To delimit messages in the stream
+// it stops when no more bytes available in the reader (EOF)
+// note: used for testing only as it allocates a lot
+func (sc *Scanner) ScanAll(s io.Reader) (messages []*ScannedMessage, err error) {
+	err = sc.Scan(s, func(m *ScannedMessage) bool {
+		m.Body = append([]byte{}, m.Body...)
+		m.Date = append([]byte{}, m.Date...)
+		messages = append(messages, m)
+		return false
+	})
+	return
 }
 
 // DetectMessageLine accepts a line with a known Date and extracts the settings

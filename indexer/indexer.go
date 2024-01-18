@@ -1,13 +1,13 @@
 package indexer
 
 import (
-	"bytes"
 	"errors"
 	"golang.org/x/exp/maps"
 	"golang.org/x/xerrors"
 	"heaplog/common"
 	"heaplog/scanner"
 	"io"
+	"unsafe"
 )
 
 // Indexer is a stateless service that indexes a given source segment
@@ -41,31 +41,29 @@ func (indexer *Indexer) IndexSegment(
 	}
 
 	termsMap := make(map[string]struct{})
-	isMessageOutsideSegment := func(message *scanner.ScannedMessage) bool {
-		effectivePos := location.Min + int64(message.Pos)
-		return effectivePos >= location.Max
-	}
-
-	for m := range indexer.scanner.ScanMessagesCond(stream, isMessageOutsideSegment) {
-		if m.Err != nil {
-			if errors.Is(m.Err, io.EOF) {
-				break
-			}
-			err = xerrors.Errorf("failed to scan a message: %w", m.Err)
-			return
+	onEachMessage := func(m *scanner.ScannedMessage) bool {
+		effectivePos := location.Min + int64(m.Pos)
+		if effectivePos >= location.Max {
+			return true // stop iteration
 		}
 
 		// do not index "date" of the message
-		dateIndex := bytes.Index(m.Body, m.Date)
-		indexableArea := append(m.Body[0:dateIndex], m.Body[dateIndex+len(m.Date):]...)
-		messageTerms := indexer.tokenizer(string(indexableArea))
+		// Index "before the date" area
+		beforeDate := unsafe.String(unsafe.SliceData(m.Body[:m.DateFrom]), m.DateFrom)
+		messageTerms := indexer.tokenizer(beforeDate)
+		for _, term := range messageTerms {
+			termsMap[term] = struct{}{}
+		}
 
+		// Index "after the date" area
+		afterDate := unsafe.String(unsafe.SliceData(m.Body[m.DateTo:]), m.Len-m.DateTo)
+		messageTerms = indexer.tokenizer(afterDate)
 		for _, term := range messageTerms {
 			termsMap[term] = struct{}{}
 		}
 
 		segment.Messages = append(segment.Messages, common.IndexedMessage{
-			-1,
+			-1, // no id during indexing
 			common.Location{
 				Min: location.Min + int64(m.Pos),
 				Max: location.Min + int64(m.Pos) + int64(len(m.Body)),
@@ -73,6 +71,14 @@ func (indexer *Indexer) IndexSegment(
 			m.DateTime,
 			m.IsTail,
 		})
+
+		return false
+	}
+
+	err = indexer.scanner.Scan(stream, onEachMessage)
+	if err != nil && !errors.Is(err, io.EOF) {
+		err = xerrors.Errorf("failed to scan a message: %w", err)
+		return
 	}
 
 	terms = maps.Keys(termsMap)

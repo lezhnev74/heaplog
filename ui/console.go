@@ -159,18 +159,17 @@ var testCmd = &cobra.Command{
 		)
 
 		i := 1
-		ch := sc.ScanMessagesCond(f, func(m *scanner.ScannedMessage) bool {
-			i++
-			return i > 3
-		})
-
-		for m := range ch {
-			if m.Err != nil {
-				log.Printf("Failed to detect a message: %s\n", m.Err)
-				return
-			} else {
-				log.Printf("Message detected:\n%s\n", m.Body)
+		err = sc.Scan(f, func(m *scanner.ScannedMessage) bool {
+			if i > 3 {
+				return true
 			}
+			log.Printf("Message detected:\n%s\n", m.Body)
+			i++
+			return false
+		})
+		if err != nil {
+			log.Printf("Failed to detect a message: %s\n", err)
+			return
 		}
 
 		log.Printf("Nice, your config is good!")

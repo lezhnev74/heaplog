@@ -22,15 +22,12 @@ func TestScanner(t *testing.T) {
 		sc := NewScanner("2006-01-02 15:04:05.000000", messageStartPattern, 100, 1000)
 
 		// use the sample content as a buffer
-		logBuf := bytes.NewReader([]byte("[2023-01-05 23:46:20.779604] testing.DEBUG: ScannedMessage 1\n"))
-		messages := make([]*ScannedMessage, 0)
-		for message := range sc.ScanAllMessages(logBuf) {
-			messages = append(messages, message)
-		}
+		logBuf := []byte("[2023-01-05 23:46:20.779604] testing.DEBUG: ScannedMessage 1\n")
+		messages, err := sc.ScanAll(bytes.NewReader(logBuf))
+		require.NoError(t, err)
 
 		require.Equal(t, 1, len(messages))
-		require.Equal(t, []byte("[2023-01-05 23:46:20.779604] testing.DEBUG: ScannedMessage 1\n"), messages[0].Body)
-		require.Equal(t, []byte("2023-01-05 23:46:20.779604"), messages[0].Date)
+		require.Equal(t, []byte("[2023-01-05 23:46:20.779604] testing.DEBUG: ScannedMessage 1\n"), logBuf[messages[0].Pos:messages[0].Pos+messages[0].Len])
 		require.Equal(t, 0, messages[0].Pos)
 		require.Equal(t, common.MakeTime(sc.dateLayout, "2023-01-05 23:46:20.779604"), messages[0].DateTime)
 		require.True(t, messages[0].IsTail)
@@ -40,29 +37,27 @@ func TestScanner(t *testing.T) {
 		sc := NewScanner("2006-01-02 15:04:05.000000", messageStartPattern, 30, 1000)
 
 		// use the sample content as a buffer
-		logBuf := bytes.NewReader([]byte(`
+		logBuf := []byte(`
 [2023-01-05 23:40:20.779604] testing.DEBUG: message 1
 [2023-01-05 23:42:20.779604] testing.DEBUG: message 2
 [2023-01-05 23:45:11.324153] testing.DEBUG: message 3
-`))
-		messages := make([]*ScannedMessage, 0)
-		for msg := range sc.ScanAllMessages(logBuf) {
-			messages = append(messages, msg)
-		}
+`)
+		messages, err := sc.ScanAll(bytes.NewReader(logBuf))
+		require.NoError(t, err)
 
 		require.Equal(t, 3, len(messages))
 
-		require.Equal(t, []byte("[2023-01-05 23:40:20.779604] testing.DEBUG: message 1\n"), messages[0].Body)
+		require.Equal(t, []byte("[2023-01-05 23:40:20.779604] testing.DEBUG: message 1\n"), logBuf[messages[0].Pos:messages[0].Pos+messages[0].Len])
 		require.Equal(t, []byte("2023-01-05 23:40:20.779604"), messages[0].Date)
 		require.Equal(t, 1, messages[0].Pos)
 		require.False(t, messages[0].IsTail)
 
-		require.Equal(t, []byte("[2023-01-05 23:42:20.779604] testing.DEBUG: message 2\n"), messages[1].Body)
+		require.Equal(t, []byte("[2023-01-05 23:42:20.779604] testing.DEBUG: message 2\n"), logBuf[messages[1].Pos:messages[1].Pos+messages[1].Len])
 		require.Equal(t, []byte("2023-01-05 23:42:20.779604"), messages[1].Date)
 		require.Equal(t, 55, messages[1].Pos)
 		require.False(t, messages[1].IsTail)
 
-		require.Equal(t, []byte("[2023-01-05 23:45:11.324153] testing.DEBUG: message 3\n"), messages[2].Body)
+		require.Equal(t, []byte("[2023-01-05 23:45:11.324153] testing.DEBUG: message 3\n"), logBuf[messages[2].Pos:messages[2].Pos+messages[2].Len])
 		require.Equal(t, []byte("2023-01-05 23:45:11.324153"), messages[2].Date)
 		require.Equal(t, 109, messages[2].Pos)
 		require.True(t, messages[2].IsTail)
@@ -72,7 +67,7 @@ func TestScanner(t *testing.T) {
 		sc := NewScanner("2006-01-02 15:04:05.000000", messageStartPattern, 100, 1000)
 
 		// use the sample content as a buffer
-		logBuf := bytes.NewReader([]byte(`
+		logBuf := []byte(`
 [2023-01-05 23:46:22.234123] testing.DEBUG: BING ADS API #0:
 BING ADS response (recorded):
 {
@@ -83,11 +78,9 @@ BING ADS response (recorded):
 }
 {"exec":{"label":"6f85c55a-4f23-45cc-8a3c-c814cc1a1d98","environment":"testing","started_at":1678491979534005,"user_id":null,"channel":{"type":"console"},"extras":[]}}
 [2023-01-07 00:00:04.452670] production.INFO: start reading tasks for App\Infrastructure\Platforms\GoogleShopping\Queue\LinkAdsMerchantTask\LinksAdsMerchantWorker
-`))
-		messages := make([]*ScannedMessage, 0)
-		for msg := range sc.ScanAllMessages(logBuf) {
-			messages = append(messages, msg)
-		}
+`)
+		messages, err := sc.ScanAll(bytes.NewReader(logBuf))
+		require.NoError(t, err)
 
 		require.Equal(t, 2, len(messages))
 
@@ -101,28 +94,39 @@ BING ADS response (recorded):
 }
 {"exec":{"label":"6f85c55a-4f23-45cc-8a3c-c814cc1a1d98","environment":"testing","started_at":1678491979534005,"user_id":null,"channel":{"type":"console"},"extras":[]}}
 `
-		require.Equal(t, []byte(expectedMessage), messages[0].Body)
-		require.Equal(t, []byte("2023-01-05 23:46:22.234123"), messages[0].Date)
-		require.Equal(t, []byte("[2023-01-07 00:00:04.452670] production.INFO: start reading tasks for App\\Infrastructure\\Platforms\\GoogleShopping\\Queue\\LinkAdsMerchantTask\\LinksAdsMerchantWorker\n"), messages[1].Body)
-		require.Equal(t, []byte("2023-01-07 00:00:04.452670"), messages[1].Date)
+		require.Equal(t, []byte(expectedMessage), logBuf[messages[0].Pos:messages[0].Pos+messages[0].Len])
+		require.Equal(t, common.MakeTime(sc.dateLayout, "2023-01-05 23:46:22.234123"), messages[0].DateTime)
+
+		require.Equal(
+			t,
+			[]byte("[2023-01-07 00:00:04.452670] production.INFO: start reading tasks for App\\Infrastructure\\Platforms\\GoogleShopping\\Queue\\LinkAdsMerchantTask\\LinksAdsMerchantWorker\n"),
+			logBuf[messages[1].Pos:messages[1].Pos+messages[1].Len],
+		)
+		require.Equal(t, common.MakeTime(sc.dateLayout, "2023-01-07 00:00:04.452670"), messages[1].DateTime)
 	})
 
 	t.Run("it respects ScannedMessage starts", func(t *testing.T) {
 		sc := NewScanner("2006-01-02 15:04:05.000000", messageStartPattern, 100, 1000)
 
 		// use the sample content as a buffer
-		logBuf := bytes.NewReader([]byte(`
+		logBuf := []byte(`
 [2023-01-05 23:46:22.234123] testing.DEBUG: [2023-01-05 23:46:22.234123]
 [2023-01-07 00:00:04.452670] testing.DEBUG: [2023-01-07 00:00:04.452670]
-`))
-		messages := make([]*ScannedMessage, 0)
-		for msg := range sc.ScanAllMessages(logBuf) {
-			messages = append(messages, msg)
-		}
+`)
+		messages, err := sc.ScanAll(bytes.NewReader(logBuf))
+		require.NoError(t, err)
 
 		require.Equal(t, 2, len(messages))
-		require.Equal(t, []byte("[2023-01-05 23:46:22.234123] testing.DEBUG: [2023-01-05 23:46:22.234123]\n"), messages[0].Body)
-		require.Equal(t, []byte("[2023-01-07 00:00:04.452670] testing.DEBUG: [2023-01-07 00:00:04.452670]\n"), messages[1].Body)
+		require.Equal(
+			t,
+			[]byte("[2023-01-05 23:46:22.234123] testing.DEBUG: [2023-01-05 23:46:22.234123]\n"),
+			logBuf[messages[0].Pos:messages[0].Pos+messages[0].Len],
+		)
+		require.Equal(
+			t,
+			[]byte("[2023-01-07 00:00:04.452670] testing.DEBUG: [2023-01-07 00:00:04.452670]\n"),
+			logBuf[messages[1].Pos:messages[1].Pos+messages[1].Len],
+		)
 	})
 
 	t.Run("it respects max buffer size when a message it too long", func(t *testing.T) {
@@ -131,11 +135,8 @@ BING ADS response (recorded):
 		// not possible To test as the procedure is performed in a separate go-routine
 		logBuf := bytes.NewBufferString(`[2023-01-05 23:46:22.234123]` + strings.Repeat("A-", 1000))
 
-		var lastErr error
-		for m := range sc.ScanAllMessages(logBuf) {
-			lastErr = m.Err
-		}
-		require.ErrorIs(t, lastErr, MaxBufSizeReached)
+		_, err := sc.ScanAll(logBuf)
+		require.ErrorIs(t, err, MaxBufSizeReached)
 	})
 
 	t.Run("it respects max buffer size when no message can be found", func(t *testing.T) {
@@ -144,32 +145,38 @@ BING ADS response (recorded):
 		// not possible To test as the procedure is performed in a separate go-routine
 		logBuf := bytes.NewBufferString(strings.Repeat("TRASH", 1000))
 
-		var lastErr error
-		for m := range sc.ScanAllMessages(logBuf) {
-			lastErr = m.Err
-		}
-		require.ErrorIs(t, lastErr, NoMessageStartFound)
+		_, err := sc.ScanAll(logBuf)
+		require.ErrorIs(t, err, NoMessageStartFound)
 	})
 
 	t.Run("it stops scanning", func(t *testing.T) {
 		sc := NewScanner("2006-01-02 15:04:05.000000", messageStartPattern, 100, 1000)
 
-		logBuf := bytes.NewReader([]byte(`
+		src := []byte(`
 [2023-01-05 23:40:20.779604] testing.DEBUG: ScannedMessage 1
 [2023-01-05 23:42:20.779604] testing.DEBUG: ScannedMessage 2
 [2023-01-05 23:45:11.324153] testing.DEBUG: ScannedMessage 3
-`))
-		messages := make([]*ScannedMessage, 0)
+`)
 		// stop after the first message scanned
-		for msg := range sc.ScanMessagesCond(logBuf, func(m *ScannedMessage) bool { return m.Pos > 1 }) {
-			messages = append(messages, msg)
-		}
+		messages := make([]*ScannedMessage, 0)
+		err := sc.Scan(bytes.NewReader(src), func(m *ScannedMessage) bool {
+			if m.Pos > 1 {
+				return true
+			}
+			messages = append(messages, m)
+			return false
+		})
+		require.NoError(t, err)
 
 		require.Equal(t, 1, len(messages))
 
-		require.Equal(t, []byte("[2023-01-05 23:40:20.779604] testing.DEBUG: ScannedMessage 1\n"), messages[0].Body)
-		require.Equal(t, []byte("2023-01-05 23:40:20.779604"), messages[0].Date)
 		require.Equal(t, 1, messages[0].Pos)
+		require.Equal(
+			t,
+			[]byte("[2023-01-05 23:40:20.779604] testing.DEBUG: ScannedMessage 1\n"),
+			src[messages[0].Pos:messages[0].Pos+messages[0].Len],
+		)
+		// require.Equal(t, []byte("2023-01-05 23:40:20.779604"), messages[0].Date)
 	})
 }
 
@@ -198,14 +205,12 @@ func TestScanAllMessagesThroughput(t *testing.T) {
 				text = append(text, newMsg...)
 				date = date.Add(time.Microsecond * time.Duration(rand.Int()%20))
 			}
-			logBuf := bytes.NewReader(text)
+			logBuf := bytes.NewBuffer(text)
 			// Run scanning and measure time
 
-			messages := make([]*ScannedMessage, 0)
 			start := time.Now()
-			for msg := range sc.ScanAllMessages(logBuf) {
-				messages = append(messages, msg)
-			}
+			messages, err := sc.ScanAll(logBuf)
+			require.NoError(t, err)
 			d := time.Now().Sub(start).Seconds()
 			throughput := float64(N) / d
 			require.EqualValues(t, N, len(messages))
