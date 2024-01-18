@@ -171,7 +171,7 @@ func (sc *Scanner) Scan(
 			msgStartPos, msgStartMatchEnd = 0, msgStartMatchEnd-msgStartPos
 		}
 		// if buf has no spare space after the workable area - extend the buffer
-		if bufLen == cap(buf) {
+		if bufLen == len(buf) {
 			// respect max buf size
 			if len(buf) >= sc.maxBufSize {
 				return xerrors.Errorf("%w: %d bytes (consider increasing the max buffer size)", MaxBufSizeReached, sc.maxBufSize)

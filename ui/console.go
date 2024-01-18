@@ -26,6 +26,11 @@ func buildHeaplog(cfg Config) *heaplog.Heaplog {
 	ingestWorkers := int(cfg.IngestWorkers)
 	if ingestWorkers == 0 {
 		ingestWorkers = runtime.NumCPU()
+		if ingestWorkers > 4 {
+			// This is to reduce chances of concurrency for resources
+			// a magick number :)
+			ingestWorkers = ingestWorkers - 2
+		}
 	}
 
 	hl, err := heaplog.NewHeaplog(
