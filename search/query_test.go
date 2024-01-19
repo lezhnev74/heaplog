@@ -11,7 +11,6 @@ import (
 	"time"
 )
 
-//
 // func TestQueryPerformance(t *testing.T) {
 //
 // 	segmentSize := int64(50_000_000)
@@ -35,7 +34,7 @@ import (
 // 	}
 // 	_indexer := indexer.NewIndexer(_scanner, tokenizerFunc)
 //
-// 	ingestor := ingest.NewIngestor(storage, _indexer, segmentSize, runtime.NumCPU())
+// 	ingestor := ingest.NewIngestor(storage, _indexer, segmentSize, 3)
 //
 // 	require.NoError(t, ingestor.Ingest())
 //

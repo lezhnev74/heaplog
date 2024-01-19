@@ -1327,7 +1327,7 @@ func NewStorage(storagePath string, ingestFlushTick, searchFlushTick time.Durati
 		return nil, err
 	}
 	go func() {
-		// merge
+		// merge terms files
 		t := time.NewTicker(100 * time.Millisecond)
 		defer t.Stop()
 		for {

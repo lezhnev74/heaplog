@@ -47,8 +47,7 @@ type Scanner struct {
 
 	// buffers are used in concurrent environment.
 	// allows reusing memory for multiple reads
-	buffers     [][]byte
-	buffersLock sync.Mutex
+	bufPool sync.Pool
 }
 
 func NewScanner(
@@ -61,6 +60,10 @@ func NewScanner(
 		messageStart: messageStart,
 		readSize:     readSize,
 		maxBufSize:   maxBufSize,
+
+		bufPool: sync.Pool{
+			New: func() any { return make([]byte, readSize) },
+		},
 	}
 }
 
@@ -93,22 +96,9 @@ func (sc *Scanner) Scan(
 	src io.Reader,
 	found func(message *ScannedMessage) (shouldStop bool), // call on each found message, if returns false -> iteration stops
 ) error {
-	// The read buffer is reusable, bellow snippet manages that part:
-	var buf []byte
-	sc.buffersLock.Lock()
-	if len(sc.buffers) > 0 {
-		buf, sc.buffers = sc.buffers[0], sc.buffers[1:]
-	} else {
-		buf = make([]byte, sc.readSize)
-	}
-	sc.buffersLock.Unlock()
-	buf = buf[:sc.readSize] // reset a reusable buffer
-	defer func() {
-		sc.buffersLock.Lock()
-		sc.buffers = append(sc.buffers, buf)
-		sc.buffersLock.Unlock()
-	}()
-	// end buffer management
+	buf := sc.bufPool.Get().([]byte)
+	defer func() { sc.bufPool.Put(buf) }()
+	buf = buf[:sc.readSize]
 
 	var (
 		// workable area is buf's area that contains unprocessed data

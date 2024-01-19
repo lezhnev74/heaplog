@@ -94,7 +94,7 @@ func (ingest *SegmentsIngest) consumeResults(results <-chan ingestResult, failed
 	// consuming results is IO-intensive as it composes an inverted index file.
 	// good idea would be to parallel this as well as indexing segments.
 
-	workers := 20
+	workers := ingest.concurrentSegments
 
 	var wg errgroup.Group
 	for i := 0; i < workers; i++ {
@@ -196,19 +196,12 @@ func (ingest *SegmentsIngest) produceTasks(stop shutdown) (<-chan ingestTask, ch
 func (ingest *SegmentsIngest) workerPool(tasks <-chan ingestTask, stop shutdown) <-chan ingestResult {
 	results := make(chan ingestResult)
 
+	streamPool := common.NewStreamsPool(ingest.concurrentSegments)
+	defer streamPool.Close()
+
 	// pool-control goroutine
 	go func() {
 		defer close(results)
-
-		streams := make([]common.Stream, 0, ingest.concurrentSegments) // streams to reuse opened file streams
-		defer func() {
-			for _, s := range streams {
-				s.Close() // cleanup file descriptors
-			}
-		}()
-
-		streamPool := common.NewStreamsPool(ingest.concurrentSegments)
-		defer streamPool.Close()
 
 		wg := sync.WaitGroup{}
 		wg.Add(ingest.concurrentSegments)
@@ -249,7 +242,7 @@ func (ingest *SegmentsIngest) workerPool(tasks <-chan ingestTask, stop shutdown)
 
 					// do the work, index the segment
 					segment, terms, err := ingest.indexer.IndexSegment(fileStream, t.loc)
-					segment.DataSource = common.HashFile(fileStream.Path)
+					segment.DataSource = common.HashFile(t.filePath)
 					if err != nil {
 						// this case is important as some segments may contain no messages at all, and thus should be ignored.
 						// this is possible for long messages in the Stream, because we slice Stream into segments with no knowledge
@@ -259,7 +252,7 @@ func (ingest *SegmentsIngest) workerPool(tasks <-chan ingestTask, stop shutdown)
 							continue
 						}
 
-						err = xerrors.Errorf("segment indexing failed in %s: %w", fileStream.Path, err)
+						err = xerrors.Errorf("segment indexing failed in %s: %w", t.filePath, err)
 						log.Print(err)
 						results <- ingestResult{t, err, nil, common.IndexedSegment{}, 0}
 						return
