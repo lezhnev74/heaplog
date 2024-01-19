@@ -30,7 +30,9 @@ var migrationFS embed.FS
 
 var ErrNoData error = xerrors.Errorf("no data available")
 var crc32c = crc32.MakeTable(crc32.Castagnoli)
-var lastMemoryReport time.Time
+
+// memoryReportCh accepts request for printing db stats (the argument controls the max pace of prints)
+var memoryReportCh chan time.Duration
 
 type Storage struct {
 	db *sql.DB // duckdb connection
@@ -403,7 +405,7 @@ WaitLoop:
 		}
 	}
 
-	s.ReportMemory(time.Second * 10)
+	memoryReportCh <- time.Second * 10 // request for a report
 
 	return segmentId, tx.Commit()
 }
@@ -1278,29 +1280,38 @@ func (s *Storage) checkInTerms(terms []string) ([]uint32, error) {
 }
 
 // ReportMemory shows usage of Duckdb
-func (s *Storage) ReportMemory(every time.Duration) {
+func reportMemory(db *sql.DB) {
 
-	if time.Now().Sub(lastMemoryReport) < every {
-		return // throughput
+	printStats := func() {
+		var (
+			name, dbSize, blockSize, walSize, memSize, memLimit string
+			totalBlocks, usedBlocks, freeBlocks                 float64
+		)
+		r := db.QueryRow(`PRAGMA database_size`)
+		err := r.Scan(&name, &dbSize, &blockSize, &totalBlocks, &usedBlocks, &freeBlocks, &walSize, &memSize, &memLimit)
+		if err != nil {
+			log.Print(err)
+			return
+		}
+		freeBlocksPct := 0.0
+		if totalBlocks > 0 {
+			freeBlocksPct = freeBlocks / totalBlocks
+		}
+		log.Printf("DB Stats: size:%s, wal:%s, mem:%s/%s, free:%.02f%% ", dbSize, walSize, memSize, memLimit, freeBlocksPct)
 	}
 
-	// Usage of buffers pool
-	var (
-		name, dbSize, blockSize, walSize, memSize, memLimit string
-		totalBlocks, usedBlocks, freeBlocks                 float64
-	)
-	r := s.db.QueryRow(`PRAGMA database_size`)
-	err := r.Scan(&name, &dbSize, &blockSize, &totalBlocks, &usedBlocks, &freeBlocks, &walSize, &memSize, &memLimit)
-	if err != nil {
-		log.Print(err)
-		return
+	var lastMemoryReport time.Time
+	for {
+		select {
+		case d := <-memoryReportCh:
+			tooSoon := time.Now().Sub(lastMemoryReport) < d
+			if tooSoon {
+				continue // limit throughput
+			}
+			printStats()
+			lastMemoryReport = time.Now()
+		}
 	}
-	freeBlocksPct := 0.0
-	if totalBlocks > 0 {
-		freeBlocksPct = freeBlocks / totalBlocks
-	}
-	log.Printf("DB Stats: size:%s, wal:%s, mem:%s/%s, free:%.02f%% ", dbSize, walSize, memSize, memLimit, freeBlocksPct)
-	lastMemoryReport = time.Now()
 }
 
 func NewStorage(storagePath string, ingestFlushTick, searchFlushTick time.Duration) (*Storage, error) {
@@ -1400,6 +1411,9 @@ func NewStorage(storagePath string, ingestFlushTick, searchFlushTick time.Durati
 
 	s.incomingQueryMessages = make(chan common.MatchedMessage)
 	go s.ingestQueryMessages(searchFlushTick)
+
+	memoryReportCh = make(chan time.Duration)
+	go reportMemory(s.db)
 
 	return s, nil
 }
