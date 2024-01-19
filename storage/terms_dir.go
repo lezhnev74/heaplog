@@ -113,7 +113,7 @@ func (d *TermsDir) Merge() error {
 		return nil // nothing to merge
 	}
 
-	// update index:
+	t := time.Now()
 	err := d.writeNewFile(func(w io.Writer) error {
 
 		// Build a selection tree from multiple FSTs:
@@ -153,7 +153,7 @@ func (d *TermsDir) Merge() error {
 			})
 		}
 
-		// Stram to a new fst:
+		// Stream to a new fst:
 		mergedFst, err := vellum.New(w, nil)
 		if err != nil {
 			return xerrors.Errorf("merge fail: %w", err)
@@ -196,6 +196,7 @@ func (d *TermsDir) Merge() error {
 		}
 	})
 
+	log.Printf("merged %d term files in %.02f", len(mergeFiles), time.Now().Sub(t).Seconds())
 	return nil
 }
 

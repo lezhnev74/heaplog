@@ -121,12 +121,12 @@ func (ingest *SegmentsIngest) consumeResults(results <-chan ingestResult, failed
 				checkInTime := time.Now().Sub(t)
 
 				log.Printf(
-					"indexed %s[%d-%d](%d msgs) in %s",
+					"indexed %s[%d-%d](%d msgs) in %.02fs",
 					r.filePath,
 					r.segment.Loc().Min,
 					r.segment.Loc().Max,
 					len(r.segment.Messages),
-					(r.timeTaken + checkInTime).String(),
+					(r.timeTaken + checkInTime).Seconds(),
 				)
 			}
 			return nil

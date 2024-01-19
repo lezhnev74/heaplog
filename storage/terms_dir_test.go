@@ -100,3 +100,72 @@ func TestPutMerge(t *testing.T) {
 	}
 	require.Equal(t, expectedTerms, alltermIds)
 }
+
+// func TestMergePerformance(t *testing.T) {
+//
+// 	// Here I am profiling how memory is used for big concurrent put/merge work.
+//
+// 	dir, err := os.MkdirTemp("", "")
+// 	require.NoError(t, err)
+// 	termsDir, err := NewTermsDir(dir)
+// 	require.NoError(t, err)
+//
+// 	ctx, stop := context.WithCancel(context.Background())
+// 	go func() {
+// 		for {
+// 			time.Sleep(time.Second)
+// 			// Show metrics:
+// 			var m runtime.MemStats
+// 			runtime.ReadMemStats(&m)
+// 			fmt.Printf("Alloc = %v MiB", m.Alloc/1024/1024)
+// 			fmt.Printf("\tTotalAlloc = %v MiB", m.TotalAlloc/1024/1024)
+// 			fmt.Printf("\tSys = %v MiB", m.Sys/1024/1024)
+// 			fmt.Printf("\tNumGC = %v\n", m.NumGC)
+// 		}
+// 	}()
+//
+// 	// 1. Load multiple Put operations
+// 	for i := 0; i < 10; i++ {
+// 		go func() {
+// 			for {
+// 				select {
+// 				case <-ctx.Done():
+// 					return
+// 				default:
+// 					randomTerms := make([]string, 0, 1_000)
+// 					for j := 0; j < 100_000; j++ {
+// 						randomTerms = append(randomTerms, generateRandomString(10))
+// 					}
+// 					require.NoError(t, termsDir.Put(randomTerms))
+// 				}
+// 			}
+// 		}()
+// 	}
+//
+// 	// 2. Merge terms
+// 	go func() {
+// 		for {
+// 			select {
+// 			case <-ctx.Done():
+// 				return
+// 			default:
+// 				err = termsDir.Merge()
+// 				require.NoError(t, err)
+// 				err = termsDir.Cleanup()
+// 				require.NoError(t, err)
+// 			}
+// 		}
+// 	}()
+//
+// 	time.Sleep(time.Second * 60)
+// 	stop()
+// }
+//
+// func generateRandomString(length int) string {
+// 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+// 	result := make([]byte, length)
+// 	for i := range result {
+// 		result[i] = charset[rand.Intn(len(charset))]
+// 	}
+// 	return string(result)
+// }
