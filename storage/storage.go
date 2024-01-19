@@ -1304,10 +1304,9 @@ func reportMemory(db *sql.DB) {
 		runtime.ReadMemStats(&m)
 
 		log.Printf(
-			"System Stats: %s, %s, %s, %s",
-			fmt.Sprintf("Alloc:%vMiB", m.Alloc/1024/1024),
-			fmt.Sprintf("TotalAlloc:%vMiB", m.TotalAlloc/1024/1024),
-			fmt.Sprintf("Sys:%vMiB", m.Sys/1024/1024),
+			"System Stats: %s, %s, %s",
+			fmt.Sprintf("HeapAlloc:%vMiB", m.Alloc/1024/1024), // heap only
+			fmt.Sprintf("Sys:%vMiB", m.Sys/1024/1024),         // total sys virtual memory
 			fmt.Sprintf("NumGC:%v\n", m.NumGC),
 		)
 	}

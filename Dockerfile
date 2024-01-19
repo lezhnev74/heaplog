@@ -1,11 +1,9 @@
-FROM golang:1.21 AS build
+FROM golang:1.21-bookworm AS build
 WORKDIR /app
 COPY . ./
-RUN go mod download
 RUN go build -o /app/binary
 
-FROM debian:stable-slim
-WORKDIR /
+FROM debian:bookworm-slim
 COPY --from=build /app/binary /heaplog
 EXPOSE 8393
 ENTRYPOINT ["/heaplog"]
