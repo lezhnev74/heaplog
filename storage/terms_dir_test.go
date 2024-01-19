@@ -125,7 +125,7 @@ func TestPutMerge(t *testing.T) {
 // 	}()
 //
 // 	// 1. Load multiple Put operations
-// 	for i := 0; i < 10; i++ {
+// 	for i := 0; i < runtime.NumCPU(); i++ {
 // 		go func() {
 // 			for {
 // 				select {
@@ -134,7 +134,7 @@ func TestPutMerge(t *testing.T) {
 // 				default:
 // 					randomTerms := make([]string, 0, 1_000)
 // 					for j := 0; j < 100_000; j++ {
-// 						randomTerms = append(randomTerms, generateRandomString(10))
+// 						randomTerms = append(randomTerms, generateRandomString(20))
 // 					}
 // 					require.NoError(t, termsDir.Put(randomTerms))
 // 				}
@@ -157,15 +157,18 @@ func TestPutMerge(t *testing.T) {
 // 		}
 // 	}()
 //
-// 	time.Sleep(time.Second * 60)
+// 	time.Sleep(time.Second * 30)
 // 	stop()
 // }
 //
 // func generateRandomString(length int) string {
 // 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 // 	result := make([]byte, length)
+// 	seed := rand.NewSource(time.Now().UnixNano())
+// 	random := rand.New(seed)
+//
 // 	for i := range result {
-// 		result[i] = charset[rand.Intn(len(charset))]
+// 		result[i] = charset[random.Intn(len(charset))]
 // 	}
 // 	return string(result)
 // }

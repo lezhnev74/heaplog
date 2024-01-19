@@ -196,7 +196,7 @@ func (d *TermsDir) Merge() error {
 		}
 	})
 
-	log.Printf("merged %d term files in %.02f", len(mergeFiles), time.Now().Sub(t).Seconds())
+	log.Printf("merged %d term files in %.02fs", len(mergeFiles), time.Now().Sub(t).Seconds())
 	return nil
 }
 

@@ -15,6 +15,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -1298,6 +1299,17 @@ func reportMemory(db *sql.DB) {
 			freeBlocksPct = freeBlocks / totalBlocks
 		}
 		log.Printf("DB Stats: size:%s, wal:%s, mem:%s/%s, free:%.02f%% ", dbSize, walSize, memSize, memLimit, freeBlocksPct)
+
+		var m runtime.MemStats
+		runtime.ReadMemStats(&m)
+
+		log.Printf(
+			"System Stats: %s, %s, %s, %s",
+			fmt.Sprintf("Alloc:%vMiB", m.Alloc/1024/1024),
+			fmt.Sprintf("TotalAlloc:%vMiB", m.TotalAlloc/1024/1024),
+			fmt.Sprintf("Sys:%vMiB", m.Sys/1024/1024),
+			fmt.Sprintf("NumGC:%v\n", m.NumGC),
+		)
 	}
 
 	var lastMemoryReport time.Time
