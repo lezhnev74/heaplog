@@ -19,8 +19,18 @@ import (
 )
 
 func buildHeaplog(cfg Config) *heaplog.Heaplog {
-	maxTokenLen := 20
-	tokenizerFunc := func(input string) []string { return tokenizer.TokenizeS2(input, 4, maxTokenLen) }
+	// controls the max length of tokens,
+	// easier to index (consume less space), could be slower to search due to collisions.
+	minTokenLen := 4
+	if cfg.MinTermLen > 0 {
+		minTokenLen = int(cfg.MinTermLen)
+	}
+	maxTokenLen := max(10, minTokenLen+1)
+	if cfg.MaxTermLen > 0 {
+		maxTokenLen = max(minTokenLen+1, int(cfg.MaxTermLen))
+	}
+
+	tokenizerFunc := func(input string) []string { return tokenizer.TokenizeS2(input, minTokenLen, maxTokenLen) }
 	unboundTokenizerFunc := func(input string) []string { return tokenizer.TokenizeS2(input, 1, maxTokenLen) }
 
 	ingestWorkers := int(cfg.IngestWorkers)

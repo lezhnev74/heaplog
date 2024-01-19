@@ -114,9 +114,12 @@
 
     // Manage a WIP label:
     isWIP = 0
+    loading = ' Loading...'
     htmx.on("htmx:beforeRequest", function(){
         isWIP++
-        $("title").html($("title").html() + ' Loading...');
+        if(!$("title").html().includes(loading)) {
+            $("title").html($("title").html() + loading);
+        }
     });
     htmx.on("htmx:afterSettle", function(){
         isWIP--
@@ -125,7 +128,7 @@
         if(isWIP > 0) {
             return;
         }
-        $("title").html($("title").html().replace(/ Loading...$/, ''));
+        $("title").html($("title").html().replace(loading, ''));
     }, 500)
 </script>
 </body>

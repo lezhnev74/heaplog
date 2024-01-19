@@ -1337,6 +1337,7 @@ func NewStorage(storagePath string, ingestFlushTick, searchFlushTick time.Durati
 				if err != nil {
 					log.Printf("terms merge fail: %s", err)
 					time.Sleep(time.Second * 10)
+					continue
 				}
 				err = termsDir.Cleanup()
 				if err != nil {
@@ -1412,7 +1413,7 @@ func NewStorage(storagePath string, ingestFlushTick, searchFlushTick time.Durati
 	s.incomingQueryMessages = make(chan common.MatchedMessage)
 	go s.ingestQueryMessages(searchFlushTick)
 
-	memoryReportCh = make(chan time.Duration)
+	memoryReportCh = make(chan time.Duration, 10)
 	go reportMemory(s.db)
 
 	return s, nil

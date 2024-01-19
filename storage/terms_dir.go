@@ -240,36 +240,50 @@ func (d *TermsDir) GetMatchedTermIds(match func(term string) bool) (terms []stri
 // writeNewFile prepares a callback with the Writer,
 // after the callback return it closes the writer.
 func (d *TermsDir) writeNewFile(writeF func(w io.Writer) error) error {
+
+	// Prepare
 	targetFilePath := path.Join(d.dir, fmt.Sprintf("%d.fst", time.Now().UnixNano()))
 	f, err := os.Create(targetFilePath)
 	if err != nil {
 		return xerrors.Errorf("terms: unable to put to a file: %w", err)
 	}
-	w := bufio.NewWriterSize(f, 4096*100)
 	defer func() {
-		err2 := w.Flush()
-		if err2 != nil {
-			log.Printf("unable to wrire a terms file: %s", err2)
-		}
-
-		var fStat os.FileInfo
-		fStat, err = f.Stat()
-		err2 = f.Close()
-		if err2 != nil {
-			log.Printf("unable to close a terms file: %s", err2)
-			_ = os.Remove(targetFilePath)
-		} else {
-			// Insert to the main list:
-			d.mainList.safeWrite(func() {
-				d.mainList.putFile(&termsFile{
-					path: targetFilePath,
-					len:  fStat.Size(),
-				})
-			})
+		if err != nil {
+			_ = os.Remove(targetFilePath) // cleanup
 		}
 	}()
 
-	return writeF(w)
+	w := bufio.NewWriterSize(f, 4096*100)
+
+	// Write
+	err = writeF(w)
+	if err != nil {
+		return err
+	}
+
+	// Complete writing
+	err2 := w.Flush()
+	if err2 != nil {
+		log.Printf("unable to wrire a terms file: %s", err2)
+	}
+
+	var fStat os.FileInfo
+	fStat, err = f.Stat()
+	err = f.Close()
+	if err != nil {
+		log.Printf("unable to close a terms file: %s", err2)
+		return err
+	}
+
+	// Insert to the main list:
+	d.mainList.safeWrite(func() {
+		d.mainList.putFile(&termsFile{
+			path: targetFilePath,
+			len:  fStat.Size(),
+		})
+	})
+
+	return nil
 }
 
 func NewTermsDir(dir string) (*TermsDir, error) {

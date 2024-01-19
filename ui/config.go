@@ -26,6 +26,10 @@ type Config struct {
 	// sets parallel degree of ingesting.
 	// defaults to the number of cores is omitted or 0.
 	IngestWorkers uint
+	// Terms are extracted from messages and indexed.
+	// These control how fast ingestion goes (and space taken for the inverted index),
+	// as well as how fast search goes (as shorter terms may duplicate in the index).
+	MinTermLen, MaxTermLen uint
 }
 
 var DefaultCfg = Config{
