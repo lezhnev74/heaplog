@@ -30,6 +30,7 @@ var migrationFS embed.FS
 
 var ErrNoData error = xerrors.Errorf("no data available")
 var crc32c = crc32.MakeTable(crc32.Castagnoli)
+var lastMemoryReport time.Time
 
 type Storage struct {
 	db *sql.DB // duckdb connection
@@ -401,6 +402,8 @@ WaitLoop:
 			}
 		}
 	}
+
+	s.ReportMemory(time.Second * 10)
 
 	return segmentId, tx.Commit()
 }
@@ -1084,7 +1087,6 @@ func (s *Storage) GetDatasourceSize(ds common.DataSourceHash) (size int64, err e
 // Each small segment will be merged with the next one until the result is > segmentSize.
 // It starts with the earliest ones (these segments are likely to be found at the tail a file)
 func (s *Storage) MergeSegments(segmentSize int64) (merged bool, err error) {
-	t := time.Now()
 	mergesCount := 0
 
 	tx, err := s.db.Begin()
@@ -1138,7 +1140,7 @@ func (s *Storage) MergeSegments(segmentSize int64) (merged bool, err error) {
 			continue
 		}
 
-		log.Printf("Merge segment #%d[%d-%d] and #%d[%d-%d]", curSegment.Id, curSegment.From, curSegment.To, lastSegment.Id, lastSegment.From, lastSegment.To)
+		// log.Printf("Merge segment #%d[%d-%d] and #%d[%d-%d]", curSegment.Id, curSegment.From, curSegment.To, lastSegment.Id, lastSegment.From, lastSegment.To)
 
 		// extend
 		mergesCount++
@@ -1187,10 +1189,6 @@ func (s *Storage) MergeSegments(segmentSize int64) (merged bool, err error) {
 		if err != nil {
 			return false, xerrors.Errorf("merge segments: remove merged segment failed: %w", err)
 		}
-	}
-
-	if mergesCount > 0 {
-		log.Printf("segments merged in %s", time.Now().Sub(t).String())
 	}
 
 	return mergesCount > 0, tx.Commit()
@@ -1279,6 +1277,32 @@ func (s *Storage) checkInTerms(terms []string) ([]uint32, error) {
 	return s.hashTerms(terms), nil
 }
 
+// ReportMemory shows usage of Duckdb
+func (s *Storage) ReportMemory(every time.Duration) {
+
+	if time.Now().Sub(lastMemoryReport) < every {
+		return // throughput
+	}
+
+	// Usage of buffers pool
+	var (
+		name, dbSize, blockSize, walSize, memSize, memLimit string
+		totalBlocks, usedBlocks, freeBlocks                 float64
+	)
+	r := s.db.QueryRow(`PRAGMA database_size`)
+	err := r.Scan(&name, &dbSize, &blockSize, &totalBlocks, &usedBlocks, &freeBlocks, &walSize, &memSize, &memLimit)
+	if err != nil {
+		log.Print(err)
+		return
+	}
+	freeBlocksPct := 0.0
+	if totalBlocks > 0 {
+		freeBlocksPct = freeBlocks / totalBlocks
+	}
+	log.Printf("DB Stats: size:%s, wal:%s, mem:%s/%s, free:%.02f%% ", dbSize, walSize, memSize, memLimit, freeBlocksPct)
+	lastMemoryReport = time.Now()
+}
+
 func NewStorage(storagePath string, ingestFlushTick, searchFlushTick time.Duration) (*Storage, error) {
 	duckFile := filepath.Join(storagePath, "db.docs")
 
@@ -1314,9 +1338,8 @@ func NewStorage(storagePath string, ingestFlushTick, searchFlushTick time.Durati
 
 	// add config values
 	duckOptions := map[string]string{
-		"memory_limit":               "1Gb",
+		"memory_limit":               "1GB",
 		"temp_directory":             storagePath,
-		"wal_autocheckpoint":         "100Mb",
 		"immediate_transaction_mode": "true",
 	}
 	duckFile += "?"

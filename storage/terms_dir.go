@@ -9,6 +9,7 @@ import (
 	go_iterators "github.com/lezhnev74/go-iterators"
 	"golang.org/x/xerrors"
 	"io"
+	"log"
 	"os"
 	"path"
 	"slices"
@@ -236,6 +237,8 @@ func (d *TermsDir) GetMatchedTermIds(match func(term string) bool) (terms []stri
 	return terms, nil
 }
 
+// writeNewFile prepares a callback with the Writer,
+// after the callback return it closes the writer.
 func (d *TermsDir) writeNewFile(writeF func(w io.Writer) error) error {
 	targetFilePath := path.Join(d.dir, fmt.Sprintf("%d.fst", time.Now().UnixNano()))
 	f, err := os.Create(targetFilePath)
@@ -244,12 +247,16 @@ func (d *TermsDir) writeNewFile(writeF func(w io.Writer) error) error {
 	}
 	w := bufio.NewWriterSize(f, 4096*100)
 	defer func() {
-		_ = w.Flush()
+		err2 := w.Flush()
+		if err2 != nil {
+			log.Printf("unable to wrire a terms file: %s", err2)
+		}
 
 		var fStat os.FileInfo
 		fStat, err = f.Stat()
-		_ = f.Close()
-		if err != nil {
+		err2 = f.Close()
+		if err2 != nil {
+			log.Printf("unable to close a terms file: %s", err2)
 			_ = os.Remove(targetFilePath)
 		} else {
 			// Insert to the main list:
