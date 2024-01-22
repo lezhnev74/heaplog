@@ -26,7 +26,7 @@ func TestItDiscoversFiles(t *testing.T) {
 	storageRoot, err := os.MkdirTemp("", "")
 	require.NoError(t, err)
 
-	_storage, err := storage.NewStorage(storageRoot, time.Second, time.Second)
+	_storage, err := storage.NewStorage(storageRoot, time.Second, time.Second, 500)
 	require.NoError(t, err)
 
 	files := []string{

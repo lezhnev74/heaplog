@@ -33,8 +33,9 @@ func NewHeaplog(
 	unboundTokenizerFunc func(input string) []string,
 	indexSegmentSize int64,
 	ingestWorkers int,
+	duckdbMemLimitMb uint,
 ) (*Heaplog, error) {
-	s, err := storage.NewStorage(storageRoot, ingestFlushTick, searchFlushTick)
+	s, err := storage.NewStorage(storageRoot, ingestFlushTick, searchFlushTick, duckdbMemLimitMb)
 	if err != nil {
 		err = xerrors.Errorf("storage init failed: %w", err)
 		return nil, err

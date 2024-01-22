@@ -54,6 +54,7 @@ func buildHeaplog(cfg Config) *heaplog.Heaplog {
 		unboundTokenizerFunc,
 		50_000_000,
 		ingestWorkers,
+		cfg.DuckdbMaxMemMb,
 	)
 
 	if err != nil {

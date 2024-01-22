@@ -1325,7 +1325,12 @@ func reportMemory(db *sql.DB) {
 	}
 }
 
-func NewStorage(storagePath string, ingestFlushTick, searchFlushTick time.Duration) (*Storage, error) {
+func NewStorage(
+	storagePath string,
+	ingestFlushTick,
+	searchFlushTick time.Duration,
+	duckdbMemLimitMb uint,
+) (*Storage, error) {
 	duckFile := filepath.Join(storagePath, "db.docs")
 
 	termsDirPath := filepath.Join(storagePath, "terms")
@@ -1360,8 +1365,9 @@ func NewStorage(storagePath string, ingestFlushTick, searchFlushTick time.Durati
 	}()
 
 	// add config values
+	duckdbMemLimit := fmt.Sprintf("%dMb", duckdbMemLimitMb)
 	duckOptions := map[string]string{
-		"memory_limit":               "1GB",
+		"memory_limit":               duckdbMemLimit,
 		"temp_directory":             storagePath,
 		"immediate_transaction_mode": "true",
 	}

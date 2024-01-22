@@ -180,6 +180,7 @@ func initHeaplog(t *testing.T) *Heaplog {
 		unboundTokenizerFunc,
 		80, // small segments will contain a single message
 		runtime.NumCPU(),
+		500,
 	)
 	require.NoError(t, err)
 

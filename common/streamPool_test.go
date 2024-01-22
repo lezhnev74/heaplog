@@ -83,3 +83,22 @@ func TestClosesAlreadyClosed(t *testing.T) {
 
 	require.NoError(t, pool.Close()) // double close
 }
+
+func TestClosesOnEviction(t *testing.T) {
+	files := makeTempFiles(t)
+	pool := NewStreamsPool(1)
+
+	var s1, s2 Stream
+
+	// 1. Put one
+	s1, err := pool.Get(files[0])
+	require.NoError(t, err)
+	require.NoError(t, pool.Put(s1))
+
+	// 2. Put second (evicts first)
+	s2, err = pool.Get(files[1])
+	require.NoError(t, err)
+	require.NoError(t, pool.Put(s2))
+
+	require.ErrorIs(t, s1.File.Close(), os.ErrClosed)
+}

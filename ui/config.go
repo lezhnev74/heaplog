@@ -30,6 +30,9 @@ type Config struct {
 	// These control how fast ingestion goes (and space taken for the inverted index),
 	// as well as how fast search goes (as shorter terms may duplicate in the index).
 	MinTermLen, MaxTermLen uint
+	// Max memory the duckdb instance is allowed to allocate.
+	// Increase if you see related errors on big data sets. (default: 500)
+	DuckdbMaxMemMb uint
 }
 
 var DefaultCfg = Config{
