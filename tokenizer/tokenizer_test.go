@@ -170,3 +170,59 @@ BING ADS response (recorded):
 		}
 	}
 }
+
+func TestSplit(t *testing.T) {
+	sep := " .-"
+
+	tests := []struct {
+		input    string
+		expected []string
+	}{
+		{"", nil},
+		{"a", []string{"a"}},
+		{" a", []string{"a"}},
+		{"    a", []string{"a"}},
+		{" a ", []string{"a"}},
+		{" a    ", []string{"a"}},
+		{"a b-c.d", []string{"a", "b", "c", "d"}},
+		{"a - b", []string{"a", "b"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("test: %s", tt.input), func(t *testing.T) {
+			require.Equal(t, tt.expected, splitString(tt.input, sep))
+			require.Equal(t, tt.expected, splitStringNoAlloc(tt.input, sep))
+		})
+	}
+}
+
+var splits []string
+
+func BenchmarkSplit(b *testing.B) {
+
+	sep := " .-"
+	input := `
+There is no way to avoid or replace the hard work of thinking. When you write a test you are thinking about how to specify behavior. When you make the test pass you are thinking about how to implement that specification. When you refactor you are thinking about how to communicate both the specification and implementation to others.
+You cannot replace any of these thought processes with tools. You cannot generate the code from tests, or the tests from code, because that would cause you to abandon a critical thought process. And may God help you if you use a tool to do the refactoring for you.
+The purpose of a tool is to enable and facilitate thought; not to replace it.
+`
+	input = strings.Repeat(input, 10_000)
+	var lSplits []string
+
+	benchmarks := []struct {
+		name      string
+		splitFunc func(input string, sep string) []string
+	}{
+		{"splitString", splitString},
+		{"splitStringNoAlloc", splitStringNoAlloc},
+	}
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				lSplits = bm.splitFunc(input, sep)
+			}
+			splits = lSplits
+		})
+	}
+}

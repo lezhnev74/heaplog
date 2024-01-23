@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 	"unicode"
+	"unicode/utf8"
+	"unsafe"
 )
 
 var (
@@ -93,11 +95,46 @@ func filterShortTokensInPlaceCutLongTokens(tokens []string, minSize, maxSize int
 }
 
 func splitString(s string, separators string) []string {
+	if len(s) == 0 {
+		return nil
+	}
+
 	f := func(r rune) bool {
 		return strings.ContainsRune(separators, r)
 	}
 	return strings.FieldsFunc(s, f)
+}
 
+func splitStringNoAlloc(s string, separators string) []string {
+
+	if len(s) == 0 {
+		return nil
+	}
+
+	ret := make([]string, 0, len(s)/10)
+	sb := unsafe.Slice(unsafe.StringData(s), len(s))
+
+	var lastChar, pos int
+	for {
+		r, n := utf8.DecodeRune(sb[pos:])
+		if n == 0 {
+			break
+		}
+		if strings.ContainsRune(separators, r) {
+			if pos-lastChar > 0 {
+				cleanString := unsafe.String(unsafe.SliceData(sb[lastChar:]), pos-lastChar)
+				ret = append(ret, cleanString)
+			}
+			lastChar = pos + n
+		}
+		pos += n
+	}
+	if pos <= len(sb) && len(sb)-lastChar > 0 {
+		cleanString := unsafe.String(unsafe.SliceData(sb[lastChar:]), len(sb)-lastChar)
+		ret = append(ret, cleanString)
+	}
+
+	return ret
 }
 
 func removeDiacritics(input string) string {

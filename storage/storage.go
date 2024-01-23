@@ -1365,6 +1365,9 @@ func NewStorage(
 	}()
 
 	// add config values
+	if duckdbMemLimitMb < 100 {
+		log.Fatalf("Duckdb mem limit is too low: %d", duckdbMemLimitMb)
+	}
 	duckdbMemLimit := fmt.Sprintf("%dMb", duckdbMemLimitMb)
 	duckOptions := map[string]string{
 		"memory_limit":               duckdbMemLimit,
