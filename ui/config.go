@@ -38,6 +38,7 @@ type Config struct {
 var DefaultCfg = Config{
 	StoragePath:      "./",
 	FilesGlobPattern: "./*.log",
+	DuckdbMaxMemMb:   500,
 }
 
 func LoadConfig(loadFile bool) (cfg Config) {
