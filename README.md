@@ -70,7 +70,7 @@ The program compiles in a single binary file. If you have Go compiler on your ma
 ## Configuration
 
 Configuration can be provided as a Yaml file, as well as command arguments (where the latter overwrite the former).
-Configurable keys and values can be seen in [config.go](https://github.com/lezhnev74/heaplog/ui/config.go).
+Configurable keys and values can be seen in [config.go](https://github.com/lezhnev74/heaplog/blob/main/ui/config.go).
 To populate a new empty file run `heaplog init > heaplog.yml`.
 
 Since there are many formats of log files, you have to provide two things about your file format:
