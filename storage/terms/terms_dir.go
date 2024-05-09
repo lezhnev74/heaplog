@@ -116,8 +116,6 @@ func (d *TermsDir) Merge() error {
 		return nil // nothing to merge
 	}
 
-	log.Printf("Start merging %d FST", len(mergeFiles))
-
 	t := time.Now()
 	err := d.writeNewFst(func(w io.Writer) error {
 

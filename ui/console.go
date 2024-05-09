@@ -11,11 +11,8 @@ import (
 	"heaplog/tokenizer"
 	"log"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"regexp"
-	"runtime"
-	"runtime/trace"
 	"strings"
 	"time"
 )
@@ -37,12 +34,7 @@ func buildHeaplog(cfg Config) *heaplog.Heaplog {
 
 	ingestWorkers := int(cfg.IngestWorkers)
 	if ingestWorkers == 0 {
-		ingestWorkers = runtime.NumCPU()
-		if ingestWorkers > 4 {
-			// This is to reduce chances of concurrency for resources
-			// a magick number :)
-			ingestWorkers = ingestWorkers - 2
-		}
+		ingestWorkers = 2
 	}
 
 	hl, err := heaplog.NewHeaplog(
@@ -81,16 +73,16 @@ var runCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 
 		// // -- Start Tracing
-		traceFile, _ := os.Create("trace")
-		trace.Start(traceFile)
-		c := make(chan os.Signal, 1)
-		signal.Notify(c, os.Interrupt)
-		go func() {
-			<-c
-			trace.Stop()
-			traceFile.Close()
-			os.Exit(0)
-		}()
+		//traceFile, _ := os.Create("trace")
+		//trace.Start(traceFile)
+		//c := make(chan os.Signal, 1)
+		//signal.Notify(c, os.Interrupt)
+		//go func() {
+		//	<-c
+		//	trace.Stop()
+		//	traceFile.Close()
+		//	os.Exit(0)
+		//}()
 		// // -- End Tracing
 
 		hl := buildHeaplog(LoadConfig(true))
