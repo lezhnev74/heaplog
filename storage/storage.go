@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"embed"
 	"errors"
 	"fmt"
@@ -11,9 +12,9 @@ import (
 	"golang.org/x/xerrors"
 	"hash/crc32"
 	"heaplog/common"
+	"heaplog/storage/terms"
 	"io"
 	"log"
-	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -47,7 +48,7 @@ type Storage struct {
 	filesLock sync.Mutex
 
 	// Checking In Segments:
-	termsDir *TermsDir
+	termsDir *terms.TermsDir
 
 	incomingSegmentTermsLastFlush     time.Time
 	incomingSegmentTermsLastFlushLock sync.RWMutex
@@ -679,25 +680,6 @@ func (s *Storage) Close() error {
 	return s.db.Close()
 }
 
-func (s *Storage) Migrate() (err error) {
-	f, err := migrationFS.Open("migrations/1_init.up.sql")
-	if err != nil {
-		return err
-	}
-	migrateContent, err := io.ReadAll(f)
-	if err != nil {
-		return err
-	}
-	_, err = s.db.Exec(string(migrateContent))
-	if err != nil && strings.Contains(err.Error(), "already exists") {
-		return nil // skip migrations
-	}
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 // CheckInQuery registers a query as running (not complete)
 // To mark the query as complete call s.FinishQuery()
 func (s *Storage) CheckInQuery(hash string, text string, from *time.Time, to *time.Time) error {
@@ -1281,36 +1263,7 @@ func (s *Storage) checkInTerms(terms []string) ([]uint32, error) {
 }
 
 // ReportMemory shows usage of Duckdb
-func reportMemory(db *sql.DB) {
-
-	printStats := func() {
-		var (
-			name, dbSize, blockSize, walSize, memSize, memLimit string
-			totalBlocks, usedBlocks, freeBlocks                 float64
-		)
-		r := db.QueryRow(`PRAGMA database_size`)
-		err := r.Scan(&name, &dbSize, &blockSize, &totalBlocks, &usedBlocks, &freeBlocks, &walSize, &memSize, &memLimit)
-		if err != nil {
-			log.Print(err)
-			return
-		}
-		freeBlocksPct := 0.0
-		if totalBlocks > 0 {
-			freeBlocksPct = freeBlocks / totalBlocks
-		}
-		log.Printf("DB Stats: size:%s, wal:%s, mem:%s/%s, free:%.02f%% ", dbSize, walSize, memSize, memLimit, freeBlocksPct)
-
-		var m runtime.MemStats
-		runtime.ReadMemStats(&m)
-
-		log.Printf(
-			"System Stats: %s, %s, %s",
-			fmt.Sprintf("HeapAlloc:%vMiB", m.Alloc/1024/1024), // heap only
-			fmt.Sprintf("Sys:%vMiB", m.Sys/1024/1024),         // total sys virtual memory
-			fmt.Sprintf("NumGC:%v\n", m.NumGC),
-		)
-	}
-
+func ReportMemory(db *sql.DB) {
 	var lastMemoryReport time.Time
 	for {
 		select {
@@ -1319,10 +1272,38 @@ func reportMemory(db *sql.DB) {
 			if tooSoon {
 				continue // limit throughput
 			}
-			printStats()
+			PrintStats(db)
 			lastMemoryReport = time.Now()
 		}
 	}
+}
+
+func PrintStats(db *sql.DB) {
+	var (
+		name, dbSize, blockSize, walSize, memSize, memLimit string
+		totalBlocks, usedBlocks, freeBlocks                 int64
+	)
+	r := db.QueryRow(`PRAGMA database_size`)
+	err := r.Scan(&name, &dbSize, &blockSize, &totalBlocks, &usedBlocks, &freeBlocks, &walSize, &memSize, &memLimit)
+	if err != nil {
+		log.Print(err)
+		return
+	}
+	freeBlocksPct := 0
+	if totalBlocks > 0 {
+		freeBlocksPct = int(float64(freeBlocks) / float64(totalBlocks) * 100)
+	}
+	log.Printf("DuckDB: fileSize:%s, walSize:%s, mem:%s/%s, Blcs[total/used/free/freePcs]:%d,%d,%d,%d%% ",
+		dbSize, walSize, memSize, memLimit, totalBlocks, usedBlocks, freeBlocks, freeBlocksPct)
+
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+
+	log.Printf(
+		"System: %s, %s",
+		fmt.Sprintf("VirtMem:%dMiB", m.Sys/1024/1024),         // total virtual memory reserved from OS
+		fmt.Sprintf("HeapAlloc:%dMiB", m.HeapAlloc/1024/1024), // HeapAlloc is bytes of allocated heap objects.
+	)
 }
 
 func NewStorage(
@@ -1331,70 +1312,30 @@ func NewStorage(
 	searchFlushTick time.Duration,
 	duckdbMemLimitMb uint,
 ) (*Storage, error) {
-	duckFile := filepath.Join(storagePath, "db.docs")
-
-	termsDirPath := filepath.Join(storagePath, "terms")
-	err := os.Mkdir(termsDirPath, 0777)
-	if err != nil && !errors.Is(err, os.ErrExist) {
-		return nil, err
-	}
-	termsDir, err := NewTermsDir(termsDirPath)
+	connector, err := PrepareDuckDB(storagePath, duckdbMemLimitMb)
 	if err != nil {
 		return nil, err
 	}
-	go func() {
-		// merge terms files
-		t := time.NewTicker(100 * time.Millisecond)
-		defer t.Stop()
-		for {
-			select {
-			case <-t.C:
-				err := termsDir.Merge()
-				if err != nil {
-					log.Printf("terms merge fail: %s", err)
-					time.Sleep(time.Second * 10)
-					continue
-				}
-				err = termsDir.Cleanup()
-				if err != nil {
-					log.Printf("terms cleanup fail: %s", err)
-					time.Sleep(time.Second * 10)
-				}
-			}
-		}
-	}()
 
-	// add config values
-	if duckdbMemLimitMb < 100 {
-		log.Fatalf("Duckdb mem limit is too low: %d", duckdbMemLimitMb)
-	}
-	duckdbMemLimit := fmt.Sprintf("%dMb", duckdbMemLimitMb)
-	duckOptions := map[string]string{
-		"memory_limit":               duckdbMemLimit,
-		"temp_directory":             storagePath,
-		"immediate_transaction_mode": "true",
-	}
-	duckFile += "?"
-	for k, v := range duckOptions {
-		duckFile += fmt.Sprintf("%s=%s&", k, v)
-	}
-
-	connector, err := duckdb.NewConnector(duckFile, nil)
-	if err != nil {
-		panic(err)
-	}
+	db := sql.OpenDB(connector)
 
 	s := &Storage{
-		db: sql.OpenDB(connector),
+		db: db,
 
-		termsDir:               termsDir,
+		termsDir:               new(terms.TermsDir),
 		appendersFlushInterval: ingestFlushTick,
 	}
 
-	err = s.Migrate()
+	err = Migrate(db)
 	if err != nil {
 		panic(err)
 	}
+
+	s.termsDir, err = terms.NewTermsDir(db)
+	if err != nil {
+		return nil, err
+	}
+	go s.termsDir.StartMergeMonitor()
 
 	conn, err := connector.Connect(context.Background())
 	if err != nil {
@@ -1434,7 +1375,49 @@ func NewStorage(
 	go s.ingestQueryMessages(searchFlushTick)
 
 	memoryReportCh = make(chan time.Duration, 10)
-	go reportMemory(s.db)
+	go ReportMemory(s.db)
 
 	return s, nil
+}
+
+func PrepareDuckDB(path string, duckdbMemLimitMb uint) (driver.Connector, error) {
+	duckFile := filepath.Join(path, "db.docs")
+
+	// add config values
+	if duckdbMemLimitMb < 100 {
+		log.Fatalf("Duckdb mem limit is too low: %d", duckdbMemLimitMb)
+	}
+	duckdbMemLimit := fmt.Sprintf("%dMb", duckdbMemLimitMb)
+	duckOptions := map[string]string{
+		"memory_limit":               duckdbMemLimit,
+		"temp_directory":             path,
+		"immediate_transaction_mode": "true",
+	}
+	duckFile += "?"
+	for k, v := range duckOptions {
+		duckFile += fmt.Sprintf("%s=%s&", k, v)
+	}
+
+	connector, err := duckdb.NewConnector(duckFile, nil)
+
+	return connector, err
+}
+
+func Migrate(db *sql.DB) (err error) {
+	f, err := migrationFS.Open("migrations/1_init.up.sql")
+	if err != nil {
+		return err
+	}
+	migrateContent, err := io.ReadAll(f)
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(string(migrateContent))
+	if err != nil && strings.Contains(err.Error(), "already exists") {
+		return nil // skip migrations
+	}
+	if err != nil {
+		return err
+	}
+	return nil
 }

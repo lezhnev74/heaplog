@@ -11,9 +11,11 @@ import (
 	"heaplog/tokenizer"
 	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"runtime/trace"
 	"strings"
 	"time"
 )
@@ -79,16 +81,16 @@ var runCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 
 		// // -- Start Tracing
-		// traceFile, _ := os.Create("trace")
-		// trace.Start(traceFile)
-		// c := make(chan os.Signal, 1)
-		// signal.Notify(c, os.Interrupt)
-		// go func() {
-		// 	<-c
-		// 	trace.Stop()
-		// 	traceFile.Close()
-		// 	os.Exit(0)
-		// }()
+		traceFile, _ := os.Create("trace")
+		trace.Start(traceFile)
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt)
+		go func() {
+			<-c
+			trace.Stop()
+			traceFile.Close()
+			os.Exit(0)
+		}()
 		// // -- End Tracing
 
 		hl := buildHeaplog(LoadConfig(true))

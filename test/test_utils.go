@@ -36,7 +36,7 @@ var (
 	_scanner = scanner.NewScanner(dateLayout, messageStartPattern, 100, 1000)
 	_indexer = indexer.NewIndexer(_scanner, tokenizerFunc)
 
-	//go:embed _testdata
+	//go:embed testdata
 	testdataFS embed.FS
 )
 
@@ -84,7 +84,7 @@ func PrepareDataSourceFiles(t *testing.T) (logFiles map[string]int64) {
 	require.NoError(t, err)
 
 	// Copy embedded files to the target dir:
-	srcFiles := []string{"_testdata/file1.log", "_testdata/file2.log"}
+	srcFiles := []string{"testdata/file1.log", "testdata/file2.log"}
 	for _, srcFile := range srcFiles {
 		_, filename := path.Split(srcFile)
 		dstFile := path.Join(filesRoot, filename)
