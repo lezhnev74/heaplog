@@ -25,6 +25,11 @@ type TermsDir struct {
 	mergedList *TermsFileList
 }
 
+type termId struct {
+	term string
+	id   uint64
+}
+
 // Put must assign unique ids for all new terms, so it must synchronise access
 func (d *TermsDir) Put(terms []string) (err error) {
 	if len(terms) == 0 {

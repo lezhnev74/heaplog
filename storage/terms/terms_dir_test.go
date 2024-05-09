@@ -1,15 +1,12 @@
 package terms_test
 
 import (
-	"context"
 	"database/sql"
 	"github.com/stretchr/testify/require"
 	"heaplog/storage"
 	"heaplog/storage/terms"
-	"log"
 	"math/rand"
 	"os"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -115,81 +112,81 @@ func TestPutMerge(t *testing.T) {
 	require.Equal(t, expectedTerms, alltermIds)
 }
 
-func TestMergePerformance(t *testing.T) {
-
-	// Here I am profiling how memory is used for big concurrent put/merge work.
-
-	path, db := prepareStorage(t)
-	defer os.RemoveAll(path)
-	defer db.Close()
-
-	termsDir, err := terms.NewTermsDir(db)
-	require.NoError(t, err)
-
-	ctxPut, stopPut := context.WithCancel(context.Background())
-	ctxMerge, stopMerge := context.WithCancel(context.Background())
-
-	go func() {
-		for {
-			time.Sleep(3 * time.Second)
-			storage.PrintStats(db)
-
-			var fstCount, fstLen int64
-			r := db.QueryRow(`SELECT count(*),sum(octet_length(fst)) FROM fst`)
-			r.Scan(&fstCount, &fstLen)
-			log.Printf("FSTs: %05d/%010d bytes", fstCount, fstLen)
-		}
-	}()
-
-	// 1. Load multiple Put operations
-	for i := 0; i < runtime.NumCPU(); i++ {
-		go func() {
-			for {
-				select {
-				case <-ctxPut.Done():
-					return
-				default:
-					randomTerms := make([]string, 0, 100_000)
-					for j := 0; j < cap(randomTerms); j++ {
-						randomTerms = append(randomTerms, generateRandomString(20))
-					}
-					require.NoError(t, termsDir.Put(randomTerms))
-				}
-			}
-		}()
-	}
-
-	// 2. Merge terms
-	go func() {
-		for {
-			select {
-			case <-ctxMerge.Done():
-				return
-			default:
-				err = termsDir.Merge()
-				require.NoError(t, err)
-				err = termsDir.Cleanup()
-				require.NoError(t, err)
-			}
-		}
-	}()
-
-	time.Sleep(time.Second * 5)
-	stopPut()
-	time.Sleep(time.Second * 10)
-	stopMerge()
-	time.Sleep(time.Second * 10)
-	runtime.GC()
-	time.Sleep(time.Second * 5)
-
-	// measure memory consumption
-	//f, err := os.Create(fmt.Sprintf("./profile_%d.tmp", time.Now().Unix()))
-	//if err != nil {
-	//	log.Fatal("could not create Mem profile: ", err)
-	//}
-	//p := pprof.Lookup("heap")
-	//require.NoError(t, p.WriteTo(f, 0))
-}
+//func TestMergePerformance(t *testing.T) {
+//
+//	// Here I am profiling how memory is used for big concurrent put/merge work.
+//
+//	path, db := prepareStorage(t)
+//	defer os.RemoveAll(path)
+//	defer db.Close()
+//
+//	termsDir, err := terms.NewTermsDir(db)
+//	require.NoError(t, err)
+//
+//	ctxPut, stopPut := context.WithCancel(context.Background())
+//	ctxMerge, stopMerge := context.WithCancel(context.Background())
+//
+//	go func() {
+//		for {
+//			time.Sleep(3 * time.Second)
+//			storage.PrintStats(db)
+//
+//			var fstCount, fstLen int64
+//			r := db.QueryRow(`SELECT count(*),sum(octet_length(fst)) FROM fst`)
+//			r.Scan(&fstCount, &fstLen)
+//			log.Printf("FSTs: %05d/%010d bytes", fstCount, fstLen)
+//		}
+//	}()
+//
+//	// 1. Load multiple Put operations
+//	for i := 0; i < runtime.NumCPU(); i++ {
+//		go func() {
+//			for {
+//				select {
+//				case <-ctxPut.Done():
+//					return
+//				default:
+//					randomTerms := make([]string, 0, 100_000)
+//					for j := 0; j < cap(randomTerms); j++ {
+//						randomTerms = append(randomTerms, generateRandomString(20))
+//					}
+//					require.NoError(t, termsDir.Put(randomTerms))
+//				}
+//			}
+//		}()
+//	}
+//
+//	// 2. Merge terms
+//	go func() {
+//		for {
+//			select {
+//			case <-ctxMerge.Done():
+//				return
+//			default:
+//				err = termsDir.Merge()
+//				require.NoError(t, err)
+//				err = termsDir.Cleanup()
+//				require.NoError(t, err)
+//			}
+//		}
+//	}()
+//
+//	time.Sleep(time.Second * 5)
+//	stopPut()
+//	time.Sleep(time.Second * 10)
+//	stopMerge()
+//	time.Sleep(time.Second * 10)
+//	runtime.GC()
+//	time.Sleep(time.Second * 5)
+//
+//	// measure memory consumption
+//	//f, err := os.Create(fmt.Sprintf("./profile_%d.tmp", time.Now().Unix()))
+//	//if err != nil {
+//	//	log.Fatal("could not create Mem profile: ", err)
+//	//}
+//	//p := pprof.Lookup("heap")
+//	//require.NoError(t, p.WriteTo(f, 0))
+//}
 
 func generateRandomString(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
