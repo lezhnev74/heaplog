@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	go_iterators "github.com/lezhnev74/go-iterators"
 	"github.com/lezhnev74/inverted_index_2"
 	"github.com/marcboeker/go-duckdb"
@@ -20,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"runtime/pprof"
 	"time"
 )
 
@@ -344,4 +346,20 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 		search: _search,
 		cfg:    cfg,
 	}, nil
+}
+
+func Profile(fn func()) {
+	tt := time.Now()
+	f, err := os.Create(fmt.Sprintf("./profile_%d.tmp", time.Now().Unix()))
+	if err != nil {
+		log.Fatal("could not create CPU profile: ", err)
+	}
+	if err := pprof.StartCPUProfile(f); err != nil {
+		log.Fatal("could not start CPU profile: ", err)
+	}
+
+	fn()
+
+	log.Printf("profiled in %s", time.Now().Sub(tt).String())
+	pprof.StopCPUProfile()
 }
