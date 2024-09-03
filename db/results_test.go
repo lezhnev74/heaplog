@@ -63,12 +63,12 @@ func TestResultsRead(t *testing.T) {
 		return
 	}, func() error { return nil })
 
-	r, err := dbContainer.QueryDB.CheckinQuery("sample", &t1, &t2, it)
+	r, err := dbContainer.QueryDB.CheckinQuery("sample", &t0, &t2, it)
 	require.NoError(t, err)
 
 	require.False(t, r.Finished)
 	require.Equal(t, 0, r.Messages)
-	require.Equal(t, &t1, r.Min)
+	require.Equal(t, &t0, r.Min)
 	require.Equal(t, &t2, r.Max)
 
 	dbContainer.QueryDB.Flush()
@@ -83,6 +83,7 @@ func TestResultsRead(t *testing.T) {
 	ticks <- true // allow one message to pass in
 	time.Sleep(200 * time.Millisecond)
 	dbContainer.QueryDB.Flush() // see the message
+	time.Sleep(200 * time.Millisecond)
 
 	page, err = dbContainer.QueryDB.Page(r.Id, nil, nil, 0, 100)
 	require.NoError(t, err)
