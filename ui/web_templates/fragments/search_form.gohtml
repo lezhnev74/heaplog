@@ -1,0 +1,165 @@
+<div class="container-fluid">
+    <form hx-get="/cmd/new" hx-target="#query_results" autocomplete="off">
+        <div class="row gx-0" style="margin:10px 0;">
+            <div class="col col-3">
+<textarea class="form-control"
+          name="Text"
+          placeholder="Type your search query here..."
+          rows="5"
+          style=""
+          spellcheck="false"
+>{{.Query}}</textarea>
+            </div>
+            <div class="col col-3 gx-3">
+
+                <div class="input-group"
+                     id="query_from"
+                     data-td-target-input="nearest"
+                     data-td-target-toggle="nearest"
+                >
+                    <span class="input-group-text" style="width:60px;">From</span>
+                    <input
+                            id="query_from_input"
+                            class="form-control"
+                            type="text"
+                            name="From"
+                            value="{{.From}}"
+                            placeholder="in UTC"
+                            data-td-target="#query_from"
+                    />
+                    <span
+                            class="input-group-text"
+                            data-td-target="#query_from"
+                            data-td-toggle="datetimepicker"
+                    >
+                       <i class="bi bi-calendar"></i>
+                     </span>
+                </div>
+                <div class="input-group"
+                     id="query_to"
+                     style="margin:10px 0;"
+                     data-td-target-input="nearest"
+                     data-td-target-toggle="nearest"
+                >
+                    <span class="input-group-text" style="width:60px;">To</span>
+                    <input
+                            type="text"
+                            name="To"
+                            id="query_to_input"
+                            class="form-control"
+                            value="{{.To}}"
+                            placeholder="in UTC"
+                            data-td-target="#query_to"
+                    />
+                    <span
+                            class="input-group-text"
+                            data-td-target="#query_to"
+                            data-td-toggle="datetimepicker"
+                    >
+                       <i class="bi bi-calendar"></i>
+                     </span>
+                </div>
+                <div class="input-group">
+                    <input type="submit" value="Search" class="btn btn-warning"/>
+                </div>
+            </div>
+            <div class="col col-6">
+                <div id="secondary_area">
+                    <div class="dropdown">
+                        <button class="btn text-muted btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown"
+                                aria-expanded="false">
+                            Choose date presets
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li>
+                                <button class="dropdown-item" type="button" id="preset_clear">Clear All</button>
+                            </li>
+                            <li>
+                                <button class="dropdown-item" type="button" id="preset_today">Today</button>
+                            </li>
+                            <li>
+                                <button class="dropdown-item" type="button" id="preset_yesterday">Yesterday</button>
+                            </li>
+                            <li>
+                                <button class="dropdown-item" type="button" id="preset_7days">Last 7 days</button>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+    var from, to;
+
+    $(function () {
+        // init date time picker
+        conf = {
+            restrictions: {
+                //maxDate: new tempusDominus.DateTime()
+            },
+            localization: {
+                hourCycle: 'h23',
+                format: 'dd.MM.yyyy HH:mm:ss',
+            },
+            display: {
+                components: {seconds: true},
+                icons: {
+                    type: 'icons',
+                    time: 'bi bi-watch',
+                    date: 'bi bi-calendar-date',
+                    up: 'bi bi-arrow-up',
+                    down: 'bi bi-arrow-down',
+                    previous: 'bi bi-chevron-left',
+                    next: 'bi bi-chevron-right',
+                    today: 'bi bi-calendar-check',
+                    clear: 'bi bi-trash',
+                    close: 'bi bi-xmark'
+                },
+                buttons: {
+                    today: false,
+                    clear: true,
+                    close: true
+                },
+            },
+
+        }
+        from = new tempusDominus.TempusDominus(document.getElementById('query_from'), conf);
+        to = new tempusDominus.TempusDominus(document.getElementById('query_to'), conf);
+
+        // Presets support
+        $("#preset_clear").click(function () {
+            document.getElementById('query_from_input').value = '';
+            document.getElementById('query_to_input').value = '';
+        })
+        $("#preset_today").click(function () {
+            from.dates.setValue((new tempusDominus.DateTime()).startOf('date'))
+            document.getElementById('query_to_input').value = '';
+        })
+        $("#preset_yesterday").click(function () {
+            from.dates.setValue((new tempusDominus.DateTime()).manipulate(-1, 'date').startOf('date'))
+            to.dates.setValue((new tempusDominus.DateTime()).startOf('date'))
+        })
+        $("#preset_7days").click(function () {
+            from.dates.setValue((new tempusDominus.DateTime()).manipulate(-7, 'date').startOf('date'))
+            to.dates.setValue((new tempusDominus.DateTime()).startOf('date'))
+        })
+
+        // pre-process dates before sending:
+        document.body.addEventListener('htmx:configRequest', function (evt) {
+            if(evt.detail.path != "/cmd/new") {
+                // only provide the below attribute for the form requests
+                return
+            }
+
+            if ($("#query_from_input").val()) {
+                evt.detail.parameters['From'] = $("#query_from_input").val()
+            }
+            if ($("#query_to_input").val()) {
+                evt.detail.parameters['To'] = $("#query_to_input").val()
+            }
+        });
+    });
+</script>

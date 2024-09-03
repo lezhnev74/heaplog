@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Heaplog</title>
+    <link href="/static/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/tempus-dominus.min.css" rel="stylesheet">
+    <link href="/static/tempus-dominus.min.css" rel="stylesheet">
+    <link href="/static/bootstrap-icons/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+
+        .form-select:focus,
+        textarea:focus,
+        select,
+        textarea.form-control:focus,
+        input.form-control:focus,
+        input[type=text]:focus,
+        input[type=password]:focus,
+        input[type=email]:focus,
+        input[type=number]:focus,
+        [type=text].form-control:focus,
+        [type=password].form-control:focus,
+        [type=email].form-control:focus,
+        [type=tel].form-control:focus,
+        [contenteditable].form-control:focus {
+            box-shadow: none;
+            outline: none !important;
+        }
+
+        .btn:focus {
+            outline: none !important;
+            box-shadow: none;
+        }
+
+        .message {
+            font-size: 14px;
+            display: flex;
+            padding-bottom: 3px;
+        }
+
+        .message pre {
+            line-height: 1.3em;
+            padding: 5px 0;
+        }
+
+        .message .message_side {
+            flex: 0 0 30px;
+            position: relative;
+            overflow: hidden;
+            text-align: right;
+        }
+
+        .message .message_side .expand {
+            cursor: pointer;
+        }
+
+        .message.collapsed pre {
+            height: 1.6em;
+            overflow: hidden;
+            margin: 0;
+        }
+
+        .messages {
+            margin-bottom: 1rem;
+        }
+
+        .messages .message * {
+            color: black;
+        }
+
+        .messages .message:nth-child(even) {
+            background-color: #f1f1f1;
+        }
+
+        .query_list:nth-child(even) {
+            background-color: #f1f1f1;
+        }
+
+        .query_line pre {
+            font-size: 1rem;
+            margin: 0 0 0 0;
+        }
+
+    </style>
+</head>
+<body>
+<div style="height:3px;">
+    <div id="load" class="loader-line" style="display:none;"></div>
+</div>
+
+<script src="/static/htmx.js"></script>
+<script src="/static/jquery-3.7.0.min.js"></script>
+<script src="/static/popper.min.js"></script>
+<script src="/static/tempus-dominus.min.js"></script>
+<script src="/static/bootstrap.min.js"></script>
+<script src="/static/jQuery-provider.min.js"></script>
+<script src="/static/luxon.js"></script>
+<script src="/static/chart.umd.min.js"></script>
+<script src="/static/chartjs-plugin-zoom.js"></script>
+<script src="/static/chartjs-adapter-luxon.js"></script>
+<script src="/static/jquery.ba-throttle-debounce.min.js"></script>
+
+{{embed}}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col">
+            <div id="command_out"></div>
+        </div>
+        <div class="col text-end">
+            <a href="https://github.com/lezhnev74/heaplog">https://github.com/lezhnev74/heaplog</a>
+            <br/>
+            by <a href="https://lessthan12ms.com">Dmitriy Lezhnev</a>
+            <br><br>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.body.addEventListener('htmx:configRequest', function (evt) {
+        // default pagesize if not given (load from the localstorage)
+        if (!evt.detail.parameters.hasOwnProperty("pagesize")) {
+            evt.detail.parameters["pagesize"] = localStorage.getItem("pagesize") || "100";
+        }
+    });
+
+    // Manage a WIP label:
+    isWIP = 0
+    loading = ' Loading...'
+    htmx.on("htmx:beforeRequest", function () {
+        isWIP++
+        if (!$("title").html().includes(loading)) {
+            $("title").html($("title").html() + loading);
+        }
+    });
+    htmx.on("htmx:afterSettle", function () {
+        isWIP--
+    });
+    setInterval(function () {
+        if (isWIP > 0) {
+            return;
+        }
+        $("title").html($("title").html().replace(loading, ''));
+    }, 500)
+
+    $(function () {
+        // Messages: expand row on click
+        $("body").on('click', ".message .expand", function (e) {
+            $(this).parents(".message").toggleClass('collapsed');
+        })
+        // Pagination: remember the page size choice
+        $("body").on("change", "#pagesize", function () {
+            localStorage.setItem("pagesize", $(this).val())
+        });
+    });
+</script>
+</body>
+</html>
