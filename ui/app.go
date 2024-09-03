@@ -19,6 +19,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"time"
 )
 
@@ -294,9 +295,14 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 				select {
 				case <-t.C:
 					go func() {
-						_, err := ii.Merge(20, 30, int(cfg.Concurrency))
-						if err != nil {
-							log.Printf("merging inverted index segments: %s", err)
+						for {
+							merged, err := ii.Merge(20, 30, int(cfg.Concurrency))
+							if err != nil {
+								log.Printf("merging inverted index segments: %s", err)
+							}
+							if merged == 0 {
+								break
+							}
 						}
 					}()
 
@@ -326,6 +332,8 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 						return
 					}
 				}
+
+				debug.FreeOSMemory()
 			}
 		}()
 	}
