@@ -11,6 +11,7 @@ import (
 	"github.com/marcboeker/go-duckdb"
 	"golang.org/x/exp/mmap"
 	"golang.org/x/xerrors"
+	"heaplog_2024/common"
 	"heaplog_2024/db"
 	"heaplog_2024/ingest"
 	"heaplog_2024/query_language"
@@ -251,8 +252,8 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 	if err != nil {
 		return nil, err
 	}
-	layoutFile := func(file string) ([]scanner.MessageLayout, error) {
-		it, err := scanner.UgScan(file, cfg.MessageStartRE)
+	layoutFile := func(file string, locations []common.Location) ([]scanner.MessageLayout, error) {
+		it, err := scanner.UgScanLocations(file, locations, cfg.MessageStartRE)
 		return go_iterators.ToSlice(it), err
 	}
 	pd := func(b []byte) (time.Time, error) {

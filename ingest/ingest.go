@@ -21,7 +21,7 @@ var EmptySegment = errors.New("no messages begins in the segment")
 
 type Ingest struct {
 	// findMessages extracts message layouts (boundaries) from the file
-	findMessages func(file string) ([]scanner.MessageLayout, error)
+	findMessages func(file string, locations []common.Location) ([]scanner.MessageLayout, error)
 	parseTime    func([]byte) (time.Time, error)
 	tokenize     func([]byte) [][]byte
 	db           *db.DbContainer
@@ -38,7 +38,7 @@ type ScannedTokenizedMessage struct {
 }
 
 func NewIngest(
-	scan func(file string) ([]scanner.MessageLayout, error),
+	scan func(file string, locations []common.Location) ([]scanner.MessageLayout, error),
 	parseTime func([]byte) (time.Time, error),
 	tokenize func([]byte) [][]byte,
 	db *db.DbContainer,
@@ -107,7 +107,7 @@ func (ing *Ingest) indexFile(file string, locations []common.Location) error {
 	}
 	defer reader.Close()
 
-	allMessageLayouts, err := ing.findMessages(file)
+	allMessageLayouts, err := ing.findMessages(file, locations)
 
 	// pickNextLocation returns the next contiguous run (that is at most segmentSize long)
 	pickNextLocation := func(minPos uint64) (nextLoc common.Location) {

@@ -9,6 +9,7 @@ import (
 	"github.com/lezhnev74/inverted_index_2"
 	"github.com/marcboeker/go-duckdb"
 	"github.com/stretchr/testify/require"
+	"heaplog_2024/common"
 	"heaplog_2024/db"
 	"heaplog_2024/ingest"
 	"heaplog_2024/query_language"
@@ -188,8 +189,8 @@ func buildDependencies(t *testing.T, segmentSize uint64, storageRoot string) (
 	ii, err := inverted_index_2.NewInvertedIndex(storageRoot)
 	require.NoError(t, err)
 
-	s := func(file string) ([]scanner.MessageLayout, error) {
-		it, err := scanner.UgScan(file, messageStartPattern)
+	s := func(file string, locations []common.Location) ([]scanner.MessageLayout, error) {
+		it, err := scanner.UgScanLocations(file, locations, messageStartPattern)
 		require.NoError(t, err)
 		return go_iterators.ToSlice(it), nil
 	}
