@@ -90,6 +90,11 @@ func (ing *Ingest) Index(files []string) error {
 }
 
 func (ing *Ingest) indexFile(file string, locations []common.Location) error {
+
+	if len(locations) == 0 {
+		return nil // nothing to index
+	}
+
 	fileId, err := ing.db.GetFileId(file)
 	if err != nil {
 		return xerrors.Errorf("index file: %w", err)

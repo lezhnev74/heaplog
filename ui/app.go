@@ -266,6 +266,7 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 
 	// 3. Start background procs
 	if startBackground {
+		// Clear up
 		go func() {
 			t := time.NewTicker(time.Minute)
 			defer t.Stop()
@@ -279,7 +280,7 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 					}
 					for _, q := range queries {
 						ttl := time.Hour * 24
-						if time.Now().Sub(*q.BuiltAt) < ttl {
+						if time.Now().Sub(*q.BuiltAt) > ttl {
 							err = dbContainer.RemoveQuery(q.Id)
 							if err != nil {
 								log.Printf("cleanup queries: %s", err.Error())
@@ -288,26 +289,17 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 						}
 					}
 				}
+
+				debug.FreeOSMemory()
 			}
 		}()
+		// Ingest
 		go func() {
 			t := time.NewTicker(time.Second * 10)
 			defer t.Stop()
 			for {
 				select {
 				case <-t.C:
-					go func() {
-						for {
-							merged, err := ii.Merge(20, 30, int(cfg.Concurrency))
-							if err != nil {
-								log.Printf("merging inverted index segments: %s", err)
-							}
-							if merged == 0 {
-								break
-							}
-						}
-					}()
-
 					_, obsoletes, err := _discover.DiscoverFiles()
 					if err != nil {
 						log.Printf("discovering files stopped: %s", err)
@@ -334,8 +326,25 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 						return
 					}
 				}
-
-				debug.FreeOSMemory()
+			}
+		}()
+		// Merge
+		go func() {
+			t := time.NewTicker(time.Second * 10)
+			defer t.Stop()
+			for {
+				select {
+				case <-t.C:
+					for {
+						merged, err := ii.Merge(30, 60, int(cfg.Concurrency))
+						if err != nil {
+							log.Printf("merging inverted index segments: %s", err)
+						}
+						if merged == 0 {
+							break
+						}
+					}
+				}
 			}
 		}()
 	}
