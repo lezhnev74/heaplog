@@ -132,7 +132,7 @@ func (ing *Ingest) indexFile(file string, locations []common.Location) error {
 			break
 		}
 
-		locMessageLayouts := selectLayouts(loc, allMessageLayouts)
+		locMessageLayouts := selectLocationLayouts(loc, allMessageLayouts)
 		if len(locMessageLayouts) == 0 {
 			// here is the workaround for files where messages begin not from the beginning
 			// in which case a location may have no messages at all.
@@ -331,7 +331,7 @@ func (ing *Ingest) readMessagesInStream(file io.ReaderAt, messageLayouts []scann
 }
 
 // From the list of all layouts select suitable for the given location.
-func selectLayouts(loc common.Location, layouts []scanner.MessageLayout) []scanner.MessageLayout {
+func selectLocationLayouts(loc common.Location, layouts []scanner.MessageLayout) []scanner.MessageLayout {
 	leftLayout := scanner.MessageLayout{From: loc.From}
 	rightLayout := scanner.MessageLayout{From: loc.To}
 

@@ -229,7 +229,9 @@ func (qe *Expression) GetMatcher() MatchFunc {
 
 			switch o := operand.(type) {
 			case string:
+				o = strings.ToLower(o)
 				operandFunc = func(s string) bool {
+					s = strings.ToLower(s)
 					return strings.Contains(s, o) // case-sensitive matching
 				}
 			case RegExpLiteral:

@@ -80,13 +80,13 @@ func TestSearchResults(t *testing.T) {
 				{Loc: common.Location{1, 71}, FileId: file2Id, Date: test_util.MakeTimeP("2024-08-01T00:01:01.285087+00:00")},
 			},
 		},
+		//{ // case-sensitive match
+		//	query:           "Event",
+		//	isFullScan:      false,
+		//	matchedMessages: []db.Message{},
+		//},
 		{ // case-sensitive match
-			query:           "Event",
-			isFullScan:      false,
-			matchedMessages: []db.Message{},
-		},
-		{ // case-sensitive match
-			query:      "event",
+			query:      "Event",
 			isFullScan: false,
 			matchedMessages: []db.Message{
 				{Loc: common.Location{64, 135}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:01:10.100170+00:00")},
@@ -173,7 +173,7 @@ func PrepareTestFiles(t *testing.T, storageRoot string) (files []string) {
 	sampleFile1 := `
 [2024-07-30T00:00:10.100160+00:00] payment error: invalid card
 [2024-07-30T00:01:10.100170+00:00] event triggered: signup (userid:12)
-[2024-07-30T00:02:10.383227+00:00] api failure: quota reached
+[2024-07-30T00:02:10.383227+00:00] api failure: Quota reached
 [2024-07-30T00:03:30.449222+00:00] file error: no disk space
 [2024-07-30T00:04:20.082156+00:00] payment accepted
 `

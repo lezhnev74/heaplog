@@ -1,10 +1,13 @@
 package common
 
 import (
+	"database/sql"
 	"fmt"
 	"golang.org/x/xerrors"
 	"hash/crc32"
+	"log"
 	"os"
+	"runtime"
 	"time"
 )
 
@@ -71,4 +74,48 @@ func FileSize(path string) (uint64, error) {
 		return 0, err
 	}
 	return uint64(fi.Size()), nil
+}
+
+// InstantTick is a forever ticker that starts instantly
+func InstantTick(d time.Duration) chan time.Time {
+	tick := time.Tick(d)
+	ret := make(chan time.Time)
+	go func() {
+		ret <- time.Now()
+		for {
+			select {
+			case n := <-tick:
+				ret <- n
+			}
+		}
+	}()
+	return ret
+}
+
+func PrintMem(db *sql.DB) {
+	var (
+		name, dbSize, blockSize, walSize, memSize, memLimit string
+		totalBlocks, usedBlocks, freeBlocks                 int64
+	)
+	r := db.QueryRow(`PRAGMA database_size`)
+	err := r.Scan(&name, &dbSize, &blockSize, &totalBlocks, &usedBlocks, &freeBlocks, &walSize, &memSize, &memLimit)
+	if err != nil {
+		log.Print(err)
+		return
+	}
+	freeBlocksPct := 0
+	if totalBlocks > 0 {
+		freeBlocksPct = int(float64(freeBlocks) / float64(totalBlocks) * 100)
+	}
+	log.Printf("DuckDB: fileSize:%s, walSize:%s, mem:%s/%s, Blcs[total/used/free/freePcs]:%d,%d,%d,%d%% ",
+		dbSize, walSize, memSize, memLimit, totalBlocks, usedBlocks, freeBlocks, freeBlocksPct)
+
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+
+	log.Printf(
+		"System: %s, %s",
+		fmt.Sprintf("VirtMem:%dMiB", m.Sys/1024/1024),         // total virtual memory reserved from OS
+		fmt.Sprintf("HeapAlloc:%dMiB", m.HeapAlloc/1024/1024), // HeapAlloc is bytes of allocated heap objects.
+	)
 }

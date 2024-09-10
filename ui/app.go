@@ -253,7 +253,7 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 		return nil, err
 	}
 	layoutFile := func(file string, locations []common.Location) ([]scanner.MessageLayout, error) {
-		it, err := scanner.UgScanLocations(file, locations, cfg.MessageStartRE)
+		it, err := scanner.UgScan(file, cfg.MessageStartRE)
 		return go_iterators.ToSlice(it), err
 	}
 	pd := func(b []byte) (time.Time, error) {
@@ -267,20 +267,31 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 
 	// 3. Start background procs
 	if startBackground {
-		// Clear up
+		// Report mem
+		if cfg.ReportLevel > 0 {
+			go func() {
+				t := common.InstantTick(time.Second * 10)
+				for {
+					select {
+					case <-t:
+						common.PrintMem(_db)
+					}
+				}
+			}()
+		}
+		// Clear up queries
 		go func() {
-			t := time.NewTicker(time.Minute)
-			defer t.Stop()
+			t := common.InstantTick(time.Minute)
 			for {
 				select {
-				case <-t.C:
+				case <-t:
 					queries, err := dbContainer.List()
 					if err != nil {
 						log.Printf("cleanup queries: %s", err.Error())
 						return
 					}
+					ttl := time.Hour * 24
 					for _, q := range queries {
-						ttl := time.Hour * 24
 						if time.Now().Sub(*q.BuiltAt) > ttl {
 							err = dbContainer.RemoveQuery(q.Id)
 							if err != nil {
@@ -296,11 +307,10 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 		}()
 		// Ingest
 		go func() {
-			t := time.NewTicker(time.Second * 10)
-			defer t.Stop()
+			t := common.InstantTick(time.Minute)
 			for {
 				select {
-				case <-t.C:
+				case <-t:
 					_, obsoletes, err := _discover.DiscoverFiles()
 					if err != nil {
 						log.Printf("discovering files stopped: %s", err)
@@ -308,7 +318,7 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 					}
 
 					if len(obsoletes) > 0 {
-						err = db.ClearUp(dbContainer)
+						err = db.ClearUp(dbContainer, ii)
 						if err != nil {
 							log.Printf("cleaning up: %s", err)
 							return
@@ -331,13 +341,12 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 		}()
 		// Merge
 		go func() {
-			t := time.NewTicker(time.Second * 10)
-			defer t.Stop()
+			t := common.InstantTick(time.Minute)
 			for {
 				select {
-				case <-t.C:
+				case <-t:
 					for {
-						merged, err := ii.Merge(30, 60, int(cfg.Concurrency))
+						merged, err := ii.Merge(30, 10, int(cfg.Concurrency))
 						if err != nil {
 							log.Printf("merging inverted index segments: %s", err)
 						}

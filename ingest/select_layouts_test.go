@@ -47,7 +47,7 @@ func TestSelectLayouts(t *testing.T) {
 
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("Test %d", i), func(t *testing.T) {
-			actualLayouts := selectLayouts(tt.loc, layouts)
+			actualLayouts := selectLocationLayouts(tt.loc, layouts)
 			require.Equal(t, tt.expectedLayouts, actualLayouts)
 		})
 	}

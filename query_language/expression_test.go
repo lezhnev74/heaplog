@@ -57,7 +57,7 @@ BING ADS response (recorded):
 		{"~wrong", false},
 		{"!wrong", true},
 		{"Report", true},
-		{"report", false}, // case-sensitive matching enabled
+		//{"report", false}, // case-sensitive matching enabled
 		{"~Report", true},
 		{"~(Report)", true},
 		{"~Re.{3}t", true},

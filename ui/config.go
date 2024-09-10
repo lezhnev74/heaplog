@@ -24,7 +24,7 @@ type Config struct {
 	// see https://go.dev/src/time/format.go
 	DateFormat string `validate:"required"`
 	// sets the degree of concurrency in the service (affects ingestion and search),
-	// defaults to the number of cores if omitted or 0.
+	// defaults to the number of cores if omitted or <1.
 	Concurrency uint
 	// Terms are extracted from messages and indexed.
 	// These control how fast ingestion goes (and space taken for the inverted index),
@@ -33,6 +33,8 @@ type Config struct {
 	// Max memory the duckdb instance is allowed to allocate.
 	// Increase if you see related errors on big data sets. (default: 500)
 	DuckdbMaxMemMb uint
+	// ReportLevel controls how much output will be shown
+	ReportLevel int
 }
 
 // Validate is the final check after all overrides are done (file load, command arguments substituted)
@@ -90,6 +92,7 @@ var DefaultCfg = Config{
 	MaxTermLen:       8,
 	DuckdbMaxMemMb:   500,
 	Concurrency:      uint(runtime.NumCPU()),
+	ReportLevel:      1,
 }
 
 func LoadConfig(loadFile bool) (cfg Config, err error) {
@@ -115,6 +118,10 @@ func LoadConfig(loadFile bool) (cfg Config, err error) {
 				return
 			}
 		}
+	}
+
+	if cfg.Concurrency < 1 {
+		cfg.Concurrency = DefaultCfg.Concurrency
 	}
 
 	return cfg, cfg.Validate()

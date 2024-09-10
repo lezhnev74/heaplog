@@ -64,7 +64,7 @@ func makeHttpApp(happ *HeaplogApp, viewsDirectory string) *fiber.App {
 			s := fmt.Sprintf("%d", c)
 			if c > 999 {
 				s = fmt.Sprintf("%.1fK", float64(c)/1000)
-				s = strings.TrimPrefix(s, ".0") // trim round suffix
+				s = strings.TrimSuffix(s, ".0") // trim round suffix
 			}
 			return s, nil
 		},

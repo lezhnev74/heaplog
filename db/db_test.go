@@ -2,6 +2,7 @@ package db_test
 
 import (
 	go_iterators "github.com/lezhnev74/go-iterators"
+	"github.com/lezhnev74/inverted_index_2"
 	"github.com/stretchr/testify/require"
 	"heaplog_2024/db"
 	"heaplog_2024/test_util"
@@ -14,7 +15,10 @@ func TestClearUp(t *testing.T) {
 	_db, storageRoot := test_util.PrepareTestDb(t)
 	defer os.RemoveAll(storageRoot)
 
-	_, err := _db.Exec(`INSERT INTO files VALUES (1, 'path1'), (2, 'path2')`)
+	ii, err := inverted_index_2.NewInvertedIndex(storageRoot)
+	require.NoError(t, err)
+
+	_, err = _db.Exec(`INSERT INTO files VALUES (1, 'path1'), (2, 'path2')`)
 	require.NoError(t, err)
 
 	_, err = _db.Exec(`INSERT INTO file_segments VALUES (1, 1, 0,10,100,200), (2, 2, 0,10,100,200)`)
@@ -30,7 +34,7 @@ func TestClearUp(t *testing.T) {
 	_, err = _db.Exec(`DELETE FROM files WHERE id=1`)
 	require.NoError(t, err)
 
-	require.NoError(t, db.ClearUp(_db))
+	require.NoError(t, db.ClearUp(_db, ii))
 
 	// Assert files
 	files, err := _db.AllFiles()

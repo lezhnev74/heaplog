@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"github.com/lezhnev74/inverted_index_2"
 	"github.com/marcboeker/go-duckdb"
 	"golang.org/x/xerrors"
 	"log"
@@ -23,10 +24,10 @@ type DbContainer struct {
 }
 
 // ClearUp removes all data associated with removed files
-func ClearUp(db *DbContainer) error {
+func ClearUp(db *DbContainer, ii *inverted_index_2.InvertedIndex) error {
 
 	// read ids as strings (helper)
-	strIds := func(sql string) (ids []string, err error) {
+	strIds := func(sql string) (ids []string, uintIds []uint32, err error) {
 		r, err := db.Query("SELECT id FROM files")
 		if err != nil {
 			return
@@ -38,25 +39,35 @@ func ClearUp(db *DbContainer) error {
 				return
 			}
 			ids = append(ids, strconv.Itoa(fid))
+			uintIds = append(uintIds, uint32(fid))
 		}
 		return
 	}
 
 	// 1. See which files exist
-	fileIds, err := strIds("SELECT id FROM files")
+	fileIds, _, err := strIds("SELECT id FROM files")
 	if err != nil {
 		return err
+	}
+	if len(fileIds) == 0 {
+		// edge-case: all files are gone
+		fileIds = append(fileIds, "9999999999999999999")
 	}
 	fileIdsString := strings.Join(fileIds, ",")
 
 	// 2. Clean up segments
-	segmentIds, err := strIds(fmt.Sprintf("SELECT id FROM file_segments WHERE fileId NOT IN (%s)", fileIdsString))
+	danglingSegmentIds, segmentU32Ids, err := strIds(fmt.Sprintf("SELECT id FROM file_segments WHERE fileId NOT IN (%s)", fileIdsString))
 	if err != nil {
 		return err
 	}
-	segmentIdsString := strings.Join(segmentIds, ",")
+	segmentIdsString := strings.Join(danglingSegmentIds, ",")
 
 	_, err = db.Exec(fmt.Sprintf("DELETE FROM file_segments WHERE fileId NOT IN (%s)", fileIdsString))
+	if err != nil {
+		return err
+	}
+
+	err = ii.PutRemoved(segmentU32Ids)
 	if err != nil {
 		return err
 	}

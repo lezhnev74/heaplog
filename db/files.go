@@ -91,12 +91,18 @@ func (fdb *FilesDb) CheckInFiles(actualFiles []string) (newFiles, obsoleteFiles 
 func (fdb *FilesDb) GetFileId(file string) (id int, err error) {
 	r := fdb.db.QueryRow("SELECT Id FROM files WHERE path=?", file)
 	err = r.Scan(&id)
+	if err != nil {
+		err = fmt.Errorf("getFile %s: %w", file, err)
+	}
 	return
 }
 
 func (fdb *FilesDb) GetFile(fileId int) (file string, err error) {
 	r := fdb.db.QueryRow("SELECT path FROM files WHERE Id=?", fileId)
 	err = r.Scan(&file)
+	if err != nil {
+		err = fmt.Errorf("getFile %d: %w", fileId, err)
+	}
 	return
 }
 
