@@ -8,7 +8,6 @@ require (
 	github.com/go-playground/validator v9.31.0+incompatible
 	github.com/gofiber/fiber/v2 v2.52.5
 	github.com/gofiber/template/html/v2 v2.1.2
-	github.com/golang/protobuf v1.5.3
 	github.com/lezhnev74/go-iterators v0.0.0-20240902070734-4c1f359dc381
 	github.com/lezhnev74/inverted_index_2 v0.0.0-20240905073239-3207e86de884
 	github.com/marcboeker/go-duckdb v1.7.1
@@ -73,7 +72,6 @@ require (
 	golang.org/x/sys v0.25.0 // indirect
 	golang.org/x/text v0.18.0 // indirect
 	golang.org/x/tools v0.25.0 // indirect
-	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 )

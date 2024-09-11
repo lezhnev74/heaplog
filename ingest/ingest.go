@@ -79,6 +79,7 @@ func (ing *Ingest) Index(files []string) error {
 			if err != nil {
 				return xerrors.Errorf("index: %w", err)
 			}
+			log.Printf("File %s, locations: %v", file, locations)
 			err = ing.indexFile(file, locations)
 			if err != nil {
 				return xerrors.Errorf("index file: %w", err)

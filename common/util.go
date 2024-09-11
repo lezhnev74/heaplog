@@ -115,7 +115,7 @@ func PrintMem(db *sql.DB) {
 
 	log.Printf(
 		"System: %s, %s",
-		fmt.Sprintf("VirtMem:%dMiB", m.Sys/1024/1024),         // total virtual memory reserved from OS
+		fmt.Sprintf("RSS:%dMiB", m.Sys/1024/1024),             // total virtual memory reserved from OS
 		fmt.Sprintf("HeapAlloc:%dMiB", m.HeapAlloc/1024/1024), // HeapAlloc is bytes of allocated heap objects.
 	)
 }

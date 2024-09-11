@@ -124,10 +124,9 @@ func UgScanLocation(file string, loc common.Location, re string) (go_iterators.I
 
 // UgScan execs "ug" and channels back each message offsets via the iterator
 // based on https://github.com/Genivia/ugrep by Robert A. van Engelen
-func UgScan(file string, re string) (go_iterators.Iterator[MessageLayout], error) {
+func UgScan(file string, re string) (layouts []MessageLayout, err error) {
 	ctx := context.Background()
 	cmd := exec.CommandContext(ctx, "ug", "-P", `--format=%[0]b,%[1]b:%[1]d%~`, re, file)
-
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, xerrors.Errorf("scan ug connect out: %w", err)
@@ -137,60 +136,51 @@ func UgScan(file string, re string) (go_iterators.Iterator[MessageLayout], error
 		return nil, xerrors.Errorf("scan ug start: %w", err)
 	}
 
+	defer func() {
+		err = cmd.Wait()
+		if err != nil {
+			err = xerrors.Errorf("ug finish: %w", err)
+		}
+	}()
+
 	scanner := bufio.NewScanner(stdout)
 	if !scanner.Scan() {
 		return nil, NoMessageStartFound
 	}
+
 	lastLine := scanner.Text()
+	m, d, dl := parseLine(lastLine)
+
 	fileSize, err := common.FileSize(file)
 	if err != nil {
 		return nil, xerrors.Errorf("scan ug: %w", err)
 	}
+
 	if err := scanner.Err(); err != nil {
 		return nil, xerrors.Errorf("scan ug: %w", err)
 	}
 
-	it := go_iterators.NewCallbackIterator(
-		func() (s MessageLayout, err error) {
-			if len(lastLine) == 0 {
-				err = go_iterators.EmptyIterator
-				return
-			}
+	for {
+		s := MessageLayout{}
+		s.From = m
+		s.DateFrom = d
+		s.DateTo = d + dl
 
-			if !scanner.Scan() {
-				// reached EOF
-				m, d, dl := parseLine(lastLine)
-				s.From = m
-				s.To = fileSize // the last message
-				s.DateFrom = d
-				s.DateTo = d + dl
-				s.IsTail = true
-				lastLine = ""
-				return
-			}
+		if !scanner.Scan() {
+			// reached EOF
+			s.To = fileSize // the last message
+			s.IsTail = true
+			layouts = append(layouts, s)
+			break
+		}
 
-			m, d, dl := parseLine(lastLine)
-			lastLine = scanner.Text()
-			m1, _, _ := parseLine(lastLine)
+		lastLine = scanner.Text()
+		m, d, dl = parseLine(lastLine)
+		s.To = m
+		layouts = append(layouts, s)
+	}
 
-			s.From = m
-			s.To = m1
-			s.DateFrom = d
-			s.DateTo = d + dl
-
-			return
-		},
-		func() (err error) {
-			cmd.Cancel() // kill the process even if it has not finished yet
-			err = cmd.Wait()
-			if err != nil {
-				err = xerrors.Errorf("scan ug wait: %w", err)
-			}
-			return
-		},
-	)
-
-	return it, nil
+	return
 }
 
 // parseLine relies on ug format: "%[0]b,%[1]b:%[1]d%~"

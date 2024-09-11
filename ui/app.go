@@ -56,18 +56,15 @@ func (happ *HeaplogApp) Test() error {
 	}
 
 	file, err := filepath.Abs(files[0])
-	layoutsIt, err := scanner.UgScan(file, happ.cfg.MessageStartRE)
+	layouts, err := scanner.UgScan(file, happ.cfg.MessageStartRE)
 	if err != nil {
 		return xerrors.Errorf("unable to test the file at %s: %w", file, err)
 	}
 
-	ml, err := layoutsIt.Next()
-	defer layoutsIt.Close()
-	if errors.Is(err, go_iterators.EmptyIterator) {
+	if len(layouts) == 0 {
 		return xerrors.Errorf("no messages found in %s (check regular expression again)", file)
-	} else if err != nil {
-		return xerrors.Errorf("unable to test file at %s: %w", file, err)
 	}
+	ml := layouts[0]
 
 	// test date extraction:
 	f, err := os.Open(file)
@@ -253,8 +250,7 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 		return nil, err
 	}
 	layoutFile := func(file string, locations []common.Location) ([]scanner.MessageLayout, error) {
-		it, err := scanner.UgScan(file, cfg.MessageStartRE)
-		return go_iterators.ToSlice(it), err
+		return scanner.UgScan(file, cfg.MessageStartRE)
 	}
 	pd := func(b []byte) (time.Time, error) {
 		return time.Parse(cfg.DateFormat, string(b))
@@ -270,7 +266,7 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 		// Report mem
 		if cfg.ReportLevel > 0 {
 			go func() {
-				t := common.InstantTick(time.Second * 10)
+				t := common.InstantTick(time.Second)
 				for {
 					select {
 					case <-t:
@@ -316,7 +312,6 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 						log.Printf("discovering files stopped: %s", err)
 						return
 					}
-
 					if len(obsoletes) > 0 {
 						err = db.ClearUp(dbContainer, ii)
 						if err != nil {
@@ -331,32 +326,39 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 						return
 					}
 
+					go DumpMemoryIn(20 * time.Second)
 					err = ingestor.IndexConcurrent(allFiles, int(cfg.Concurrency))
 					if err != nil {
 						log.Printf("ingest: %s", err)
 						return
 					}
+
+					//err = ingestor.IndexConcurrent(allFiles, int(cfg.Concurrency))
+					//if err != nil {
+					//	log.Printf("ingest: %s", err)
+					//	return
+					//}
 				}
 			}
 		}()
 		// Merge
-		go func() {
-			t := common.InstantTick(time.Minute)
-			for {
-				select {
-				case <-t:
-					for {
-						merged, err := ii.Merge(30, 10, int(cfg.Concurrency))
-						if err != nil {
-							log.Printf("merging inverted index segments: %s", err)
-						}
-						if merged == 0 {
-							break
-						}
-					}
-				}
-			}
-		}()
+		//go func() {
+		//	t := common.InstantTick(time.Minute)
+		//	for {
+		//		select {
+		//		case <-t:
+		//			for {
+		//				merged, err := ii.Merge(30, 10, int(cfg.Concurrency))
+		//				if err != nil {
+		//					log.Printf("merging inverted index segments: %s", err)
+		//				}
+		//				if merged == 0 {
+		//					break
+		//				}
+		//			}
+		//		}
+		//	}
+		//}()
 	}
 
 	// 4. Let's run it, huh?
@@ -367,9 +369,21 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 	}, nil
 }
 
-func Profile(fn func()) {
+func DumpMemoryIn(d time.Duration) {
+	time.Sleep(d)
+	f2, err := os.Create(fmt.Sprintf("./%s_profile_mem.tmp", time.Now().Format("150405")))
+	if err != nil {
+		log.Fatal("could not create mem profile: ", err)
+	}
+	if err := pprof.WriteHeapProfile(f2); err != nil {
+		log.Fatal("could not start mem profile: ", err)
+	}
+	f2.Close()
+}
+
+func ProfileCPU(fn func()) {
 	tt := time.Now()
-	f, err := os.Create(fmt.Sprintf("./profile_%d.tmp", time.Now().Unix()))
+	f, err := os.Create(fmt.Sprintf("./%s_profile_cpu.tmp", time.Now().Format("150405")))
 	if err != nil {
 		log.Fatal("could not create CPU profile: ", err)
 	}
@@ -381,4 +395,5 @@ func Profile(fn func()) {
 
 	log.Printf("profiled in %s", time.Now().Sub(tt).String())
 	pprof.StopCPUProfile()
+	defer f.Close()
 }
