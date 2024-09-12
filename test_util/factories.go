@@ -3,7 +3,6 @@ package test_util
 import (
 	"context"
 	"database/sql"
-	go_iterators "github.com/lezhnev74/go-iterators"
 	"github.com/lezhnev74/inverted_index_2"
 	"github.com/marcboeker/go-duckdb"
 	"github.com/stretchr/testify/require"
@@ -65,9 +64,9 @@ func PrepareTestIngest(t *testing.T, segmentSize uint64, storageRoot string, db 
 	require.NoError(t, err)
 
 	s := func(file string, locations []common.Location) ([]scanner.MessageLayout, error) {
-		it, err := scanner.UgScanLocations(file, locations, MessageStartPattern)
+		layouts, err := scanner.UgScanLocations(file, locations, MessageStartPattern)
 		require.NoError(t, err)
-		return go_iterators.ToSlice(it), nil
+		return layouts, nil
 	}
 	pd := func(b []byte) (time.Time, error) {
 		return time.Parse(TimeFormat, string(b))

@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
-	go_iterators "github.com/lezhnev74/go-iterators"
 	"golang.org/x/xerrors"
 	"heaplog_2024/common"
 	"log"
@@ -27,25 +27,28 @@ type MessageLayout struct {
 
 // UgScanLocations works as UgScan but only searches the given locations,
 // thus greatly reduces the time.
-func UgScanLocations(file string, locations []common.Location, re string) (go_iterators.Iterator[MessageLayout], error) {
-	var loc common.Location
-	nextIt := func() (go_iterators.Iterator[MessageLayout], error) {
-		if len(locations) == 0 {
-			return nil, go_iterators.EmptyIterator
+func UgScanLocations(file string, locations []common.Location, re string) (layouts []MessageLayout, err error) {
+	var locLayouts []MessageLayout
+	for _, loc := range locations {
+		locLayouts, err = UgScanLocation(file, loc, re)
+		if errors.Is(err, NoMessageStartFound) {
+			return layouts, nil
+		} else if err != nil {
+			return nil, xerrors.Errorf("ug scan locations: %w", err)
 		}
-		loc, locations = locations[0], locations[1:]
-		return UgScanLocation(file, loc, re)
+		layouts = append(layouts, locLayouts...)
 	}
-	it := go_iterators.NewSequentialDynamicIterator(nextIt)
-	return it, nil
+	return
 }
 
-func UgScanLocation(file string, loc common.Location, re string) (go_iterators.Iterator[MessageLayout], error) {
+func UgScanLocation(file string, loc common.Location, re string) (layouts []MessageLayout, err error) {
 
+	// Feed ug with only location bytes,
+	// it skips the left file run, and starts at the loc.From
+	// when the next message is beyond loc.To, it stops.
 	ugLoc := fmt.Sprintf(
-		`dd skip=%d count=%d bs=1 if=%s | ug -P --format="%s" "%s"`,
+		`dd skip=%d bs=1 if=%s | ug -P --format="%s" "%s"`,
 		loc.From,
-		loc.To-loc.From,
 		file,
 		`%[0]b,%[1]b:%[1]d%~`,
 		re,
@@ -63,68 +66,66 @@ func UgScanLocation(file string, loc common.Location, re string) (go_iterators.I
 		return nil, xerrors.Errorf("scan ug start: %w", err)
 	}
 
-	fileSize, err := common.FileSize(file)
-	if err != nil {
-		return nil, xerrors.Errorf("scan ug: %w", err)
+	putLayout := func(l MessageLayout) bool {
+		if l.From >= loc.To {
+			return false
+		}
+		layouts = append(layouts, l)
+		return true
 	}
+
+	defer func() {
+		if err != nil {
+			return
+		}
+		err = cmd.Cancel()
+		if err != nil {
+			err = xerrors.Errorf("ug finish: %w", err)
+		}
+		cmd.Wait()
+	}()
 
 	scanner := bufio.NewScanner(stdout)
 	if !scanner.Scan() {
 		return nil, NoMessageStartFound
 	}
+
 	lastLine := scanner.Text()
-	if err := scanner.Err(); err != nil {
+	m, d, dl := parseLine(lastLine)
+
+	fileSize, err := common.FileSize(file)
+	if err != nil {
 		return nil, xerrors.Errorf("scan ug: %w", err)
 	}
 
-	it := go_iterators.NewCallbackIterator(
-		func() (s MessageLayout, err error) {
-			if len(lastLine) == 0 {
-				err = go_iterators.EmptyIterator
-				return
-			}
+	for {
+		l := MessageLayout{}
+		l.From = loc.From + m
+		l.DateFrom = loc.From + d
+		l.DateTo = loc.From + d + dl
 
-			m, d, dl := parseLine(lastLine)
-			m += loc.From // correct the position relative to the whole file
-			d += loc.From // correct the position relative to the whole file
+		if !scanner.Scan() {
+			// reached EOF
+			l.To = fileSize // the last message
+			l.IsTail = true
+			putLayout(l)
+			break
+		}
 
-			if !scanner.Scan() {
-				// reached EOF
-				s.From = m
-				s.To = min(fileSize, loc.To) // the last message
-				s.DateFrom = d
-				s.DateTo = d + dl
-				s.IsTail = true
-				lastLine = ""
-				return
-			}
+		lastLine = scanner.Text()
+		m, d, dl = parseLine(lastLine)
+		l.To = loc.From + m
+		if !putLayout(l) {
+			break // should stop
+		}
+	}
 
-			lastLine = scanner.Text()
-			m1, _, _ := parseLine(lastLine)
-
-			s.From = m
-			s.To = m1
-			s.DateFrom = d
-			s.DateTo = d + dl
-
-			return
-		},
-		func() (err error) {
-			cmd.Cancel() // kill the process even if it has not finished yet
-			err = cmd.Wait()
-			if err != nil {
-				err = xerrors.Errorf("scan ug wait: %w", err)
-			}
-			return
-		},
-	)
-
-	return it, nil
+	return
 }
 
 // UgScan execs "ug" and channels back each message offsets via the iterator
 // based on https://github.com/Genivia/ugrep by Robert A. van Engelen
-func UgScan(file string, re string) (layouts []MessageLayout, err error) {
+func UgScan(file string, re string, locations []common.Location) (layouts []MessageLayout, err error) {
 	ctx := context.Background()
 	cmd := exec.CommandContext(ctx, "ug", "-P", `--format=%[0]b,%[1]b:%[1]d%~`, re, file)
 	stdout, err := cmd.StdoutPipe()
@@ -143,6 +144,17 @@ func UgScan(file string, re string) (layouts []MessageLayout, err error) {
 		}
 	}()
 
+	// When a new layout is scanned from the file,
+	// here we decide if it within the given locations.
+	putLayout := func(l MessageLayout) {
+		for _, loc := range locations {
+			if loc.Contains(l.From) {
+				layouts = append(layouts, l) // yes, keep the layout
+				return
+			}
+		}
+	}
+
 	scanner := bufio.NewScanner(stdout)
 	if !scanner.Scan() {
 		return nil, NoMessageStartFound
@@ -156,28 +168,24 @@ func UgScan(file string, re string) (layouts []MessageLayout, err error) {
 		return nil, xerrors.Errorf("scan ug: %w", err)
 	}
 
-	if err := scanner.Err(); err != nil {
-		return nil, xerrors.Errorf("scan ug: %w", err)
-	}
-
 	for {
-		s := MessageLayout{}
-		s.From = m
-		s.DateFrom = d
-		s.DateTo = d + dl
+		l := MessageLayout{}
+		l.From = m
+		l.DateFrom = d
+		l.DateTo = d + dl
 
 		if !scanner.Scan() {
 			// reached EOF
-			s.To = fileSize // the last message
-			s.IsTail = true
-			layouts = append(layouts, s)
+			l.To = fileSize // the last message
+			l.IsTail = true
+			putLayout(l)
 			break
 		}
 
 		lastLine = scanner.Text()
 		m, d, dl = parseLine(lastLine)
-		s.To = m
-		layouts = append(layouts, s)
+		l.To = m
+		putLayout(l)
 	}
 
 	return

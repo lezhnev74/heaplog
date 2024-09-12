@@ -2,7 +2,6 @@ package scanner_test
 
 import (
 	"fmt"
-	go_iterators "github.com/lezhnev74/go-iterators"
 	"github.com/stretchr/testify/require"
 	"heaplog_2024/common"
 	"heaplog_2024/scanner"
@@ -48,6 +47,12 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 			locations:       nil,
 			expectedLayouts: nil,
 		},
+		{ // no message start
+			locations: []common.Location{
+				{0, 1},
+			},
+			expectedLayouts: nil,
+		},
 		{ // wrong locations
 			locations: []common.Location{
 				{2000, 10000},
@@ -84,19 +89,25 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 			locations: []common.Location{
 				{0, 20},
 			},
-			expectedLayouts: nil,
+			expectedLayouts: []scanner.MessageLayout{
+				{
+					From:     1,
+					To:       125,
+					DateFrom: 2,
+					DateTo:   34,
+				},
+			},
 		},
-		{ // Location that contains the first message
+		{ // Location that contains the date of the first message
 			locations: []common.Location{
 				{0, 50},
 			},
 			expectedLayouts: []scanner.MessageLayout{
 				{
 					From:     1,
-					To:       50, // right boundary of the location
+					To:       125, // right boundary is the next message or the eof
 					DateFrom: 2,
 					DateTo:   34,
-					IsTail:   true, // at the end of the location
 				},
 			},
 		},
@@ -108,17 +119,16 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 			expectedLayouts: []scanner.MessageLayout{
 				{
 					From:     1,
-					To:       50, // right boundary of the location
+					To:       125,
 					DateFrom: 2,
 					DateTo:   34,
-					IsTail:   true, // at the end of the location
 				},
 				{
 					From:     620,
-					To:       700,
+					To:       885,
 					DateFrom: 621,
 					DateTo:   653,
-					IsTail:   true, // at the end of the location
+					IsTail:   true,
 				},
 			},
 		},
@@ -126,12 +136,9 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("Test %d", i), func(t *testing.T) {
-			it, err := scanner.UgScanLocations(file, tt.locations, re)
+			layouts, err := scanner.UgScanLocations(file, tt.locations, re)
 			require.NoError(t, err)
-
-			messages := go_iterators.ToSlice(it)
-			require.NoError(t, it.Close())
-			require.Equal(t, tt.expectedLayouts, messages)
+			require.Equal(t, tt.expectedLayouts, layouts)
 		})
 	}
 }
@@ -168,7 +175,7 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 	file := test_util.PopulateFile(storageRoot, hugeStream)
 
 	re := `^\[([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}[+-][0-9]{2}:[0-9]{2})]`
-	messages, err := scanner.UgScan(file, re)
+	messages, err := scanner.UgScan(file, re, []common.Location{{0, 1_000_000}})
 	require.NoError(t, err)
 	require.Len(t, messages, 3000)
 
@@ -201,7 +208,7 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 	file := test_util.PopulateFile(storageRoot, sourceStream)
 
 	re := `^\[([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}[+-][0-9]{2}:[0-9]{2})]`
-	messages, err := scanner.UgScan(file, re)
+	messages, err := scanner.UgScan(file, re, []common.Location{{0, 10000}})
 	require.NoError(t, err)
 	expectedMessages := []scanner.MessageLayout{
 		{

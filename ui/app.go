@@ -56,7 +56,7 @@ func (happ *HeaplogApp) Test() error {
 	}
 
 	file, err := filepath.Abs(files[0])
-	layouts, err := scanner.UgScan(file, happ.cfg.MessageStartRE)
+	layouts, err := scanner.UgScan(file, happ.cfg.MessageStartRE, []common.Location{{0, 10000}})
 	if err != nil {
 		return xerrors.Errorf("unable to test the file at %s: %w", file, err)
 	}
@@ -250,7 +250,7 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 		return nil, err
 	}
 	layoutFile := func(file string, locations []common.Location) ([]scanner.MessageLayout, error) {
-		return scanner.UgScan(file, cfg.MessageStartRE)
+		return scanner.UgScan(file, cfg.MessageStartRE, locations)
 	}
 	pd := func(b []byte) (time.Time, error) {
 		return time.Parse(cfg.DateFormat, string(b))
@@ -326,7 +326,7 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 						return
 					}
 
-					go DumpMemoryIn(20 * time.Second)
+					//go DumpMemoryIn(20 * time.Second)
 					err = ingestor.IndexConcurrent(allFiles, int(cfg.Concurrency))
 					if err != nil {
 						log.Printf("ingest: %s", err)

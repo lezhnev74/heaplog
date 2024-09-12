@@ -108,7 +108,8 @@ func (ing *Ingest) indexFile(file string, locations []common.Location) error {
 	}
 	defer reader.Close()
 
-	allMessageLayouts, err := ing.findMessages(file, locations)
+	//allMessageLayouts, err := ing.findMessages(file, locations)
+	//log.Printf("layouts for %s: len %d: %d", file, cap(allMessageLayouts), unsafe.Sizeof(allMessageLayouts[0]))
 
 	// pickNextLocation returns the next contiguous run (that is at most segmentSize long)
 	pickNextLocation := func(minPos uint64) (nextLoc common.Location) {
@@ -133,7 +134,11 @@ func (ing *Ingest) indexFile(file string, locations []common.Location) error {
 			break
 		}
 
-		locMessageLayouts := selectLocationLayouts(loc, allMessageLayouts)
+		//locMessageLayouts := selectLocationLayouts(loc, allMessageLayouts)
+		locMessageLayouts, err := ing.findMessages(file, []common.Location{loc})
+		if err != nil {
+			return xerrors.Errorf("select layouts: %w", err)
+		}
 		if len(locMessageLayouts) == 0 {
 			// here is the workaround for files where messages begin not from the beginning
 			// in which case a location may have no messages at all.
