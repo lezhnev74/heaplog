@@ -92,7 +92,7 @@ func InstantTick(d time.Duration) chan time.Time {
 	return ret
 }
 
-func PrintMem(db *sql.DB) {
+func PrintMem(db *sql.DB) (rss uint64) {
 	var (
 		name, dbSize, blockSize, walSize, memSize, memLimit string
 		totalBlocks, usedBlocks, freeBlocks                 int64
@@ -118,4 +118,6 @@ func PrintMem(db *sql.DB) {
 		fmt.Sprintf("RSS:%dMiB", m.Sys/1024/1024),             // total virtual memory reserved from OS
 		fmt.Sprintf("HeapAlloc:%dMiB", m.HeapAlloc/1024/1024), // HeapAlloc is bytes of allocated heap objects.
 	)
+
+	return m.Sys
 }

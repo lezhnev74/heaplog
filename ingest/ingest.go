@@ -12,6 +12,8 @@ import (
 	"io"
 	"log"
 	"os"
+	"runtime"
+	"runtime/debug"
 	"slices"
 	"time"
 	"unsafe"
@@ -108,8 +110,7 @@ func (ing *Ingest) indexFile(file string, locations []common.Location) error {
 	}
 	defer reader.Close()
 
-	//allMessageLayouts, err := ing.findMessages(file, locations)
-	//log.Printf("layouts for %s: len %d: %d", file, cap(allMessageLayouts), unsafe.Sizeof(allMessageLayouts[0]))
+	allMessageLayouts, err := ing.findMessages(file, locations)
 
 	// pickNextLocation returns the next contiguous run (that is at most segmentSize long)
 	pickNextLocation := func(minPos uint64) (nextLoc common.Location) {
@@ -134,11 +135,7 @@ func (ing *Ingest) indexFile(file string, locations []common.Location) error {
 			break
 		}
 
-		//locMessageLayouts := selectLocationLayouts(loc, allMessageLayouts)
-		locMessageLayouts, err := ing.findMessages(file, []common.Location{loc})
-		if err != nil {
-			return xerrors.Errorf("select layouts: %w", err)
-		}
+		locMessageLayouts := selectLocationLayouts(loc, allMessageLayouts)
 		if len(locMessageLayouts) == 0 {
 			// here is the workaround for files where messages begin not from the beginning
 			// in which case a location may have no messages at all.
@@ -300,7 +297,7 @@ func (ing *Ingest) readMessagesInStream(file io.ReaderAt, messageLayouts []scann
 	go func() {
 		defer close(r)
 
-		buf := make([]byte, 1000)
+		buf := make([]byte, 0)
 		for _, layout := range messageLayouts {
 			messageLen := layout.To - layout.From
 			if cap(buf) < int(messageLen) {
@@ -318,6 +315,7 @@ func (ing *Ingest) readMessagesInStream(file io.ReaderAt, messageLayouts []scann
 			dateFrom, dateTo := layout.DateFrom-layout.From, layout.DateTo-layout.From
 			terms := ing.tokenize(buf[:dateFrom])
 			terms = append(terms, ing.tokenize(buf[dateTo:])...)
+
 			tm := &ScannedTokenizedMessage{
 				MessageLayout: layout,
 				Terms:         terms,
@@ -327,6 +325,14 @@ func (ing *Ingest) readMessagesInStream(file io.ReaderAt, messageLayouts []scann
 			if err != nil {
 				err = xerrors.Errorf("date parse: %w", err)
 				r <- &ScannedTokenizedMessage{Err: err}
+			}
+
+			// Cleanup big buffers instantly
+			if cap(buf) > 10_000_000 {
+				log.Printf("big message: %dMiB at %d", len(buf)/1024/1024, layout.From)
+				buf = nil
+				runtime.GC()
+				debug.FreeOSMemory()
 			}
 
 			r <- tm

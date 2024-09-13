@@ -190,9 +190,9 @@ func buildDependencies(t *testing.T, segmentSize uint64, storageRoot string) (
 	require.NoError(t, err)
 
 	s := func(file string, locations []common.Location) ([]scanner.MessageLayout, error) {
-		it, err := scanner.UgScanLocations(file, locations, messageStartPattern)
+		layouts, err := scanner.UgScanLocations(file, locations, messageStartPattern)
 		require.NoError(t, err)
-		return go_iterators.ToSlice(it), nil
+		return layouts, nil
 	}
 	pd := func(b []byte) (time.Time, error) {
 		return time.Parse(timeFormat, string(b))

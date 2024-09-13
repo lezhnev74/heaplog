@@ -271,6 +271,10 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 					select {
 					case <-t:
 						common.PrintMem(_db)
+						//if rss > 1500*1024*1024 && !dumped {
+						//	DumpMemoryIn(time.Nanosecond) // Dump when memory is too high
+						//	dumped = true
+						//}
 					}
 				}
 			}()
@@ -333,32 +337,32 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 						return
 					}
 
-					//err = ingestor.IndexConcurrent(allFiles, int(cfg.Concurrency))
-					//if err != nil {
-					//	log.Printf("ingest: %s", err)
-					//	return
-					//}
+					err = ingestor.IndexConcurrent(allFiles, int(cfg.Concurrency))
+					if err != nil {
+						log.Printf("ingest: %s", err)
+						return
+					}
 				}
 			}
 		}()
-		// Merge
-		//go func() {
-		//	t := common.InstantTick(time.Minute)
-		//	for {
-		//		select {
-		//		case <-t:
-		//			for {
-		//				merged, err := ii.Merge(30, 10, int(cfg.Concurrency))
-		//				if err != nil {
-		//					log.Printf("merging inverted index segments: %s", err)
-		//				}
-		//				if merged == 0 {
-		//					break
-		//				}
-		//			}
-		//		}
-		//	}
-		//}()
+		//Merge
+		go func() {
+			t := common.InstantTick(time.Minute)
+			for {
+				select {
+				case <-t:
+					for {
+						merged, err := ii.Merge(30, 30, int(cfg.Concurrency))
+						if err != nil {
+							log.Printf("merging inverted index segments: %s", err)
+						}
+						if merged == 0 {
+							break
+						}
+					}
+				}
+			}
+		}()
 	}
 
 	// 4. Let's run it, huh?
@@ -371,7 +375,7 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 
 func DumpMemoryIn(d time.Duration) {
 	time.Sleep(d)
-	f2, err := os.Create(fmt.Sprintf("./%s_profile_mem.tmp", time.Now().Format("150405")))
+	f2, err := os.Create(fmt.Sprintf("/storage/%s_profile_mem.tmp", time.Now().Format("150405")))
 	if err != nil {
 		log.Fatal("could not create mem profile: ", err)
 	}
