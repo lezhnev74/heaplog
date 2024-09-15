@@ -60,7 +60,14 @@ func ClearUp(db *DbContainer, ii *inverted_index_2.InvertedIndex) error {
 	if err != nil {
 		return err
 	}
-	segmentIdsString := strings.Join(danglingSegmentIds, ",")
+
+	if len(danglingSegmentIds) > 0 {
+		segmentIdsString := strings.Join(danglingSegmentIds, ",")
+		_, err = db.Exec(fmt.Sprintf("DELETE FROM file_segments_messages WHERE segmentId NOT IN (%s)", segmentIdsString))
+		if err != nil {
+			return err
+		}
+	}
 
 	_, err = db.Exec(fmt.Sprintf("DELETE FROM file_segments WHERE fileId NOT IN (%s)", fileIdsString))
 	if err != nil {
@@ -72,13 +79,7 @@ func ClearUp(db *DbContainer, ii *inverted_index_2.InvertedIndex) error {
 		return err
 	}
 
-	// 3. Clear up messages
-	_, err = db.Exec(fmt.Sprintf("DELETE FROM file_segments_messages WHERE segmentId NOT IN (%s)", segmentIdsString))
-	if err != nil {
-		return err
-	}
-
-	// 4. Clear up query results
+	// 3. Clear up query results
 	_, err = db.Exec(fmt.Sprintf("DELETE FROM query_results WHERE fileId NOT IN (%s)", fileIdsString))
 	if err != nil {
 		return err

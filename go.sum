@@ -63,10 +63,16 @@ github.com/lezhnev74/go-iterators v0.0.0-20240902070734-4c1f359dc381 h1:PfCSf5r9
 github.com/lezhnev74/go-iterators v0.0.0-20240902070734-4c1f359dc381/go.mod h1:lK0tbJcxEOV1dc0p+s3gaYYZI00mwvMcw4FBe01x6XY=
 github.com/lezhnev74/inverted_index_2 v0.0.0-20240905073239-3207e86de884 h1:FCNbD2r3+4FCfE2wNQNwCNJ/GxCmiH+f8n/4qc3FdWI=
 github.com/lezhnev74/inverted_index_2 v0.0.0-20240905073239-3207e86de884/go.mod h1:klfQynw1TsDbFokToqzh9hDSqIlzPbxX365VKzw16Pk=
+github.com/lezhnev74/inverted_index_2 v0.0.0-20240914171448-2f2d187fde6b h1:mx3Y1T+bCYE1XRTyybCnsFGepUJv7PKurQvEvKjB0Do=
+github.com/lezhnev74/inverted_index_2 v0.0.0-20240914171448-2f2d187fde6b/go.mod h1:klfQynw1TsDbFokToqzh9hDSqIlzPbxX365VKzw16Pk=
+github.com/lezhnev74/inverted_index_2 v0.0.0-20240915090532-e9822aa2e9a4 h1:WU9annvsg1LQB71ECXgztI3I50WS36q3Csf9WrH8v0I=
+github.com/lezhnev74/inverted_index_2 v0.0.0-20240915090532-e9822aa2e9a4/go.mod h1:klfQynw1TsDbFokToqzh9hDSqIlzPbxX365VKzw16Pk=
 github.com/magiconair/properties v1.8.7 h1:IeQXZAiQcpL9mgcAe1Nu6cX9LLw6ExEHKjN0VQdvPDY=
 github.com/magiconair/properties v1.8.7/go.mod h1:Dhd985XPs7jluiymwWYZ0G4Z61jb3vdS329zhj2hYo0=
 github.com/marcboeker/go-duckdb v1.7.1 h1:m9/nKfP7cG9AptcQ95R1vfacRuhtrZE5pZF8BPUb/Iw=
 github.com/marcboeker/go-duckdb v1.7.1/go.mod h1:2oV8BZv88S16TKGKM+Lwd0g7DX84x0jMxjTInThC8Is=
+github.com/marcboeker/go-duckdb v1.8.0 h1:iOWv1wTL0JIMqpyns6hCf5XJJI4fY6lmJNk+itx5RRo=
+github.com/marcboeker/go-duckdb v1.8.0/go.mod h1:2oV8BZv88S16TKGKM+Lwd0g7DX84x0jMxjTInThC8Is=
 github.com/mattn/go-colorable v0.1.13 h1:fFA4WZxdEF4tXPZVKMLwD8oUnCTTo08duU7wxecdEvA=
 github.com/mattn/go-colorable v0.1.13/go.mod h1:7S9/ev0klgBDR4GtXTXX8a3vIGJpMovkB8vQcUbaXHg=
 github.com/mattn/go-isatty v0.0.16/go.mod h1:kYGgaQfpe5nmfYZH+SKPsOc2e4SrIfOl2e/yFXSvRLM=

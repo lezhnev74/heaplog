@@ -22,12 +22,40 @@ using your logs as "heapfiles" (hence the name).
 <a href="https://github.com/lezhnev74/heaplog/blob/main/HeaplogScreenshot.png"><img src="HeaplogScreenshot.png" style="width:400px;"></a>
 
 ## Features
+
 - Modest on disk space (uses [DuckDB](https://duckdb.org/) + [FST](https://blog.burntsushi.net/transducers/) for terms).
 - Powerful query language (prefix match, regular expressions, AND-, OR-, NOT-operators).
 - Supports append-only files (logs and such).
 - Supports multi-line log messages.
 - Runs as a background service: exposes Web UI, runs indexing workers.
 - Deploys as docker container
+
+## Query Language
+
+Query language supports prefix match, regular expressions, and AND-OR-NOT operators. Note that prefix match uses the
+index to speed up the query,
+while regular expression does full scan of all files. To have the best performance always add at least one prefix match
+term to the query to help it narrow down the search area.
+
+**What is prefix match?**
+Each message is split in terms, and the beginning of each term is indexed.
+Example:
+`Error at locahost.domain` will be split in `Error`, `at`, `locahost`, `domain`.
+We can find this message by the query line `local` but not `host`. In the latter case we should use regular expression `~host`
+which won't use the index, but does full-scan.
+
+Samples:
+
+| Query (UTF-8)                                                                 | Description                                                                                                                                             |
+|-------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `error`                                                                       | **Case-insensitive prefix match**. Will find all messages with this sequence of bytes as term prefix.                                                   |
+| `"error failure"`, the same as `'error failure'`                              | Quoted exact match. Used to provide a literal with space-like symbols.                                                                                  |
+| `error failure`, the same as `failure error`, the same as `error AND failure` | Looks for the presence of both exact matches `error` and `failure`. `AND` operator is assumed for literals. **No order is preserved.**                  |
+| `error OR failure`, the same as `failure OR error`                            | OR-union for exact match.                                                                                                                               |
+| `(error failure) OR success`                                                  | Supports parenthesis to group literals.                                                                                                                 |
+| `!error`, `!(error OR failure)`                                               | Inversion of the expression.                                                                                                                            |
+| `~.*`, `~error`, `~(error \d+)`, `~"error \d+"`                               | `~` - **Regular Expression** operator. Everything after `~` is used as a regular expression. Matches against every messaged. It does not use the index. |
+| `report ~report\d+`                                                           | Combine prefix match with the RE to use the index and improve search performance.                                                                       |
 
 ## Installation
 
@@ -61,26 +89,6 @@ Since there are many formats of log files, you have to provide two settings:
 
 1. Regular Expression to find individual messages(config key `MessageStartRE`) in your files.
 2. Go Date Format(config key `DateFormat`) to parse timestamps. See [Syntax docs](https://go.dev/src/time/format.go).
-
-### Use Automatic Format Detection Command
-
-This command `heaplog detect` will ask you to give it a sample log message. It will try to detect date format
-automatically.
-If it succeeds, you can copy the output config values and go to testing your config.
-
-Sample output:
-
-```
-$ heaplog detect
-Enter a sample message line:
-[2023-12-31T00:00:03.448201+00:00] production.DEBUG: My message
- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
- Yay, the date detected above!
-
-Config values:
-MessageStartRE: "^\[(\d{4}\-\d{2}\-\d{2}\w\d{2}:\d{2}:\d{2}\.\d{6}[+-]\d{2}:\d{2})"
-DateFormat: "2006-01-02T15:04:05.000000-07:00"
-```
 
 ### Use ChatGPT
 
@@ -116,25 +124,6 @@ DateFormat: "2006-01-02T15:04:05.000000-07:00"
 
 Once you have configured the app, run this command to make sure everything is ok:
 `heaplog test <path/to/log.file>`.
-
-## Query Language
-
-Query language supports prefix match and regular expressions. Note that prefix match uses the index to speed up the query,
-while regular expression does full scan of all files. To have the best performance always add at least one prefix match
-term to the query to help it narrow down the search area.
-
-Samples:
-
-| Query (UTF-8)                                                                 | Description                                                                                                                                             |
-|-------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `error`                                                                       | **Case-insensitive prefix match**. Will find all messages with this sequence of bytes as term prefix.                                                   |
-| `"error failure"`, the same as `'error failure'`                              | Quoted exact match. Used to provide a literal with space-like symbols.                                                                                  |
-| `error failure`, the same as `failure error`, the same as `error AND failure` | Looks for the presence of both exact matches `error` and `failure`. `AND` operator is assumed for literals. **No order is preserved.**                  |
-| `error OR failure`, the same as `failure OR error`                            | OR-union for exact match.                                                                                                                               |
-| `(error failure) OR success`                                                  | Supports parenthesis to group literals.                                                                                                                 |
-| `!error`, `!(error OR failure)`                                               | Inversion of the expression.                                                                                                                            |
-| `~.*`, `~error`, `~(error \d+)`, `~"error \d+"`                               | `~` - **Regular Expression** operator. Everything after `~` is used as a regular expression. Matches against every messaged. It does not use the index. |
-| `report ~report\d+`                                                           | Combine prefix match with the RE to use the index and improve search performance.                                                                       |
 
 ## Access Control
 

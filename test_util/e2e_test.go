@@ -142,8 +142,6 @@ func _TestIngest(t *testing.T) {
 	err = ing.IndexConcurrent(files, runtime.NumCPU())
 	require.NoError(t, err)
 
-	runtime.GC()
-	debug.FreeOSMemory()
 	test_util.ProcStat()
 
 	// MERGE II:

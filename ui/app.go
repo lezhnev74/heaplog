@@ -264,21 +264,17 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 	// 3. Start background procs
 	if startBackground {
 		// Report mem
-		if cfg.ReportLevel > 0 {
+		/*if cfg.ReportLevel > 0 {
 			go func() {
 				t := common.InstantTick(time.Second)
 				for {
 					select {
 					case <-t:
 						common.PrintMem(_db)
-						//if rss > 1500*1024*1024 && !dumped {
-						//	DumpMemoryIn(time.Nanosecond) // Dump when memory is too high
-						//	dumped = true
-						//}
 					}
 				}
 			}()
-		}
+		}*/
 		// Clear up queries
 		go func() {
 			t := common.InstantTick(time.Minute)
@@ -307,7 +303,7 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 		}()
 		// Ingest
 		go func() {
-			t := common.InstantTick(time.Minute)
+			t := common.InstantTick(time.Minute * 10)
 			for {
 				select {
 				case <-t:
@@ -347,7 +343,7 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 		}()
 		//Merge
 		go func() {
-			t := common.InstantTick(time.Minute)
+			t := common.InstantTick(time.Minute * 10)
 			for {
 				select {
 				case <-t:

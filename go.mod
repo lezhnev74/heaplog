@@ -9,8 +9,8 @@ require (
 	github.com/gofiber/fiber/v2 v2.52.5
 	github.com/gofiber/template/html/v2 v2.1.2
 	github.com/lezhnev74/go-iterators v0.0.0-20240902070734-4c1f359dc381
-	github.com/lezhnev74/inverted_index_2 v0.0.0-20240905073239-3207e86de884
-	github.com/marcboeker/go-duckdb v1.7.1
+	github.com/lezhnev74/inverted_index_2 v0.0.0-20240915090532-e9822aa2e9a4
+	github.com/marcboeker/go-duckdb v1.8.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/procfs v0.15.1
 	github.com/spf13/viper v1.19.0

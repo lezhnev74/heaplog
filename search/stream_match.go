@@ -12,16 +12,33 @@ import (
 func StreamFileMatch(file string, messages []db.Message, mf SearchMatcher, dateFormat string) (go_iterators.Iterator[db.Message], error) {
 	buf := make([]byte, 0, 1000)
 	messageIndex := 0
-	mmapReader, err := mmap.Open(file)
+	stream, err := mmap.Open(file)
 	if err != nil {
-		return nil, xerrors.Errorf("match messages: %w", err)
+		return nil, xerrors.Errorf("match messages: mmap open: %w", err)
 	}
+
+	mmapScannedBytes := 0
+	refreshMmapBytes := 500_000_000
+	n := 0
 
 	it := go_iterators.NewCallbackIterator(
 		func() (m db.Message, err error) {
 
 			// Check every message in the messages iterator until one matched
 			for {
+
+				// experiment: release mmap after reading N bytes
+				if mmapScannedBytes > refreshMmapBytes {
+					mmapScannedBytes = 0
+					_ = stream.Close()
+					stream, err = mmap.Open(file)
+					if err != nil {
+						err = xerrors.Errorf("match message: mmap open: %w", err)
+						return
+					}
+				}
+				////////////////////////////////////////////////////
+
 				if messageIndex == len(messages) {
 					break
 				}
@@ -34,11 +51,12 @@ func StreamFileMatch(file string, messages []db.Message, mf SearchMatcher, dateF
 				}
 				buf = buf[:mLen]
 
-				_, err = mmapReader.ReadAt(buf, int64(m.Loc.From))
+				n, err = stream.ReadAt(buf, int64(m.Loc.From))
 				if err != nil {
 					err = xerrors.Errorf("match message: %w", err)
 					return
 				}
+				mmapScannedBytes += n
 
 				// parse the date of the message
 				var t time.Time
@@ -61,7 +79,7 @@ func StreamFileMatch(file string, messages []db.Message, mf SearchMatcher, dateF
 			return
 		},
 		func() error {
-			return mmapReader.Close()
+			return stream.Close()
 		},
 	)
 

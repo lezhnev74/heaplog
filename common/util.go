@@ -121,3 +121,18 @@ func PrintMem(db *sql.DB) (rss uint64) {
 
 	return m.Sys
 }
+
+//func CleanMem() {
+//	runtime.GC()
+//	debug.FreeOSMemory()
+//
+//	// since the main runtime for the app is Docker, clearing caches allows the app to stay below the max mem limit.
+//	ctx := context.Background()
+//	cmd := exec.CommandContext(ctx, "bash", "-c", `echo 3 > /proc/sys/vm/drop_caches`)
+//	out, err := cmd.CombinedOutput()
+//	log.Printf("cleanmem: %s", out)
+//	if err != nil {
+//		log.Printf("cleanmem error: %s", err)
+//		return
+//	}
+//}

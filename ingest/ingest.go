@@ -12,8 +12,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"runtime"
-	"runtime/debug"
 	"slices"
 	"time"
 	"unsafe"
@@ -81,7 +79,6 @@ func (ing *Ingest) Index(files []string) error {
 			if err != nil {
 				return xerrors.Errorf("index: %w", err)
 			}
-			log.Printf("File %s, locations: %v", file, locations)
 			err = ing.indexFile(file, locations)
 			if err != nil {
 				return xerrors.Errorf("index file: %w", err)
@@ -129,6 +126,7 @@ func (ing *Ingest) indexFile(file string, locations []common.Location) error {
 		return err
 	}
 
+	loops := 0
 	for {
 		loc := pickNextLocation(lastSegmentLoc.To)
 		if loc.Len() == 0 {
@@ -143,11 +141,13 @@ func (ing *Ingest) indexFile(file string, locations []common.Location) error {
 			continue
 		}
 
-		tokenizedMessages := ing.readMessagesInStream(reader, locMessageLayouts)
+		tokenizedMessages := ing.readMessagesInStream(file, reader, locMessageLayouts)
 		lastSegmentLoc, err = ing.saveBatch(file, tokenizedMessages)
 		if err != nil {
 			return xerrors.Errorf("save segment: %w", err)
 		}
+
+		loops++
 	}
 
 	ing.db.MessagesDb.Flush()
@@ -159,7 +159,7 @@ func (ing *Ingest) indexFile(file string, locations []common.Location) error {
 // If indexing happens more often then messages appear in the file, then segments can be very small (and pollute II).
 // To solve that it must stream found messages to the existing segment (that adjoins this message)
 // until it is full, in which case it should allocate a new one.
-func (ing *Ingest) saveBatch(file string, messages <-chan *ScannedTokenizedMessage) (segmentLoc common.Location, err error) {
+func (ing *Ingest) saveBatch(file string, messages <-chan *ScannedTokenizedMessage) (lastSegmentLoc common.Location, err error) {
 	t0 := time.Now()
 
 	fileId, err := ing.db.GetFileId(file)
@@ -204,32 +204,35 @@ func (ing *Ingest) saveBatch(file string, messages <-chan *ScannedTokenizedMessa
 			return xerrors.Errorf("save segment: ii: %w", iiErr)
 		}
 
-		curSegmentTermsMap = make(map[string]struct{}) // reset for the next segment
-
 		// Report
 		if curSegmentMessages > 0 {
 			log.Printf("indexed %s[%d:%d]: %d messages, %d terms in %s", file, curSegment.Loc.From, curSegment.Loc.To, curSegmentMessages, len(segmentTerms), time.Now().Sub(t0).String())
 		}
+
+		// Cleanup
+		curSegmentTermsMap = make(map[string]struct{}) // reset for the next segment
+		segmentTerms = nil
 
 		t0 = time.Now()
 		return nil
 	}
 
 	// selectSegment picks a segment which is half-full and adjoins this message,
-	// otherwise it starts a new segment
+	// otherwise it starts a new segment.
 	selectSegment := func(m *ScannedTokenizedMessage) (segmentId uint32, err error) {
 		if curSegment.Id == 0 {
-			// this is the time the selection is invoked, so we try to use an existing segment
+			// this is the first time the selection is invoked, so we try to use an existing segment
 			// that adjoins this message. It can return 0 if none found, though.
+			// no suitable segments is an expected case.
 			curSegment, err = ing.db.SelectSegmentThatAdjoins(fileId, m.From)
-			if err != nil {
-				if !errors.Is(err, sql.ErrNoRows) {
-					return 0, err // no suitable segments is an expected case
-				}
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				return 0, err
 			}
 		}
 
+		// new segment is started if the current is absent or too big already.
 		if curSegment.Id == 0 || uint64(curSegment.Loc.Len()) > ing.segmentSize {
+			// flush previous segment data
 			if curSegment.Id != 0 {
 				err = flush()
 				if err != nil {
@@ -287,29 +290,60 @@ func (ing *Ingest) saveBatch(file string, messages <-chan *ScannedTokenizedMessa
 	}
 
 	err = flush()
-	segmentLoc = curSegment.Loc
+	lastSegmentLoc = curSegment.Loc
 	return
 }
 
-func (ing *Ingest) readMessagesInStream(file io.ReaderAt, messageLayouts []scanner.MessageLayout) <-chan *ScannedTokenizedMessage {
+func (ing *Ingest) readMessagesInStream(name string, stream io.ReaderAt, messageLayouts []scanner.MessageLayout) <-chan *ScannedTokenizedMessage {
 	r := make(chan *ScannedTokenizedMessage)
+
+	// Big messages lead to an exponential memory consumption spike,
+	// so to be predictable in terms of memory, we limit the size of indexable area.
+	maxIndexableSize := uint64(10_000_000) // bytes
 
 	go func() {
 		defer close(r)
 
 		buf := make([]byte, 0)
+		var err error
 		for _, layout := range messageLayouts {
 			messageLen := layout.To - layout.From
-			if cap(buf) < int(messageLen) {
-				buf = make([]byte, messageLen)
-			} else {
-				buf = buf[:messageLen]
-			}
+			if messageLen > maxIndexableSize {
+				log.Printf("big message %dMiB at %s:%d", messageLen/1024/1024, name, layout.From)
 
-			_, err := file.ReadAt(buf, int64(layout.From))
-			if err != nil {
-				err = xerrors.Errorf("file read: %w", err)
-				r <- &ScannedTokenizedMessage{Err: err}
+				// Index only the beginning and the end of the big message.
+				halfSize := maxIndexableSize / 2
+				if cap(buf) < int(maxIndexableSize) {
+					buf = make([]byte, maxIndexableSize)
+				}
+
+				// Read the beginning of the message
+				_, err := stream.ReadAt(buf[:halfSize], int64(layout.From))
+				if err != nil {
+					err = xerrors.Errorf("file read: %w", err)
+					r <- &ScannedTokenizedMessage{Err: err}
+				}
+
+				// Read the end of the message
+				_, err = stream.ReadAt(buf[halfSize:], int64(layout.To-halfSize))
+				if err != nil {
+					err = xerrors.Errorf("file read: %w", err)
+					r <- &ScannedTokenizedMessage{Err: err}
+				}
+
+			} else {
+				// Messages under the limit are indexed entirely.
+				if cap(buf) < int(messageLen) {
+					buf = make([]byte, messageLen)
+				} else {
+					buf = buf[:messageLen]
+				}
+
+				_, err := stream.ReadAt(buf, int64(layout.From))
+				if err != nil {
+					err = xerrors.Errorf("file read: %w", err)
+					r <- &ScannedTokenizedMessage{Err: err}
+				}
 			}
 
 			dateFrom, dateTo := layout.DateFrom-layout.From, layout.DateTo-layout.From
@@ -325,14 +359,6 @@ func (ing *Ingest) readMessagesInStream(file io.ReaderAt, messageLayouts []scann
 			if err != nil {
 				err = xerrors.Errorf("date parse: %w", err)
 				r <- &ScannedTokenizedMessage{Err: err}
-			}
-
-			// Cleanup big buffers instantly
-			if cap(buf) > 10_000_000 {
-				log.Printf("big message: %dMiB at %d", len(buf)/1024/1024, layout.From)
-				buf = nil
-				runtime.GC()
-				debug.FreeOSMemory()
 			}
 
 			r <- tm
