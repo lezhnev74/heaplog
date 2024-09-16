@@ -11,6 +11,8 @@ import (
 // StreamFileMatch streams matched messages out of the file.
 func StreamFileMatch(file string, messages []db.Message, mf SearchMatcher, dateFormat string) (go_iterators.Iterator[db.Message], error) {
 	buf := make([]byte, 0, 1000)
+	maxBufLen := 10_000_000
+
 	messageIndex := 0
 	stream, err := mmap.Open(file)
 	if err != nil {
@@ -26,7 +28,6 @@ func StreamFileMatch(file string, messages []db.Message, mf SearchMatcher, dateF
 
 			// Check every message in the messages iterator until one matched
 			for {
-
 				// experiment: release mmap after reading N bytes
 				if mmapScannedBytes > refreshMmapBytes {
 					mmapScannedBytes = 0
@@ -68,7 +69,12 @@ func StreamFileMatch(file string, messages []db.Message, mf SearchMatcher, dateF
 				}
 				m.Date = &t
 
-				if !mf(m, buf) {
+				matchedMessage := mf(m, buf)
+				if len(buf) > maxBufLen {
+					buf = nil // release buffer allocated for a big message quickly
+				}
+
+				if !matchedMessage {
 					continue // bad message
 				}
 

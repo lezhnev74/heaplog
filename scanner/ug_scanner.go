@@ -126,6 +126,7 @@ func UgScanLocation(file string, loc common.Location, re string) (layouts []Mess
 // UgScan execs "ug" and channels back each message offsets via the iterator
 // based on https://github.com/Genivia/ugrep by Robert A. van Engelen
 func UgScan(file string, re string, locations []common.Location) (layouts []MessageLayout, err error) {
+
 	ctx := context.Background()
 	cmd := exec.CommandContext(ctx, "ug", "-P", `--format=%[0]b,%[1]b:%[1]d%~`, re, file)
 	stdout, err := cmd.StdoutPipe()
@@ -147,8 +148,8 @@ func UgScan(file string, re string, locations []common.Location) (layouts []Mess
 	// When a new layout is scanned from the file,
 	// here we decide if it within the given locations.
 	putLayout := func(l MessageLayout) {
-		for _, loc := range locations {
-			if loc.Contains(l.From) {
+		for _, rloc := range locations {
+			if rloc.Contains(l.From) {
 				layouts = append(layouts, l) // yes, keep the layout
 				return
 			}

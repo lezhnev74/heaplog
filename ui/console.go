@@ -5,7 +5,9 @@ import (
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
 	"log"
+	"net/http"
 )
+import _ "net/http/pprof"
 
 func overrideConfig(cfg Config, ctx *cli.Context) Config {
 	if ctx.String("FilesGlobPattern") != "" {
@@ -103,6 +105,11 @@ func PrepareConsoleApp() (app *cli.App) {
 					if err != nil {
 						return err
 					}
+
+					go func() {
+						log.Printf("Listening pprof on port 6060")
+						log.Println(http.ListenAndServe(":6060", nil))
+					}()
 
 					httpApp := makeHttpApp(happ, "")
 					log.Printf("Listening on port 8393")
