@@ -72,18 +72,19 @@ services:
       - /host/path/to/logs:/logs:ro
       - /host/path/to/storage:/storage:rw
       - /host/path/to/heaplog.yml:/heaplog.yml:ro
-    entrypoint: [ "/heaplog", "run" ]
+    entrypoint: [ "/heaplog" ]
+    command: ["run"]
     ports:
       - 8393:8393
 ```
 
-Now you can run `docker-compose up heaplog` and access the UI at `http://localhost:8393`.
+Now you can run `docker compose up heaplog` and access the UI at `http://localhost:8393`.
 
 ## Configuration
 
 Configuration can be provided as a Yaml file, as well as command arguments (where the latter overwrite the former).
 Configurable keys and values can be seen in [config.go](https://github.com/lezhnev74/heaplog/blob/main/ui/config.go).
-To populate a new empty file run `heaplog gen > heaplog.yml`.
+To populate a new empty file run `docker compose run heaplog gen > heaplog.yml`.
 
 Since there are many formats of log files, you have to provide two settings:
 
@@ -123,7 +124,7 @@ DateFormat: "2006-01-02T15:04:05.000000-07:00"
 ### Test Your Config
 
 Once you have configured the app, run this command to make sure everything is ok:
-`heaplog test <path/to/log.file>`.
+`docker compose run test`.
 
 ## Access Control
 
