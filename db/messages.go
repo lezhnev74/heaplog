@@ -63,9 +63,9 @@ func NewMessagesDb(db *sql.DB, appender *duckdb.Appender) *MessagesDb {
 			if mp == flushPacket {
 				err = mdb.appender.Flush()
 				continue
-			} else {
-				err = mdb.appender.AppendRow(mp.segmentId, mp.from, mp.relDateFrom, mp.dateLen)
 			}
+
+			err = mdb.appender.AppendRow(mp.segmentId, mp.from, mp.relDateFrom, mp.dateLen)
 			if err != nil {
 				log.Printf("check in message error: %s", err)
 			}
@@ -86,7 +86,7 @@ func (mdb *MessagesDb) CheckinMessage(segmentId uint32, from uint64, relDateFrom
 
 // Flush makes sure all previously checked-in Messages are persisted on disk
 func (mdb *MessagesDb) Flush() {
-	mdb.appenderChan <- MessageAppendPacket{segmentId: 0, dateLen: 0} // special mark to flush
+	mdb.appenderChan <- flushPacket
 }
 
 func (mdb *MessagesDb) AllMessagesIt() (messages go_iterators.Iterator[Message], err error) {

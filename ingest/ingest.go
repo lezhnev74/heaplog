@@ -108,6 +108,11 @@ func (ing *Ingest) indexFile(file string, locations []common.Location) error {
 	defer reader.Close()
 
 	allMessageLayouts, err := ing.findMessages(file, locations)
+	if errors.Is(err, scanner.NoMessageStartFound) || len(allMessageLayouts) == 0 {
+		return xerrors.Errorf("no messages found")
+	} else if err != nil {
+		return xerrors.Errorf("message scan failed: %w", err)
+	}
 
 	// pickNextLocation returns the next contiguous run (that is at most segmentSize long)
 	pickNextLocation := func(minPos uint64) (nextLoc common.Location) {
@@ -144,7 +149,7 @@ func (ing *Ingest) indexFile(file string, locations []common.Location) error {
 		tokenizedMessages := ing.readMessagesInStream(file, reader, locMessageLayouts)
 		lastSegmentLoc, err = ing.saveBatch(file, tokenizedMessages)
 		if err != nil {
-			return xerrors.Errorf("save segment: %w", err)
+			return xerrors.Errorf("save segment failed: %w", err)
 		}
 
 		loops++
@@ -164,7 +169,7 @@ func (ing *Ingest) saveBatch(file string, messages <-chan *ScannedTokenizedMessa
 
 	fileId, err := ing.db.GetFileId(file)
 	if err != nil {
-		err = xerrors.Errorf("index file: %w", err)
+		err = xerrors.Errorf("file is missing: %w", err)
 		return
 	}
 
@@ -181,17 +186,15 @@ func (ing *Ingest) saveBatch(file string, messages <-chan *ScannedTokenizedMessa
 	// As we iterate through messages, we accumulate segment terms.
 	// This function flushes terms to II and updates cur segment's boundaries
 	flush := func() error {
-		// update segment boundaries
-		syncErr := ing.db.CheckinSegmentWithId(
-			uint32(curSegment.Id),
-			fileId,
-			curSegment.Loc,
-			curSegment.DateMin,
-			curSegment.DateMax,
-		)
-		if syncErr != nil {
-			return xerrors.Errorf("sync segment: %w", syncErr)
-		}
+
+		// Here it has to save data with respect to accidental interruptions.
+		// The reserved segment id is used in both messages and II. But in case the interruption happens
+		// during the flush, those will point to a non-existing segment.
+		// In some cases that can lead to disk space wasted.
+		// Saving the segment as the last step gives more guarantees that no empty segments will appear.
+
+		// Before proceeding, we need to make sure the messages are flushed (though this is a non-blocking operation)
+		ing.db.MessagesDb.Flush()
 
 		// update II
 		segmentTerms := make([][]byte, 0, len(curSegmentTermsMap))
@@ -202,6 +205,18 @@ func (ing *Ingest) saveBatch(file string, messages <-chan *ScannedTokenizedMessa
 		iiErr := ing.ii.Put(segmentTerms, uint32(curSegment.Id))
 		if iiErr != nil {
 			return xerrors.Errorf("save segment: ii: %w", iiErr)
+		}
+
+		// as the last step, persist the segment
+		syncErr := ing.db.CheckinSegmentWithId(
+			uint32(curSegment.Id),
+			fileId,
+			curSegment.Loc,
+			curSegment.DateMin,
+			curSegment.DateMax,
+		)
+		if syncErr != nil {
+			return xerrors.Errorf("sync segment: %w", syncErr)
 		}
 
 		// Report
@@ -223,14 +238,14 @@ func (ing *Ingest) saveBatch(file string, messages <-chan *ScannedTokenizedMessa
 		if curSegment.Id == 0 {
 			// this is the first time the selection is invoked, so we try to use an existing segment
 			// that adjoins this message. It can return 0 if none found, though.
-			// no suitable segments is an expected case.
+			// "no suitable segment" is an expected case.
 			curSegment, err = ing.db.SelectSegmentThatAdjoins(fileId, m.From)
 			if err != nil && !errors.Is(err, sql.ErrNoRows) {
 				return 0, err
 			}
 		}
 
-		// new segment is started if the current is absent or too big already.
+		// make a new segment if the current is absent or too big already.
 		if curSegment.Id == 0 || uint64(curSegment.Loc.Len()) > ing.segmentSize {
 			// flush previous segment data
 			if curSegment.Id != 0 {
@@ -260,17 +275,13 @@ func (ing *Ingest) saveBatch(file string, messages <-chan *ScannedTokenizedMessa
 
 	for message := range messages {
 		if message.Err != nil {
-			if errors.Is(message.Err, scanner.NoMessageStartFound) {
-				err = EmptySegment
-			} else {
-				err = xerrors.Errorf("save segment: %w", message.Err)
-			}
-			return // no more messages
+			err = message.Err
+			break // no more messages
 		}
 
 		segmentId, serr := selectSegment(message)
 		if serr != nil {
-			err = xerrors.Errorf("segment selection: %w", serr)
+			err = xerrors.Errorf("segment selection failed: %w", serr)
 			return
 		}
 
@@ -279,7 +290,7 @@ func (ing *Ingest) saveBatch(file string, messages <-chan *ScannedTokenizedMessa
 
 		checkInErr := ing.db.CheckinMessage(segmentId, message.From, relDateFrom, dateLen)
 		if checkInErr != nil {
-			err = xerrors.Errorf("checking messages: %w", checkInErr)
+			err = xerrors.Errorf("checking messages failed: %w", checkInErr)
 			return
 		}
 

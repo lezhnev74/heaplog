@@ -5,7 +5,6 @@ import (
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
 	"log"
-	"net/http"
 )
 import _ "net/http/pprof"
 
@@ -106,10 +105,30 @@ func PrepareConsoleApp() (app *cli.App) {
 						return err
 					}
 
-					go func() {
-						log.Printf("Listening pprof on port 6060")
-						log.Println(http.ListenAndServe(":6060", nil))
-					}()
+					//go func() {
+					//	log.Printf("Listening pprof on port 6060")
+					//	log.Println(http.ListenAndServe(":6060", nil))
+					//}()
+
+					httpApp := makeHttpApp(happ, "")
+					log.Printf("Listening on port 8393")
+					log.Fatal(httpApp.Listen(":8393"))
+					return nil
+				},
+			},
+			{
+				Name:        "run_readonly",
+				Description: "Runs search only (no indexing or any other writing is happening)",
+				Flags:       flags,
+				Action: func(ctx *cli.Context) error {
+					cfg, err := prepareCfg(ctx)
+					if err != nil {
+						return err
+					}
+					happ, err := NewHeaplog(cfg, false)
+					if err != nil {
+						return err
+					}
 
 					httpApp := makeHttpApp(happ, "")
 					log.Printf("Listening on port 8393")

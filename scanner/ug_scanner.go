@@ -123,7 +123,7 @@ func UgScanLocation(file string, loc common.Location, re string) (layouts []Mess
 	return
 }
 
-// UgScan execs "ug" and channels back each message offsets via the iterator
+// UgScan execs "ug" on the entire file and channels back each message offsets via the iterator
 // based on https://github.com/Genivia/ugrep by Robert A. van Engelen
 func UgScan(file string, re string, locations []common.Location) (layouts []MessageLayout, err error) {
 

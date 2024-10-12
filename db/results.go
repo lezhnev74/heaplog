@@ -211,6 +211,7 @@ func (q *QueryDB) Page(queryId int, min, max *time.Time, page, pageLen int) (mes
 	SELECT fileId,pos,len 
 	FROM query_results
 	WHERE queryId=? AND date>=? and date<=?
+	ORDER BY date ASC -- show early messages first (just like in a file)
 	LIMIT ? OFFSET ? -- use cursors based on rowid instead?
 `
 	minMicro := int64(0)

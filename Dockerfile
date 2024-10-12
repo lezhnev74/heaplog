@@ -9,3 +9,4 @@ RUN apt-get install ugrep
 COPY --from=build /app/binary /heaplog
 EXPOSE 8393
 ENTRYPOINT ["/heaplog"]
+CMD ["run"]
