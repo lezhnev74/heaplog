@@ -91,6 +91,32 @@ Since there are many formats of log files, you have to provide two settings:
 1. Regular Expression to find individual messages(config key `MessageStartRE`) in your files.
 2. Go Date Format(config key `DateFormat`) to parse timestamps. See [Syntax docs](https://go.dev/src/time/format.go).
 
+**Example Config For PHP App Based On Laravel Framework**
+```yaml
+# where to look for log files? example: "./*.log"
+filesglobpattern: /logs/*.log
+# where to store the index and other data (relative to cwd supported)
+storagepath: ./storage
+# a regular expression to find the start of messages in a heap file,
+# it must contain the date pattern in the first matching group
+# example: "^\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\]"
+messagestartre: ^\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}[+-]\d{2}:\d{2})\]
+# the pattern of a date in a message
+# see https://go.dev/src/time/format.go
+dateformat: "2006-01-02T15:04:05.000000-07:00"
+# sets the degree of concurrency in the service (affects ingestion and search),
+# defaults to the number of cores if omitted or <1.
+concurrency: 8
+# Terms are extracted from messages and indexed.
+# These control how fast ingestion goes (and space taken for the inverted index),
+# as well as how fast search goes (as shorter terms may duplicate in the index).
+mintermlen: 4
+maxtermlen: 8
+# Max memory the duckdb instance is allowed to allocate in Mb.
+# Increase if you see related errors on big data sets. (default: 500)
+duckdbmaxmemmb: 1000
+```
+
 ### Use ChatGPT
 
 Use the power of AI to do the job for you :) Use this prompt to get a go code from where you can copy-paste the regular
