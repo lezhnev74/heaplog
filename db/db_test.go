@@ -15,7 +15,7 @@ func TestClearUp(t *testing.T) {
 	_db, storageRoot := test_util.PrepareTestDb(t)
 	defer os.RemoveAll(storageRoot)
 
-	ii, err := inverted_index_2.NewInvertedIndex(storageRoot)
+	ii, err := inverted_index_2.NewInvertedIndex(storageRoot, true)
 	require.NoError(t, err)
 
 	_, err = _db.Exec(`INSERT INTO files VALUES (1, 'path1'), (2, 'path2')`)

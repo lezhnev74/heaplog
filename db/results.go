@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	go_iterators "github.com/lezhnev74/go-iterators"
@@ -96,7 +97,7 @@ func (q *QueryDB) Flush() {
 }
 
 // CheckinQuery returns queryId instantly while ingesting the Messages.
-func (q *QueryDB) CheckinQuery(text string, min, max *time.Time, messages go_iterators.Iterator[Message]) (query Query, err error) {
+func (q *QueryDB) CheckinQuery(ctx context.Context, text string, min, max *time.Time, messages go_iterators.Iterator[Message]) (query Query, err error) {
 	queryId, err := q.ReserveQueryId()
 	if err != nil {
 		err = xerrors.Errorf("query checkin: %w", err)
@@ -132,6 +133,13 @@ func (q *QueryDB) CheckinQuery(text string, min, max *time.Time, messages go_ite
 			n int
 		)
 		for {
+			// Cancellation test:
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
 			m, err = messages.Next()
 			if errors.Is(err, go_iterators.EmptyIterator) {
 				break

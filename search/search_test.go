@@ -2,6 +2,7 @@ package search_test
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	go_iterators "github.com/lezhnev74/go-iterators"
@@ -38,7 +39,7 @@ func TestSearchResults(t *testing.T) {
 	tokenize := func(s []byte) [][]byte {
 		return tokenizer.Tokenize(s, 4, 8)
 	}
-	s := search.NewSearch(_db, ii, dateFormat)
+	s := search.NewSearch(context.Background(), _db, ii, dateFormat)
 
 	type test struct {
 		query           string
@@ -225,7 +226,7 @@ multile
 
 	// Ingest data before testing search
 	ing, ii := test_util.PrepareTestIngest(t, 50, storageRoot, _db)
-	s := search.NewSearch(_db, ii, "2006-01-02T15:04:05.000000-07:00")
+	s := search.NewSearch(context.Background(), _db, ii, "2006-01-02T15:04:05.000000-07:00")
 
 	_, _, err := _db.CheckInFiles([]string{file1, file2})
 	require.NoError(t, err)

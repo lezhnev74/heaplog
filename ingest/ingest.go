@@ -1,6 +1,7 @@
 package ingest
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"github.com/lezhnev74/inverted_index_2"
@@ -17,8 +18,6 @@ import (
 	"unsafe"
 )
 
-var EmptySegment = errors.New("no messages begins in the segment")
-
 type Ingest struct {
 	// findMessages extracts message layouts (boundaries) from the file
 	findMessages func(file string, locations []common.Location) ([]scanner.MessageLayout, error)
@@ -28,6 +27,7 @@ type Ingest struct {
 	ii           *inverted_index_2.InvertedIndex
 	segmentSize  uint64
 	concurrency  int // the level of concurrency in ingestion
+	ctx          context.Context
 }
 
 type ScannedTokenizedMessage struct {
@@ -38,6 +38,7 @@ type ScannedTokenizedMessage struct {
 }
 
 func NewIngest(
+	ctx context.Context,
 	scan func(file string, locations []common.Location) ([]scanner.MessageLayout, error),
 	parseTime func([]byte) (time.Time, error),
 	tokenize func([]byte) [][]byte,
@@ -54,6 +55,7 @@ func NewIngest(
 		ii:           ii,
 		segmentSize:  segmentSize,
 		concurrency:  concurrency,
+		ctx:          ctx,
 	}
 	return &ing
 }
@@ -317,7 +319,15 @@ func (ing *Ingest) readMessagesInStream(name string, stream io.ReaderAt, message
 
 		buf := make([]byte, 0)
 		var err error
+	loop:
 		for _, layout := range messageLayouts {
+
+			select {
+			case <-ing.ctx.Done():
+				break loop // stop
+			default:
+			}
+
 			messageLen := layout.To - layout.From
 			if messageLen > maxIndexableSize {
 				log.Printf("big message %dMiB at %s:%d", messageLen/1024/1024, name, layout.From)

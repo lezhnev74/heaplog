@@ -2,6 +2,7 @@ package search
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	go_iterators "github.com/lezhnev74/go-iterators"
@@ -21,15 +22,17 @@ type Search struct {
 	// dateFormat is GO time format for message's dates,
 	// extract message date upon scanning heap files
 	dateFormat string
+	ctx        context.Context
 }
 
 type SearchMatcher func(m db.Message, body []byte) bool
 
-func NewSearch(db *db.DbContainer, ii *inverted_index_2.InvertedIndex, dateFormat string) *Search {
+func NewSearch(ctx context.Context, db *db.DbContainer, ii *inverted_index_2.InvertedIndex, dateFormat string) *Search {
 	return &Search{
 		db:         db,
 		ii:         ii,
 		dateFormat: dateFormat,
+		ctx:        ctx,
 	}
 }
 
@@ -113,8 +116,18 @@ func (s *Search) Search(
 			panic(err)
 		}
 
+	rangeSegments:
 		for i, segment := range segments {
-			freeList <- true // get the slot
+
+			select {
+			case <-s.ctx.Done():
+				// Cancellation test: after another segment is checked we test the context,
+				// if cancelled, stop processing.
+				break rangeSegments
+			case freeList <- true:
+				// get the slot and process the segment
+			}
+
 			go func() {
 				defer func() {
 					<-freeList // release the slot

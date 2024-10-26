@@ -1,10 +1,15 @@
 package ui
 
 import (
+	"context"
 	"fmt"
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 )
 import _ "net/http/pprof"
 
@@ -86,6 +91,10 @@ func PrepareConsoleApp() (app *cli.App) {
 			Aliases: []string{"duckdb"},
 			Usage:   "Max memory the duckdb instance is allowed to allocate (Mb)",
 		},
+		&cli.BoolFlag{
+			Aliases: []string{"v"},
+			Usage:   "Show extra details about what the service does",
+		},
 	}
 
 	app = &cli.App{
@@ -96,21 +105,43 @@ func PrepareConsoleApp() (app *cli.App) {
 				Description: "Runs the service (indexes files and exposes search UI over HTTP)",
 				Flags:       flags,
 				Action: func(ctx *cli.Context) error {
+
+					log.Printf("Pid: %d", os.Getpid())
+
 					cfg, err := prepareCfg(ctx)
 					if err != nil {
 						return err
 					}
-					happ, err := NewHeaplog(cfg, true)
+
+					_ctx, cancel := context.WithCancel(context.Background())
+					happ, err := NewHeaplog(_ctx, cfg, true)
 					if err != nil {
+						cancel()
 						return err
 					}
+					httpApp := makeHttpApp(happ, "")
+
+					sigs := make(chan os.Signal, 1)
+					signal.Notify(sigs, syscall.SIGTERM)
+					go func() {
+						<-sigs
+						cancel() // stop the program
+						log.Printf("Stopping heaplog...")
+
+						t := time.Second * 10 // the same as the docker's timeout for "docker stop"
+						time.Sleep(t)
+
+						err := httpApp.Shutdown()
+						if err != nil {
+							log.Printf("%s", err)
+						}
+					}()
 
 					//go func() {
 					//	log.Printf("Listening pprof on port 6060")
 					//	log.Println(http.ListenAndServe(":6060", nil))
 					//}()
 
-					httpApp := makeHttpApp(happ, "")
 					log.Printf("Listening on port 8393")
 					log.Fatal(httpApp.Listen(":8393"))
 					return nil
@@ -125,7 +156,7 @@ func PrepareConsoleApp() (app *cli.App) {
 					if err != nil {
 						return err
 					}
-					happ, err := NewHeaplog(cfg, false)
+					happ, err := NewHeaplog(context.Background(), cfg, false)
 					if err != nil {
 						return err
 					}
@@ -145,7 +176,7 @@ func PrepareConsoleApp() (app *cli.App) {
 					if err != nil {
 						return err
 					}
-					happ, err := NewHeaplog(cfg, false)
+					happ, err := NewHeaplog(context.Background(), cfg, false)
 					if err != nil {
 						return err
 					}

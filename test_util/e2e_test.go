@@ -184,7 +184,7 @@ func buildDependencies(t *testing.T, segmentSize uint64, storageRoot string) (
 	tok := func(in []byte) [][]byte {
 		return tokenizer.Tokenize(in, 4, 8)
 	}
-	ii, err := inverted_index_2.NewInvertedIndex(storageRoot)
+	ii, err := inverted_index_2.NewInvertedIndex(storageRoot, true)
 	require.NoError(t, err)
 
 	s := func(file string, locations []common.Location) ([]scanner.MessageLayout, error) {
@@ -196,9 +196,9 @@ func buildDependencies(t *testing.T, segmentSize uint64, storageRoot string) (
 		return time.Parse(timeFormat, string(b))
 	}
 
-	ing := ingest.NewIngest(s, pd, tok, dbContainer, ii, segmentSize, 1)
+	ing := ingest.NewIngest(context.Background(), s, pd, tok, dbContainer, ii, segmentSize, 1)
 
-	_search := search.NewSearch(dbContainer, ii, timeFormat)
+	_search := search.NewSearch(context.Background(), dbContainer, ii, timeFormat)
 
 	return _search, ing, ii, dbContainer, tok
 }

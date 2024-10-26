@@ -60,7 +60,7 @@ func PrepareTestIngest(t *testing.T, segmentSize uint64, storageRoot string, db 
 		return tokenizer.Tokenize(in, 4, 10)
 	}
 
-	ii, err := inverted_index_2.NewInvertedIndex(storageRoot)
+	ii, err := inverted_index_2.NewInvertedIndex(storageRoot, true)
 	require.NoError(t, err)
 
 	s := func(file string, locations []common.Location) ([]scanner.MessageLayout, error) {
@@ -72,7 +72,7 @@ func PrepareTestIngest(t *testing.T, segmentSize uint64, storageRoot string, db 
 		return time.Parse(TimeFormat, string(b))
 	}
 
-	ing := ingest.NewIngest(s, pd, tok, db, ii, segmentSize, 1)
+	ing := ingest.NewIngest(context.Background(), s, pd, tok, db, ii, segmentSize, 1)
 
 	return ing, ii
 }

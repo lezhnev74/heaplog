@@ -33,8 +33,8 @@ type Config struct {
 	// Max memory the duckdb instance is allowed to allocate.
 	// Increase if you see related errors on big data sets. (default: 500)
 	DuckdbMaxMemMb uint
-	// ReportLevel controls how much output will be shown
-	ReportLevel int
+	// EnableLogging controls how much output will be shown
+	EnableLogging bool
 }
 
 // Validate is the final check after all overrides are done (file load, command arguments substituted)
@@ -92,7 +92,7 @@ var DefaultCfg = Config{
 	MaxTermLen:       8,
 	DuckdbMaxMemMb:   500,
 	Concurrency:      uint(runtime.NumCPU()),
-	ReportLevel:      1,
+	EnableLogging:    true,
 }
 
 func LoadConfig(loadFile bool) (cfg Config, err error) {

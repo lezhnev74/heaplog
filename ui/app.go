@@ -32,6 +32,7 @@ type HeaplogApp struct {
 	db     *db.DbContainer
 	search *search.Search
 	cfg    Config
+	ctx    context.Context
 }
 
 // DeleteQuery removes the query and its results
@@ -131,7 +132,7 @@ func (happ *HeaplogApp) NewQuery(text string, min *time.Time, max *time.Time) (n
 		},
 		int(happ.cfg.Concurrency),
 	)
-	newQuery, err = happ.db.CheckinQuery(text, min, max, messagesIt)
+	newQuery, err = happ.db.CheckinQuery(happ.ctx, text, min, max, messagesIt)
 
 	return
 }
@@ -207,7 +208,9 @@ func (happ *HeaplogApp) Query(queryId int, from, to *time.Time) (query db.Query,
 	return
 }
 
-func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
+func NewHeaplog(ctx context.Context, cfg Config, startBackground bool) (*HeaplogApp, error) {
+
+	common.EnableLogging = cfg.EnableLogging
 
 	// 1. Init the database
 	connector, err := db.PrepareDuckDB(cfg.StoragePath, int(cfg.DuckdbMaxMemMb))
@@ -245,7 +248,7 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 	tok := func(in []byte) [][]byte {
 		return tokenizer.Tokenize(in, int(cfg.MinTermLen), int(cfg.MaxTermLen))
 	}
-	ii, err := inverted_index_2.NewInvertedIndex(cfg.StoragePath)
+	ii, err := inverted_index_2.NewInvertedIndex(cfg.StoragePath, cfg.EnableLogging)
 	if err != nil {
 		return nil, err
 	}
@@ -256,8 +259,8 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 		return time.Parse(cfg.DateFormat, string(b))
 	}
 	segmentSize := uint64(5_000_000)
-	ingestor := ingest.NewIngest(layoutFile, pd, tok, dbContainer, ii, segmentSize, int(cfg.Concurrency))
-	_search := search.NewSearch(dbContainer, ii, cfg.DateFormat)
+	ingestor := ingest.NewIngest(ctx, layoutFile, pd, tok, dbContainer, ii, segmentSize, int(cfg.Concurrency))
+	_search := search.NewSearch(ctx, dbContainer, ii, cfg.DateFormat)
 
 	_discover := ingest.NewDiscover([]string{cfg.FilesGlobPattern}, dbContainer.FilesDb)
 
@@ -366,6 +369,7 @@ func NewHeaplog(cfg Config, startBackground bool) (*HeaplogApp, error) {
 		db:     dbContainer,
 		search: _search,
 		cfg:    cfg,
+		ctx:    ctx,
 	}, nil
 }
 

@@ -122,6 +122,12 @@ func PrintMem(db *sql.DB) (rss uint64) {
 	return m.Sys
 }
 
+var EnableLogging bool
+
+func Log(message string) {
+	fmt.Println(message)
+}
+
 //func CleanMem() {
 //	runtime.GC()
 //	debug.FreeOSMemory()

@@ -1,6 +1,7 @@
 package db_test
 
 import (
+	"context"
 	go_iterators "github.com/lezhnev74/go-iterators"
 	"github.com/stretchr/testify/require"
 	"heaplog_2024/common"
@@ -63,7 +64,7 @@ func TestResultsRead(t *testing.T) {
 		return
 	}, func() error { return nil })
 
-	r, err := dbContainer.QueryDB.CheckinQuery("sample", &t0, &t2, it)
+	r, err := dbContainer.QueryDB.CheckinQuery(context.Background(), "sample", &t0, &t2, it)
 	require.NoError(t, err)
 
 	require.False(t, r.Finished)
