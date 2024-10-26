@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/prometheus/procfs"
+	"heaplog_2024/common"
 	"log"
 	"os"
 	"path"
@@ -107,5 +108,5 @@ func ProcStat() {
 	if err != nil {
 		log.Fatalf("could not get process stat: %s", err)
 	}
-	log.Printf("RSS: %dMb\n", stat.ResidentMemory()/1024/1024)
+	common.Out("RSS: %dMb\n", stat.ResidentMemory()/1024/1024)
 }

@@ -11,7 +11,6 @@ import (
 	"heaplog_2024/db"
 	"heaplog_2024/scanner"
 	"io"
-	"log"
 	"os"
 	"slices"
 	"time"
@@ -223,7 +222,7 @@ func (ing *Ingest) saveBatch(file string, messages <-chan *ScannedTokenizedMessa
 
 		// Report
 		if curSegmentMessages > 0 {
-			log.Printf("indexed %s[%d:%d]: %d messages, %d terms in %s", file, curSegment.Loc.From, curSegment.Loc.To, curSegmentMessages, len(segmentTerms), time.Now().Sub(t0).String())
+			common.Out("indexed %s[%d:%d]: %d messages, %d terms in %s", file, curSegment.Loc.From, curSegment.Loc.To, curSegmentMessages, len(segmentTerms), time.Now().Sub(t0).String())
 		}
 
 		// Cleanup
@@ -330,7 +329,7 @@ func (ing *Ingest) readMessagesInStream(name string, stream io.ReaderAt, message
 
 			messageLen := layout.To - layout.From
 			if messageLen > maxIndexableSize {
-				log.Printf("big message %dMiB at %s:%d", messageLen/1024/1024, name, layout.From)
+				common.Out("big message %dMiB at %s:%d", messageLen/1024/1024, name, layout.From)
 
 				// Index only the beginning and the end of the big message.
 				halfSize := maxIndexableSize / 2

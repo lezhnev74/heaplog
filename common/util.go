@@ -107,13 +107,13 @@ func PrintMem(db *sql.DB) (rss uint64) {
 	if totalBlocks > 0 {
 		freeBlocksPct = int(float64(freeBlocks) / float64(totalBlocks) * 100)
 	}
-	log.Printf("DuckDB: fileSize:%s, walSize:%s, mem:%s/%s, Blcs[total/used/free/freePcs]:%d,%d,%d,%d%% ",
+	Out("DuckDB: fileSize:%s, walSize:%s, mem:%s/%s, Blcs[total/used/free/freePcs]:%d,%d,%d,%d%% ",
 		dbSize, walSize, memSize, memLimit, totalBlocks, usedBlocks, freeBlocks, freeBlocksPct)
 
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 
-	log.Printf(
+	Out(
 		"System: %s, %s",
 		fmt.Sprintf("RSS:%dMiB", m.Sys/1024/1024),             // total virtual memory reserved from OS
 		fmt.Sprintf("HeapAlloc:%dMiB", m.HeapAlloc/1024/1024), // HeapAlloc is bytes of allocated heap objects.
@@ -124,8 +124,10 @@ func PrintMem(db *sql.DB) (rss uint64) {
 
 var EnableLogging bool
 
-func Log(message string) {
-	fmt.Println(message)
+func Out(pattern string, args ...any) {
+	if EnableLogging {
+		log.Printf(pattern, args...)
+	}
 }
 
 //func CleanMem() {
@@ -136,9 +138,9 @@ func Log(message string) {
 //	ctx := context.Background()
 //	cmd := exec.CommandContext(ctx, "bash", "-c", `echo 3 > /proc/sys/vm/drop_caches`)
 //	out, err := cmd.CombinedOutput()
-//	log.Printf("cleanmem: %s", out)
+//	Out("cleanmem: %s", out)
 //	if err != nil {
-//		log.Printf("cleanmem error: %s", err)
+//		Out("cleanmem error: %s", err)
 //		return
 //	}
 //}

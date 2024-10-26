@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
+	"heaplog_2024/common"
 	"log"
 	"os"
 	"os/signal"
@@ -38,6 +39,7 @@ func overrideConfig(cfg Config, ctx *cli.Context) Config {
 	if ctx.Int("DuckdbMaxMemMb") != 0 {
 		cfg.DuckdbMaxMemMb = uint(ctx.Int("DuckdbMaxMemMb"))
 	}
+	cfg.EnableLogging = ctx.Bool("Verbose")
 
 	return cfg
 }
@@ -47,6 +49,9 @@ func PrepareConsoleApp() (app *cli.App) {
 	prepareCfg := func(ctx *cli.Context) (Config, error) {
 		cfg, _ := LoadConfig(true)
 		cfg = overrideConfig(cfg, ctx)
+
+		common.EnableLogging = cfg.EnableLogging
+
 		return cfg, cfg.Validate()
 	}
 
@@ -92,8 +97,9 @@ func PrepareConsoleApp() (app *cli.App) {
 			Usage:   "Max memory the duckdb instance is allowed to allocate (Mb)",
 		},
 		&cli.BoolFlag{
+			Name:    "Verbose",
 			Aliases: []string{"v"},
-			Usage:   "Show extra details about what the service does",
+			Usage:   "Show extra details about what the service is doing",
 		},
 	}
 
@@ -122,18 +128,18 @@ func PrepareConsoleApp() (app *cli.App) {
 					httpApp := makeHttpApp(happ, "")
 
 					sigs := make(chan os.Signal, 1)
-					signal.Notify(sigs, syscall.SIGTERM)
+					signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT)
 					go func() {
 						<-sigs
 						cancel() // stop the program
 						log.Printf("Stopping heaplog...")
 
-						t := time.Second * 10 // the same as the docker's timeout for "docker stop"
+						t := time.Second * 3
 						time.Sleep(t)
 
 						err := httpApp.Shutdown()
 						if err != nil {
-							log.Printf("%s", err)
+							common.Out("%s", err)
 						}
 					}()
 

@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"golang.org/x/xerrors"
+	"heaplog_2024/common"
 	"heaplog_2024/db"
 	"log"
 	"path/filepath"
@@ -48,7 +49,7 @@ func (d *Discover) DiscoverFiles() (news, obsoletes []string, err error) {
 		for i, _ := range obsoletes {
 			report += "- " + obsoletes[i] + "\n"
 		}
-		log.Printf(report)
+		common.Out(report)
 	}
 
 	return
