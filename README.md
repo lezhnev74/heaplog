@@ -117,7 +117,26 @@ maxtermlen: 8
 duckdbmaxmemmb: 1000
 ```
 
-### Use ChatGPT
+### Automatic Format Detection Command
+
+This command `docker compose run --rm heaplog detect` will ask you to give it a sample log message. 
+It will try to detect the date format automatically.
+If it succeeds, you can copy the output config values and paste into your config.
+
+Sample output:
+```
+$ docker compose run --rm heaplog detect
+Enter a sample message line:
+[2023-12-31T00:00:03.448201+00:00] production.DEBUG: My message
+ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ Yay, the date detected above!
+
+Config values:
+MessageStartRE: "(?m)^\[(\d{4}\-\d{2}\-\d{2}\w\d{2}:\d{2}:\d{2}\.\d{6}[+-]\d{2}:\d{2})"
+DateFormat: "2006-01-02T15:04:05.000000-07:00"
+```
+
+### Use ChatGPT To Detect Format
 
 Use the power of AI to do the job for you :) Use this prompt to get a go code from where you can copy-paste the regular
 expression as well as date format for parsing.
