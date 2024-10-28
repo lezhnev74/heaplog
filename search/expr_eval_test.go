@@ -60,6 +60,17 @@ func TestExprEval(t *testing.T) {
 			},
 			expectedSegments: []uint32{2},
 		},
+		{ // TWO TERM SEGMENTS WITH INVERSION
+			// one segment can contain messages with "failure" as well without,
+			// we can't discard segments just based on the II.
+			query:       "error !failure",
+			allSegments: []uint32{1, 2, 3},
+			termSegments: map[string][]uint32{
+				"error":   {1, 2},
+				"failure": {2, 3},
+			},
+			expectedSegments: []uint32{1, 2},
+		},
 		{ // RE -> FULL-SCAN
 			query:       "~error",
 			allSegments: []uint32{1, 2, 3, 4, 5},
@@ -98,7 +109,7 @@ func TestExprEval(t *testing.T) {
 			termSegments: map[string][]uint32{
 				"error": {1, 2, 3},
 			},
-			expectedSegments: []uint32{4, 5},
+			expectedSegments: []uint32{1, 2, 3, 4, 5},
 		},
 		{
 			query:       "!(~error OR error)",

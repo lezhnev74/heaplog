@@ -295,9 +295,7 @@ func (s *Search) filterSegmentsWithInvertedIndex(expr *query_language.Expression
 	literals := expr.FindKeywords()
 	terms := make([][]byte, 0, len(literals))
 	for _, lit := range literals {
-		for _, t := range tokenize([]byte(lit)) {
-			terms = append(terms, t)
-		}
+		terms = append(terms, tokenize([]byte(lit))...)
 	}
 	slices.SortFunc(terms, bytes.Compare)
 	terms = slices.CompactFunc(terms, bytes.Equal)

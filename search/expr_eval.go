@@ -38,11 +38,8 @@ func ExprEval(
 		case query_language.AND:
 			return setAnd(operands)
 		case query_language.NOT:
-			// edge-case, "!(Full-FilterMessagesStream)" evaluates to "Full-FilterMessagesStream"
-			if len(allSegments) == len(operands[0]) {
-				return allSegments
-			}
-			return setExcept(allSegments, operands[0])
+			// inversion does not say anything about relevant segments
+			return allSegments
 		}
 
 		panic("unexpected operator in expr eval")
