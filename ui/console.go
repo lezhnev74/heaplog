@@ -1,14 +1,18 @@
 package ui
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
 	"heaplog_2024/common"
+	"heaplog_2024/scanner"
 	"log"
 	"os"
 	"os/signal"
+	"regexp"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -187,6 +191,40 @@ func PrepareConsoleApp() (app *cli.App) {
 						return err
 					}
 					return happ.Test()
+				},
+			},
+			{
+				Name:        "detect",
+				Flags:       flags,
+				Description: "Detect the correct regexp pattern for the dates in your log files",
+				Action: func(ctx *cli.Context) error {
+
+					fmt.Print("Enter a sample message line:\n")
+					reader := bufio.NewReader(os.Stdin)
+					input, err := reader.ReadString('\n')
+					if err != nil {
+						return err
+					}
+					// try to find the date
+					startPattern, format, err := scanner.DetectMessageLine([]byte(input))
+					if err != nil {
+						return fmt.Errorf("Detection failed: %s\n", err)
+					}
+
+					pattern := scanner.TimeFormatToRegexp(format)
+					r := regexp.MustCompile(pattern)
+					matches := r.FindStringSubmatch(input)
+					if len(matches) != 1 {
+						return fmt.Errorf("Detection failed\n")
+					}
+
+					datePos := strings.Index(input, matches[0])
+					fmt.Printf("%s%s\n", strings.Repeat(" ", datePos), strings.Repeat("^", len(matches[0])))
+					fmt.Printf("%sYay, the date detected above!\n\n", strings.Repeat(" ", datePos))
+					fmt.Printf("Config values:\n")
+					fmt.Printf("MessageStartRE: \"%s\"\nDateFormat: \"%s\"\n", startPattern, format)
+
+					return nil
 				},
 			},
 			{

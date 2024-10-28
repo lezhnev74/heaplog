@@ -47,7 +47,7 @@ func DetectMessageLine(text []byte) (startPattern string, dateFormat string, err
 		startPattern = fmt.Sprintf("(?m)^%s(%s)", escapedPrefix, TimeFormatToRegexp(dateFormat))
 		return startPattern, dateFormat, nil
 	}
-	return "", "", xerrors.Errorf("unable To detect messages")
+	return "", "", xerrors.Errorf("unable to detect messages")
 }
 
 // TimeFormatToRegexp returns a regexp pattern that can recognize any Date in the given Time Format

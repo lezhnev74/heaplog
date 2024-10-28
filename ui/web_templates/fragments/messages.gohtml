@@ -1,10 +1,7 @@
 {{range .Messages}}
     <div class="message collapsed">
         <div class="message_side">
-            {{if gt (lines .) 1}}
-                <span class="small text-success expand">+{{shortNumber (lines .)}}</span>
-            {{end}}
-
+            <span class="small text-success expand">+{{shortNumber (lines .)}}</span>
         </div>
         <pre>{{.}}</pre>
     </div>
