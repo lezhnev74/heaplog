@@ -222,7 +222,7 @@ func PrepareConsoleApp() (app *cli.App) {
 					fmt.Printf("%s%s\n", strings.Repeat(" ", datePos), strings.Repeat("^", len(matches[0])))
 					fmt.Printf("%sYay, the date detected above!\n\n", strings.Repeat(" ", datePos))
 					fmt.Printf("Config values:\n")
-					fmt.Printf("MessageStartRE: \"%s\"\nDateFormat: \"%s\"\n", startPattern, format)
+					fmt.Printf("MessageStartRE: '%s'\nDateFormat: '%s'\n", startPattern, format)
 
 					return nil
 				},

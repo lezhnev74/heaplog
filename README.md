@@ -11,6 +11,8 @@ It builds a small separate index (in its storage directory) from your files.
 It does not contain your log messages, only some meta information to help find where the messages are,
 using your logs as "heapfiles" (hence the name).
 
+**[📌 Watch a quickstart video on Youtube](http://www.youtube.com/watch?v=fxMeAP41btY)**
+
 **Table of content:**
 
 - [Installation](#installation)
