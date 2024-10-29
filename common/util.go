@@ -1,13 +1,17 @@
 package common
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"golang.org/x/xerrors"
 	"hash/crc32"
 	"log"
 	"os"
+	"os/exec"
 	"runtime"
+	"runtime/debug"
+	"runtime/pprof"
 	"time"
 )
 
@@ -130,17 +134,46 @@ func Out(pattern string, args ...any) {
 	}
 }
 
-//func CleanMem() {
-//	runtime.GC()
-//	debug.FreeOSMemory()
-//
-//	// since the main runtime for the app is Docker, clearing caches allows the app to stay below the max mem limit.
-//	ctx := context.Background()
-//	cmd := exec.CommandContext(ctx, "bash", "-c", `echo 3 > /proc/sys/vm/drop_caches`)
-//	out, err := cmd.CombinedOutput()
-//	Out("cleanmem: %s", out)
-//	if err != nil {
-//		Out("cleanmem error: %s", err)
-//		return
-//	}
-//}
+func CleanMem() {
+	runtime.GC()
+	debug.FreeOSMemory()
+
+	// since the main runtime for the app is Docker, clearing caches allows the app to stay below the max mem limit.
+	ctx := context.Background()
+	cmd := exec.CommandContext(ctx, "bash", "-c", `echo 3 > /proc/sys/vm/drop_caches`)
+	out, err := cmd.CombinedOutput()
+	Out("cleanmem: %s", out)
+	if err != nil {
+		Out("cleanmem error: %s", err)
+		return
+	}
+}
+
+func DumpMemoryIn(d time.Duration) {
+	time.Sleep(d)
+	f2, err := os.Create(fmt.Sprintf("/storage/%s_profile_mem.tmp", time.Now().Format("150405")))
+	if err != nil {
+		log.Fatal("could not create mem profile: ", err)
+	}
+	if err := pprof.WriteHeapProfile(f2); err != nil {
+		log.Fatal("could not start mem profile: ", err)
+	}
+	f2.Close()
+}
+
+func ProfileCPU(fn func()) {
+	tt := time.Now()
+	f, err := os.Create(fmt.Sprintf("./%s_profile_cpu.tmp", time.Now().Format("150405")))
+	if err != nil {
+		log.Fatal("could not create CPU profile: ", err)
+	}
+	if err := pprof.StartCPUProfile(f); err != nil {
+		log.Fatal("could not start CPU profile: ", err)
+	}
+
+	fn()
+
+	log.Printf("profiled in %s", time.Now().Sub(tt).String())
+	pprof.StopCPUProfile()
+	defer f.Close()
+}

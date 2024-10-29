@@ -5,7 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	go_iterators "github.com/lezhnev74/go-iterators"
 	"github.com/lezhnev74/inverted_index_2"
 	"github.com/marcboeker/go-duckdb"
@@ -22,7 +21,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
-	"runtime/pprof"
 	"time"
 )
 
@@ -329,13 +327,6 @@ func NewHeaplog(ctx context.Context, cfg Config, startBackground bool) (*Heaplog
 						return
 					}
 
-					//go DumpMemoryIn(20 * time.Second)
-					err = ingestor.IndexConcurrent(allFiles, int(cfg.Concurrency))
-					if err != nil {
-						log.Printf("ingest: %s", err)
-						return
-					}
-
 					err = ingestor.IndexConcurrent(allFiles, int(cfg.Concurrency))
 					if err != nil {
 						log.Printf("ingest: %s", err)
@@ -371,33 +362,4 @@ func NewHeaplog(ctx context.Context, cfg Config, startBackground bool) (*Heaplog
 		cfg:    cfg,
 		ctx:    ctx,
 	}, nil
-}
-
-func DumpMemoryIn(d time.Duration) {
-	time.Sleep(d)
-	f2, err := os.Create(fmt.Sprintf("/storage/%s_profile_mem.tmp", time.Now().Format("150405")))
-	if err != nil {
-		log.Fatal("could not create mem profile: ", err)
-	}
-	if err := pprof.WriteHeapProfile(f2); err != nil {
-		log.Fatal("could not start mem profile: ", err)
-	}
-	f2.Close()
-}
-
-func ProfileCPU(fn func()) {
-	tt := time.Now()
-	f, err := os.Create(fmt.Sprintf("./%s_profile_cpu.tmp", time.Now().Format("150405")))
-	if err != nil {
-		log.Fatal("could not create CPU profile: ", err)
-	}
-	if err := pprof.StartCPUProfile(f); err != nil {
-		log.Fatal("could not start CPU profile: ", err)
-	}
-
-	fn()
-
-	log.Printf("profiled in %s", time.Now().Sub(tt).String())
-	pprof.StopCPUProfile()
-	defer f.Close()
 }
