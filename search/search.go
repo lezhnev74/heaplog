@@ -5,7 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	go_iterators "github.com/lezhnev74/go-iterators"
+	"github.com/lezhnev74/go-iterators"
 	"github.com/lezhnev74/inverted_index_2"
 	"golang.org/x/xerrors"
 	"heaplog_2024/db"

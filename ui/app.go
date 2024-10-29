@@ -5,7 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	go_iterators "github.com/lezhnev74/go-iterators"
+	"github.com/lezhnev74/go-iterators"
 	"github.com/lezhnev74/inverted_index_2"
 	"github.com/marcboeker/go-duckdb"
 	"golang.org/x/exp/mmap"
@@ -264,18 +264,6 @@ func NewHeaplog(ctx context.Context, cfg Config, startBackground bool) (*Heaplog
 
 	// 3. Start background procs
 	if startBackground {
-		// Report mem
-		/*if cfg.ReportLevel > 0 {
-			go func() {
-				t := common.InstantTick(time.Second)
-				for {
-					select {
-					case <-t:
-						common.PrintMem(_db)
-					}
-				}
-			}()
-		}*/
 		// Clear up queries
 		go func() {
 			t := common.InstantTick(time.Minute)

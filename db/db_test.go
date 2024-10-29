@@ -1,7 +1,7 @@
 package db_test
 
 import (
-	go_iterators "github.com/lezhnev74/go-iterators"
+	"github.com/lezhnev74/go-iterators"
 	"github.com/lezhnev74/inverted_index_2"
 	"github.com/stretchr/testify/require"
 	"heaplog_2024/db"

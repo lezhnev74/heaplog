@@ -1,7 +1,7 @@
 package search
 
 import (
-	go_iterators "github.com/lezhnev74/go-iterators"
+	"github.com/lezhnev74/go-iterators"
 	"golang.org/x/exp/mmap"
 	"golang.org/x/xerrors"
 	"heaplog_2024/db"

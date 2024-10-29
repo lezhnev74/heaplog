@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	go_iterators "github.com/lezhnev74/go-iterators"
+	"github.com/lezhnev74/go-iterators"
 	"github.com/marcboeker/go-duckdb"
 	"golang.org/x/xerrors"
 	"log"

@@ -2,7 +2,7 @@ package db_test
 
 import (
 	"context"
-	go_iterators "github.com/lezhnev74/go-iterators"
+	"github.com/lezhnev74/go-iterators"
 	"github.com/stretchr/testify/require"
 	"heaplog_2024/common"
 	"heaplog_2024/db"
