@@ -28,7 +28,7 @@ func ClearUp(db *DbContainer, ii *inverted_index_2.InvertedIndex) error {
 
 	// read ids as strings (helper)
 	strIds := func(sql string) (ids []string, uintIds []uint32, err error) {
-		r, err := db.Query("SELECT id FROM files")
+		r, err := db.Query(sql)
 		if err != nil {
 			return
 		}
@@ -63,7 +63,7 @@ func ClearUp(db *DbContainer, ii *inverted_index_2.InvertedIndex) error {
 
 	if len(danglingSegmentIds) > 0 {
 		segmentIdsString := strings.Join(danglingSegmentIds, ",")
-		_, err = db.Exec(fmt.Sprintf("DELETE FROM file_segments_messages WHERE segmentId NOT IN (%s)", segmentIdsString))
+		_, err = db.Exec(fmt.Sprintf("DELETE FROM file_segments_messages WHERE segmentId IN (%s)", segmentIdsString))
 		if err != nil {
 			return err
 		}

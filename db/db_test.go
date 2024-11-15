@@ -34,6 +34,8 @@ func TestClearUp(t *testing.T) {
 	_, err = _db.Exec(`DELETE FROM files WHERE id=1`)
 	require.NoError(t, err)
 
+	test_util.DumpTable(_db.DB, "files", 2)
+	test_util.DumpTable(_db.DB, "file_segments", 6)
 	require.NoError(t, db.ClearUp(_db, ii))
 
 	// Assert files
