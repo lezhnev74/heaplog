@@ -232,7 +232,7 @@ func (qe *Expression) GetMatcher() MatchFunc {
 				o = strings.ToLower(o)
 				operandFunc = func(s string) bool {
 					s = strings.ToLower(s)
-					return strings.Contains(s, o) // case-sensitive matching
+					return strings.Contains(s, o) // case-insensitive matching is expensive, but greatly improves UX...
 				}
 			case RegExpLiteral:
 				p := regexp.MustCompile(string(o)) // RE match
