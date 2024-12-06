@@ -145,6 +145,59 @@ func (happ *HeaplogApp) Page(queryId int, from, to *time.Time, page, pageSize, p
 	// Apply skip-offset:
 	messages = messages[min(len(messages), pageSkip):]
 
+	return happ.fetchMessages(queryId, messages)
+}
+
+func (happ *HeaplogApp) All(queryId int, from, to *time.Time) (rows go_iterators.Iterator[string], err error) {
+	// stream from the query storage
+	messages, err := happ.db.QueryDB.Stream(queryId, from, to)
+	if err != nil {
+		err = xerrors.Errorf("page failed: %w", err)
+		return
+	}
+
+	// batch messages
+	messageBatchesIt := go_iterators.NewBatchingIterator(messages, 1000)
+
+	// map stream to message strings (read from heap files)
+	retIterator := go_iterators.NewMappingIterator(messageBatchesIt, func(messageBatch []db.Message) []string {
+		rowBatch, err := happ.fetchMessages(queryId, messageBatch)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return rowBatch
+	})
+
+	// flatten
+	flatRows := go_iterators.NewDynamicSliceIterator(
+		func() ([]string, error) {
+			return retIterator.Next()
+		},
+		func() error {
+			return nil
+		},
+	)
+
+	return flatRows, nil
+}
+
+// Query returns query description with sub-query support (time scope on the query)
+func (happ *HeaplogApp) Query(queryId int, from, to *time.Time) (query db.Query, err error) {
+	query, err = happ.db.QueryDB.FindQuery(queryId)
+	if err != nil {
+		return
+	}
+	if from != nil {
+		query.Min = from
+	}
+	if to != nil {
+		query.Max = to
+	}
+	query.Messages, err = happ.db.QueryDB.Count(queryId, from, to)
+	return
+}
+
+func (happ *HeaplogApp) fetchMessages(queryId int, messages []db.Message) (rows []string, err error) {
 	// Read actual messages from the source files
 	var (
 		file           string
@@ -153,6 +206,8 @@ func (happ *HeaplogApp) Page(queryId int, from, to *time.Time, page, pageSize, p
 	)
 	for _, m := range messages {
 		if lastFileId != m.FileId {
+			lastFileId = m.FileId
+
 			// Open a new file stream:
 			file, err = happ.db.GetFile(m.FileId)
 			if err != nil {
@@ -187,22 +242,6 @@ func (happ *HeaplogApp) Page(queryId int, from, to *time.Time, page, pageSize, p
 		_ = lastFileReader.Close()
 	}
 
-	return
-}
-
-// Query returns query description with sub-query support (time scope on the query)
-func (happ *HeaplogApp) Query(queryId int, from, to *time.Time) (query db.Query, err error) {
-	query, err = happ.db.QueryDB.FindQuery(queryId)
-	if err != nil {
-		return
-	}
-	if from != nil {
-		query.Min = from
-	}
-	if to != nil {
-		query.Max = to
-	}
-	query.Messages, err = happ.db.QueryDB.Count(queryId, from, to)
 	return
 }
 

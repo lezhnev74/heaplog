@@ -3,7 +3,9 @@ package ui
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
+	go_iterators "github.com/lezhnev74/go-iterators"
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
 	"heaplog_2024/common"
@@ -174,6 +176,58 @@ func PrepareConsoleApp() (app *cli.App) {
 					httpApp := makeHttpApp(happ, "")
 					log.Printf("Listening on port 8393")
 					log.Fatal(httpApp.Listen(":8393"))
+					return nil
+				},
+			},
+			{
+				Name:        "query",
+				Description: "Send a single query",
+				Flags: append(flags, &cli.StringFlag{
+					Name:    "QueryText",
+					Aliases: []string{"query", "q"},
+					Usage:   "A normal query as a string",
+				}),
+				Action: func(ctx *cli.Context) error {
+					cfg, err := prepareCfg(ctx)
+					if err != nil {
+						return err
+					}
+					happ, err := NewHeaplog(context.Background(), cfg, false)
+					if err != nil {
+						return err
+					}
+
+					outStream := os.Stdout
+
+					// 1. Make a query
+					queryText := ctx.String("QueryText")
+					if len(queryText) == 0 {
+						return fmt.Errorf("empty query")
+					}
+					q, _, err := happ.NewQuery(queryText, nil, nil)
+					if err != nil {
+						return err
+					}
+
+					// 2. Read all the data into a destination stream
+					rows, err := happ.All(q.Id, nil, nil)
+					if err != nil {
+						return err
+					}
+
+					for {
+						messageString, err := rows.Next()
+						if errors.Is(err, go_iterators.EmptyIterator) {
+							break
+						} else if err != nil {
+							return err
+						}
+						_, err = outStream.Write([]byte(messageString + "\n"))
+						if err != nil {
+							return err
+						}
+					}
+
 					return nil
 				},
 			},

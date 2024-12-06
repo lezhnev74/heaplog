@@ -107,3 +107,52 @@ func TestResultsRead(t *testing.T) {
 	require.Equal(t, t0, *r.Min)
 	require.Equal(t, t2, *r.Max)
 }
+
+func TestStreamResults(t *testing.T) {
+	// Test plan:
+	// 1. Imitate slow message ingestion
+	// 2. Stream query results
+	// 3. Test the query state
+
+	// Exec:
+	dbContainer, storageRoot := test_util.PrepareTestDb(t)
+	defer os.RemoveAll(storageRoot)
+
+	// 1. Imitate slow message ingestion
+	t0 := time.Now().Round(time.Microsecond)
+	t1 := t0.Add(time.Second)
+	t2 := t1.Add(time.Second)
+	messages := []db.Message{
+		{1, common.Location{0, 10}, common.Location{}, 1, &t0},
+		{2, common.Location{10, 20}, common.Location{}, 1, &t1},
+		{3, common.Location{2, 4}, common.Location{}, 2, &t2},
+	}
+	curMessage := 0
+	it := go_iterators.NewCallbackIterator(func() (m db.Message, err error) {
+		if curMessage == len(messages) {
+			err = go_iterators.EmptyIterator
+		} else {
+			m = messages[curMessage]
+			curMessage++
+		}
+		return
+	}, func() error { return nil })
+
+	r, err := dbContainer.QueryDB.CheckinQuery(context.Background(), "sample", &t0, &t2, it)
+	require.NoError(t, err)
+
+	dbContainer.QueryDB.Flush()
+
+	// 2. Stream query results:
+	stream, err := dbContainer.QueryDB.Stream(r.Id, nil, nil)
+	require.NoError(t, err)
+	streamedMessages := go_iterators.ToSlice(stream)
+
+	// 3. Test
+	// normalize streamed results as they do not include the date column
+	require.Len(t, streamedMessages, len(messages))
+	for i := 0; i < len(messages); i++ {
+		require.Equal(t, messages[i].FileId, streamedMessages[i].FileId)
+		require.Equal(t, messages[i].Loc.From, streamedMessages[i].Loc.From)
+	}
+}

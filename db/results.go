@@ -249,6 +249,75 @@ func (q *QueryDB) Page(queryId int, min, max *time.Time, page, pageLen int) (mes
 	return
 }
 
+// Stream all messages for a query.
+// If the query is still in-flight, it will push messages as they appear.
+func (q *QueryDB) Stream(queryId int, min, max *time.Time) (messages go_iterators.Iterator[Message], err error) {
+
+	totalRead := 0
+	// confirm query has finished twice as these are two separate query ops
+	doubleConfirm := 0
+
+	readBatch := func() (messages []Message, err error) {
+		sqlSelect := `
+	SELECT fileId,pos,len 
+	FROM query_results
+	WHERE queryId=? AND date>=? and date<=?
+	ORDER BY date ASC -- show early messages first (just like in a file)
+	OFFSET ?
+`
+		minMicro := int64(0)
+		maxMicro := int64(math.MaxInt64)
+		if min != nil {
+			minMicro = min.UnixMicro()
+		}
+		if max != nil {
+			maxMicro = max.UnixMicro()
+		}
+
+		// Keep reading until the query is finished (double confirm) or we get a batch of rows
+		for {
+			r, err := q.db.Query(sqlSelect, queryId, minMicro, maxMicro, totalRead)
+			if err != nil {
+				return nil, err
+			}
+			defer r.Close()
+
+			for r.Next() {
+				m := Message{}
+				err = r.Scan(&m.FileId, &m.Loc.From, &m.Loc.To)
+				if err != nil {
+					return nil, err
+				}
+				messages = append(messages, m)
+				totalRead++
+			}
+
+			if len(messages) == 0 {
+				// maybe the query is still fetching rows, or maybe it has no data, test the query itself
+				query, err := q.FindQuery(queryId)
+				if err != nil {
+					return nil, err
+				}
+				if query.Finished {
+					doubleConfirm++
+					if doubleConfirm >= 2 {
+						return messages, nil
+					}
+				}
+				time.Sleep(time.Millisecond * 100) // no data available and query is still in-flight
+				continue                           // read again
+			}
+
+			break // return messages that we got so far
+		}
+
+		return
+	}
+
+	retIterator := go_iterators.NewDynamicSliceIterator(readBatch, func() error { return nil })
+	return retIterator, nil
+}
+
 func (q *QueryDB) List() (queries []Query, err error) {
 	rows, err := q.db.Query("SELECT queryId,text,dateMin,dateMax,builtAt,finished,messages FROM queries ORDER BY queryId desc")
 	if err != nil {
