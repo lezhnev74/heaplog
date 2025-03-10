@@ -2,11 +2,13 @@ package search
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
-	"heaplog_2024/common"
-	"heaplog_2024/test_util"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	"heaplog_2024/common"
+	"heaplog_2024/test_util"
 )
 
 func TestReadMessages(t *testing.T) {
@@ -36,8 +38,8 @@ func TestReadMessages(t *testing.T) {
 	tests := []test{
 		{
 			addrs: []MessageAddr{
-				{file1, common.Location{1, 64}},
-				{file1, common.Location{197, 258}},
+				{file1, common.Location{From: 1, To: 64}},
+				{file1, common.Location{From: 197, To: 258}},
 			},
 			expectedBodies: [][]byte{
 				[]byte("[2024-07-30T00:00:10.100160+00:00] payment error: invalid card\n"),
@@ -46,9 +48,9 @@ func TestReadMessages(t *testing.T) {
 		},
 		{
 			addrs: []MessageAddr{
-				{file1, common.Location{1, 64}},
-				{file1, common.Location{197, 258}},
-				{file2, common.Location{71, 130}},
+				{file1, common.Location{From: 1, To: 64}},
+				{file1, common.Location{From: 197, To: 258}},
+				{file2, common.Location{From: 71, To: 130}},
 			},
 			expectedBodies: [][]byte{
 				[]byte("[2024-07-30T00:00:10.100160+00:00] payment error: invalid card\n"),
@@ -58,9 +60,9 @@ func TestReadMessages(t *testing.T) {
 		},
 		{ // read from a missing file
 			addrs: []MessageAddr{
-				{file1, common.Location{1, 64}},
-				{"unknown", common.Location{197, 258}},
-				{file2, common.Location{71, 130}},
+				{file1, common.Location{From: 1, To: 64}},
+				{"unknown", common.Location{From: 197, To: 258}},
+				{file2, common.Location{From: 71, To: 130}},
 			},
 			expectedBodies: [][]byte{
 				[]byte("[2024-07-30T00:00:10.100160+00:00] payment error: invalid card\n"),

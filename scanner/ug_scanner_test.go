@@ -49,19 +49,19 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 		},
 		{ // no message start
 			locations: []common.Location{
-				{0, 1},
+				{From: 0, To: 1},
 			},
 			expectedLayouts: nil,
 		},
 		{ // wrong locations
 			locations: []common.Location{
-				{2000, 10000},
+				{From: 2000, To: 10000},
 			},
 			expectedLayouts: nil,
 		},
 		{ // All file as a single location
 			locations: []common.Location{
-				{0, 10000},
+				{From: 0, To: 10000},
 			},
 			expectedLayouts: []scanner.MessageLayout{
 				{
@@ -87,7 +87,7 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 		},
 		{ // Location that contains only part of the date
 			locations: []common.Location{
-				{0, 20},
+				{From: 0, To: 20},
 			},
 			expectedLayouts: []scanner.MessageLayout{
 				{
@@ -100,7 +100,7 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 		},
 		{ // Location that contains the date of the first message
 			locations: []common.Location{
-				{0, 50},
+				{From: 0, To: 50},
 			},
 			expectedLayouts: []scanner.MessageLayout{
 				{
@@ -113,8 +113,8 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 		},
 		{ // Multiple location that contain messages
 			locations: []common.Location{
-				{0, 50},
-				{610, 700},
+				{From: 0, To: 50},
+				{From: 610, To: 700},
 			},
 			expectedLayouts: []scanner.MessageLayout{
 				{
@@ -175,7 +175,7 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 	file := test_util.PopulateFile(storageRoot, hugeStream)
 
 	re := `^\[([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}[+-][0-9]{2}:[0-9]{2})]`
-	messages, err := scanner.UgScan(file, re, []common.Location{{0, 1_000_000}})
+	messages, err := scanner.UgScan(file, re, []common.Location{{From: 0, To: 1_000_000}})
 	require.NoError(t, err)
 	require.Len(t, messages, 3000)
 
@@ -208,7 +208,7 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 	file := test_util.PopulateFile(storageRoot, sourceStream)
 
 	re := `^\[([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}[+-][0-9]{2}:[0-9]{2})]`
-	messages, err := scanner.UgScan(file, re, []common.Location{{0, 10000}})
+	messages, err := scanner.UgScan(file, re, []common.Location{{From: 0, To: 10000}})
 	require.NoError(t, err)
 	expectedMessages := []scanner.MessageLayout{
 		{

@@ -43,9 +43,9 @@ func TestSmallSegmentsMerging(t *testing.T) {
 
 	// make sure all messages are visible
 	expectedMessages := []db.Message{
-		{1, common.Location{0, 45}, common.Location{1, 32}, fileId, nil},  // SAME SEGMENT
-		{1, common.Location{45, 90}, common.Location{1, 32}, fileId, nil}, // SAME SEGMENT
-		{2, common.Location{90, 135}, common.Location{1, 32}, fileId, nil},
+		{SegmentId: 1, Loc: common.Location{From: 0, To: 45}, RelDateLoc: common.Location{From: 1, To: 32}, FileId: fileId, Date: nil},  // SAME SEGMENT
+		{SegmentId: 1, Loc: common.Location{From: 45, To: 90}, RelDateLoc: common.Location{From: 1, To: 32}, FileId: fileId, Date: nil}, // SAME SEGMENT
+		{SegmentId: 2, Loc: common.Location{From: 90, To: 135}, RelDateLoc: common.Location{From: 1, To: 32}, FileId: fileId, Date: nil},
 	}
 	_db.MessagesDb.Flush()
 	actualMessages, err := _db.AllMessages(fileId)
@@ -70,13 +70,13 @@ multile
 	expectedMessages := []db.Message{
 		{
 			SegmentId:  0, // do not compare
-			Loc:        common.Location{1, 152},
-			RelDateLoc: common.Location{1, 32},
+			Loc:        common.Location{From: 1, To: 152},
+			RelDateLoc: common.Location{From: 1, To: 32},
 		},
 		{
 			SegmentId:  0, // do not compare
-			Loc:        common.Location{152, 212},
-			RelDateLoc: common.Location{1, 32},
+			Loc:        common.Location{From: 152, To: 212},
+			RelDateLoc: common.Location{From: 1, To: 32},
 		},
 	}
 

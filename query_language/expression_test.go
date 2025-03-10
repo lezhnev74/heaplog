@@ -76,7 +76,7 @@ BING ADS response (recorded):
 		t.Run(tt.query, func(t *testing.T) {
 			expr, err := ParseUserQuery(tt.query)
 			require.NoError(t, err)
-			log.Printf(expr.String())
+			log.Print(expr.String())
 			require.Equal(t, tt.expectedMatch, expr.GetMatcher()(message))
 		})
 	}

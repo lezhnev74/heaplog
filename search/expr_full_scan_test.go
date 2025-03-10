@@ -1,11 +1,12 @@
 package search
 
 import (
-	"fmt"
+	"testing"
+
 	"github.com/stretchr/testify/require"
+
 	"heaplog_2024/query_language"
 	"heaplog_2024/tokenizer"
-	"testing"
 )
 
 func TestFullScanDetection(t *testing.T) {
@@ -37,7 +38,7 @@ func TestFullScanDetection(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(fmt.Sprintf("%s", tt.query), func(t *testing.T) {
+		t.Run(tt.query, func(t *testing.T) {
 			expr, err := query_language.ParseUserQuery(tt.query)
 			require.NoError(t, err)
 

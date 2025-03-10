@@ -16,7 +16,7 @@ import (
 func TestSegmentSelection(t *testing.T) {
 	_db, sdb, fdb, root := PrepareSegmentsForTesting(t)
 	defer os.RemoveAll(root)
-	dbc := &db.DbContainer{fdb, nil, sdb, nil, _db}
+	dbc := &db.DbContainer{FilesDb: fdb, MessagesDb: nil, SegmentsDb: sdb, QueryDB: nil, DB: _db}
 
 	file1 := path.Join(root, "file1.log")
 	_, _, err := fdb.CheckInFiles([]string{file1})
@@ -35,43 +35,43 @@ func TestSegmentSelection(t *testing.T) {
 	tests := []test{
 		{ // full
 			expectedLocations: []common.Location{
-				{0, 100},
+				{From: 0, To: 100},
 			},
 		},
 		{ // left indexed
 			indexedLocations: []common.Location{
-				{0, 50},
+				{From: 0, To: 50},
 			},
 			expectedLocations: []common.Location{
-				{50, 100},
+				{From: 50, To: 100},
 			},
 		},
 		{ // right indexed
 			indexedLocations: []common.Location{
-				{50, 100},
+				{From: 50, To: 100},
 			},
 			expectedLocations: []common.Location{
-				{0, 50},
+				{From: 0, To: 50},
 			},
 		},
 		{ // middle indexed
 			indexedLocations: []common.Location{
-				{50, 60},
+				{From: 50, To: 60},
 			},
 			expectedLocations: []common.Location{
-				{0, 50},
-				{60, 100},
+				{From: 0, To: 50},
+				{From: 60, To: 100},
 			},
 		},
 		{ // multiple middle indexed
 			indexedLocations: []common.Location{
-				{0, 11},
-				{50, 60},
-				{88, 100},
+				{From: 0, To: 11},
+				{From: 50, To: 60},
+				{From: 88, To: 100},
 			},
 			expectedLocations: []common.Location{
-				{11, 50},
-				{60, 88},
+				{From: 11, To: 50},
+				{From: 60, To: 88},
 			},
 		},
 	}

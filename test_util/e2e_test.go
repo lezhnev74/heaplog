@@ -70,7 +70,7 @@ func _TestSearch(t *testing.T) {
 		c++
 
 		if c == 1 || c == 100 {
-			log.Printf("%d results ready in %s\n", c, time.Now().Sub(t0).String())
+			log.Printf("%d results ready in %s\n", c, time.Since(t0).String())
 		}
 	}
 	log.Printf("Found messages: %d\n", c)

@@ -1,14 +1,16 @@
 package ui
 
 import (
+	"errors"
 	"fmt"
-	"github.com/go-playground/validator"
-	"github.com/spf13/viper"
 	"log"
 	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
+
+	"github.com/go-playground/validator"
+	"github.com/spf13/viper"
 )
 
 type Config struct {
@@ -79,7 +81,7 @@ func (cfg Config) Validate() error {
 		for _, err := range err.(validator.ValidationErrors) {
 			message += fmt.Sprintf("> %v: %s\n", err.StructField(), translateError(err))
 		}
-		return fmt.Errorf(message)
+		return errors.New(message)
 	}
 
 	return err
@@ -102,7 +104,7 @@ func LoadConfig(loadFile bool) (cfg Config, err error) {
 	viper.AddConfigPath(".")
 	viper.SetConfigName("heaplog")
 
-	if loadFile == true {
+	if loadFile {
 		err = viper.ReadInConfig()
 		if err == nil {
 			err = viper.Unmarshal(&cfg)

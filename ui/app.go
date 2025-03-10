@@ -5,11 +5,18 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log"
+	"os"
+	"path/filepath"
+	"runtime/debug"
+	"time"
+
 	"github.com/lezhnev74/go-iterators"
 	"github.com/lezhnev74/inverted_index_2"
 	"github.com/marcboeker/go-duckdb"
 	"golang.org/x/exp/mmap"
 	"golang.org/x/xerrors"
+
 	"heaplog_2024/common"
 	"heaplog_2024/db"
 	"heaplog_2024/ingest"
@@ -17,11 +24,6 @@ import (
 	"heaplog_2024/scanner"
 	"heaplog_2024/search"
 	"heaplog_2024/tokenizer"
-	"log"
-	"os"
-	"path/filepath"
-	"runtime/debug"
-	"time"
 )
 
 // HeaplogApp is the main layer that manages use-cases connected to console/HTTP channel.
@@ -55,7 +57,7 @@ func (happ *HeaplogApp) Test() error {
 	}
 
 	file, err := filepath.Abs(files[0])
-	layouts, err := scanner.UgScan(file, happ.cfg.MessageStartRE, []common.Location{{0, 10000}})
+	layouts, err := scanner.UgScan(file, happ.cfg.MessageStartRE, []common.Location{{From: 0, To: 10000}})
 	if err != nil {
 		return xerrors.Errorf("unable to test the file at %s: %w", file, err)
 	}
@@ -307,21 +309,19 @@ func NewHeaplog(ctx context.Context, cfg Config, startBackground bool) (*Heaplog
 		go func() {
 			t := common.InstantTick(time.Minute)
 			for {
-				select {
-				case <-t:
-					queries, err := dbContainer.List()
-					if err != nil {
-						log.Printf("cleanup queries: %s", err.Error())
-						return
-					}
-					ttl := time.Hour * 24
-					for _, q := range queries {
-						if time.Now().Sub(*q.BuiltAt) > ttl {
-							err = dbContainer.RemoveQuery(q.Id)
-							if err != nil {
-								log.Printf("cleanup queries: %s", err.Error())
-								return
-							}
+				<-t
+				queries, err := dbContainer.List()
+				if err != nil {
+					log.Printf("cleanup queries: %s", err.Error())
+					return
+				}
+				ttl := time.Hour * 24
+				for _, q := range queries {
+					if time.Since(*q.BuiltAt) > ttl {
+						err = dbContainer.RemoveQuery(q.Id)
+						if err != nil {
+							log.Printf("cleanup queries: %s", err.Error())
+							return
 						}
 					}
 				}

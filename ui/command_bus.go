@@ -3,13 +3,14 @@ package ui
 import (
 	"bytes"
 	"fmt"
+	"math"
+	"time"
+
 	"github.com/go-playground/validator"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/template/html/v2"
-	"golang.org/x/xerrors"
+
 	"heaplog_2024/db"
-	"math"
-	"time"
 )
 
 type CommandBus struct {
@@ -162,8 +163,7 @@ func (bus *CommandBus) Pagination(c *fiber.Ctx) error {
 	}
 
 	// 3. Build view models
-	viewModel := fiber.Map{}
-	viewModel = bus.buildPaginationViewModel(query, page, pageSize)
+	viewModel := bus.buildPaginationViewModel(query, page, pageSize)
 
 	// 4. Render HTML
 	htmlBuf := bytes.NewBuffer(nil)
@@ -221,11 +221,10 @@ func (bus *CommandBus) Messages(c *fiber.Ctx) error {
 	}
 
 	// 4. Build view models
-	viewModel := fiber.Map{}
 	shouldPoll := !query.Finished && len(messages) < (pageSize-pageSkip) // is the page full now?
 	pollDelay := fmt.Sprintf("%dms", 5000*polls)                         // increase timeouts through time
 
-	viewModel = fiber.Map{
+	viewModel := fiber.Map{
 		"QueryId":    queryId,
 		"Messages":   messages,
 		"ShouldPoll": shouldPoll,
@@ -299,7 +298,7 @@ func (bus *CommandBus) NewQuery(c *fiber.Ctx) error {
 	dates["From"] = nil
 	dates["To"] = nil
 	v := validator.New()
-	v.RegisterValidation("date", func(fl validator.FieldLevel) bool {
+	err = v.RegisterValidation("date", func(fl validator.FieldLevel) bool {
 		s := fl.Field().String()
 		if s == "" {
 			return true // optional validation
@@ -311,6 +310,11 @@ func (bus *CommandBus) NewQuery(c *fiber.Ctx) error {
 		dates[fl.FieldName()] = &t
 		return true
 	}, false)
+	if err != nil {
+		message := fmt.Sprintf("Validation failed: %s\n", err)
+		return &fiber.Error{Code: fiber.StatusOK, Message: message}
+	}
+
 	err = v.Struct(input)
 	if err != nil {
 		message := "Invalid request payload:\n"
@@ -345,21 +349,21 @@ func (bus *CommandBus) NewQuery(c *fiber.Ctx) error {
 	return err
 }
 
-func (bus *CommandBus) pushFragment(c *fiber.Ctx, targetHtmlId, fragmentName string, payload fiber.Map) error {
-	fragmentHtml, err := bus.buildFragment(targetHtmlId, fragmentName, payload)
-	if err != nil {
-		return err
-	}
-	_, err = c.Write(fragmentHtml)
-	return err
-}
-
-func (bus *CommandBus) buildFragment(targetHtmlId, fragmentName string, payload fiber.Map) (fragment []byte, err error) {
-	tplBuf := bytes.NewBuffer(nil)
-	err = bus.viewEngine.Render(tplBuf, fragmentName, payload)
-	if err != nil {
-		return nil, xerrors.Errorf("unable to render a fragment %s: %w", fragmentName, err)
-	}
-	fragmentString := fmt.Sprintf("<div id=\"%s\" hx-swap-oob=\"true\">\n%s\n</div>", targetHtmlId, tplBuf.Bytes())
-	return []byte(fragmentString), nil
-}
+//func (bus *CommandBus) pushFragment(c *fiber.Ctx, targetHtmlId, fragmentName string, payload fiber.Map) error {
+//	fragmentHtml, err := bus.buildFragment(targetHtmlId, fragmentName, payload)
+//	if err != nil {
+//		return err
+//	}
+//	_, err = c.Write(fragmentHtml)
+//	return err
+//}
+//
+//func (bus *CommandBus) buildFragment(targetHtmlId, fragmentName string, payload fiber.Map) (fragment []byte, err error) {
+//	tplBuf := bytes.NewBuffer(nil)
+//	err = bus.viewEngine.Render(tplBuf, fragmentName, payload)
+//	if err != nil {
+//		return nil, xerrors.Errorf("unable to render a fragment %s: %w", fragmentName, err)
+//	}
+//	fragmentString := fmt.Sprintf("<div id=\"%s\" hx-swap-oob=\"true\">\n%s\n</div>", targetHtmlId, tplBuf.Bytes())
+//	return []byte(fragmentString), nil
+//}

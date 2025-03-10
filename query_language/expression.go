@@ -248,21 +248,21 @@ func (qe *Expression) GetMatcher() MatchFunc {
 			switch qe.Operator {
 			case AND:
 				for _, opFunc := range operandFuncs {
-					if opFunc(message) == false {
+					if !opFunc(message) {
 						return false
 					}
 				}
 				return true
 			case OR:
 				for _, opFunc := range operandFuncs {
-					if opFunc(message) == true {
+					if opFunc(message) {
 						return true
 					}
 				}
 				return false
 			case NOT:
 				for _, opFunc := range operandFuncs {
-					if opFunc(message) == true {
+					if opFunc(message) {
 						return false
 					}
 				}

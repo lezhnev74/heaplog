@@ -4,13 +4,14 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
-	"github.com/lezhnev74/inverted_index_2"
-	"github.com/marcboeker/go-duckdb"
-	"golang.org/x/xerrors"
 	"log"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/lezhnev74/inverted_index_2"
+	"github.com/marcboeker/go-duckdb"
+	"golang.org/x/xerrors"
 )
 
 var ErrNoData error = xerrors.Errorf("no data available")

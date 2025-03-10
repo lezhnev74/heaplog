@@ -43,10 +43,10 @@ func (d *Discover) DiscoverFiles() (news, obsoletes []string, err error) {
 
 	if len(news) > 0 || len(obsoletes) > 0 {
 		report := "files discovered:\n"
-		for i, _ := range news {
+		for i := range news {
 			report += "+ " + news[i] + "\n"
 		}
-		for i, _ := range obsoletes {
+		for i := range obsoletes {
 			report += "- " + obsoletes[i] + "\n"
 		}
 		common.Out(report)

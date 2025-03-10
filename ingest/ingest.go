@@ -4,17 +4,19 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"github.com/lezhnev74/inverted_index_2"
-	"golang.org/x/sync/errgroup"
-	"golang.org/x/xerrors"
-	"heaplog_2024/common"
-	"heaplog_2024/db"
-	"heaplog_2024/scanner"
 	"io"
 	"os"
 	"slices"
 	"time"
 	"unsafe"
+
+	"github.com/lezhnev74/inverted_index_2"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/xerrors"
+
+	"heaplog_2024/common"
+	"heaplog_2024/db"
+	"heaplog_2024/scanner"
 )
 
 type Ingest struct {
@@ -119,7 +121,7 @@ func (ing *Ingest) indexFile(file string, locations []common.Location) error {
 	pickNextLocation := func(minPos uint64) (nextLoc common.Location) {
 		for _, l := range locations {
 			if l.Contains(minPos) {
-				nextLoc = common.Location{minPos, min(minPos+ing.segmentSize, l.To)}
+				nextLoc = common.Location{From: minPos, To: min(minPos+ing.segmentSize, l.To)}
 				break
 			}
 		}
@@ -222,7 +224,7 @@ func (ing *Ingest) saveBatch(file string, messages <-chan *ScannedTokenizedMessa
 
 		// Report
 		if curSegmentMessages > 0 {
-			common.Out("indexed %s[%d:%d]: %d messages, %d terms in %s", file, curSegment.Loc.From, curSegment.Loc.To, curSegmentMessages, len(segmentTerms), time.Now().Sub(t0).String())
+			common.Out("indexed %s[%d:%d]: %d messages, %d terms in %s", file, curSegment.Loc.From, curSegment.Loc.To, curSegmentMessages, len(segmentTerms), time.Since(t0).String())
 		}
 
 		// Cleanup
@@ -261,7 +263,7 @@ func (ing *Ingest) saveBatch(file string, messages <-chan *ScannedTokenizedMessa
 			newId, _ := ing.db.ReserveSegmentId()
 			curSegment.Id = int(newId)
 			curSegment.FileId = fileId
-			curSegment.Loc = common.Location{m.From, m.To}
+			curSegment.Loc = common.Location{From: m.From, To: m.To}
 			curSegment.DateMin = m.DateTime
 			curSegment.DateMax = m.DateTime
 			curSegmentMessages = 0

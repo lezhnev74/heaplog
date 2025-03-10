@@ -22,25 +22,25 @@ func TestSelectLayouts(t *testing.T) {
 
 	tests := []test{
 		{ // includes all
-			loc:             common.Location{0, 100},
+			loc:             common.Location{From: 0, To: 100},
 			expectedLayouts: layouts,
 		},
 		{ // includes nothing left
-			loc:             common.Location{0, 9},
+			loc:             common.Location{From: 0, To: 9},
 			expectedLayouts: []scanner.MessageLayout{},
 		},
 		{ // includes nothing right
-			loc:             common.Location{1000, 2000},
+			loc:             common.Location{From: 1000, To: 2000},
 			expectedLayouts: []scanner.MessageLayout{},
 		},
 		{ // smaller than a message
-			loc: common.Location{10, 12},
+			loc: common.Location{From: 10, To: 12},
 			expectedLayouts: []scanner.MessageLayout{
 				{From: 10, To: 20},
 			},
 		},
 		{ // no message starts in the location
-			loc:             common.Location{11, 12},
+			loc:             common.Location{From: 11, To: 12},
 			expectedLayouts: []scanner.MessageLayout{},
 		},
 	}

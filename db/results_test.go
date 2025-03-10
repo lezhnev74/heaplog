@@ -48,9 +48,9 @@ func TestResultsRead(t *testing.T) {
 	t1 := t0.Add(time.Second)
 	t2 := t1.Add(time.Second)
 	messages := []db.Message{
-		{1, common.Location{0, 10}, common.Location{}, 1, &t0},
-		{2, common.Location{10, 20}, common.Location{}, 1, &t1},
-		{3, common.Location{2, 4}, common.Location{}, 2, &t2},
+		{1, common.Location{From: 0, To: 10}, common.Location{}, 1, &t0},
+		{2, common.Location{From: 10, To: 20}, common.Location{}, 1, &t1},
+		{3, common.Location{From: 2, To: 4}, common.Location{}, 2, &t2},
 	}
 	curMessage := 0
 	it := go_iterators.NewCallbackIterator(func() (m db.Message, err error) {
@@ -123,9 +123,9 @@ func TestStreamResults(t *testing.T) {
 	t1 := t0.Add(time.Second)
 	t2 := t1.Add(time.Second)
 	messages := []db.Message{
-		{1, common.Location{0, 10}, common.Location{}, 1, &t0},
-		{2, common.Location{10, 20}, common.Location{}, 1, &t1},
-		{3, common.Location{2, 4}, common.Location{}, 2, &t2},
+		{1, common.Location{From: 0, To: 10}, common.Location{}, 1, &t0},
+		{2, common.Location{From: 10, To: 20}, common.Location{}, 1, &t1},
+		{3, common.Location{From: 2, To: 4}, common.Location{}, 2, &t2},
 	}
 	curMessage := 0
 	it := go_iterators.NewCallbackIterator(func() (m db.Message, err error) {

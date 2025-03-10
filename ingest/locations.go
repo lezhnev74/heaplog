@@ -27,7 +27,7 @@ func SelectLocationsForIndexing(_db *db.DbContainer, file string) ([]common.Loca
 		return nil, err
 	}
 
-	unindexedLocations := []common.Location{{0, fileSize}}
+	unindexedLocations := []common.Location{{From: 0, To: fileSize}}
 	for _, indexedLocation := range indexedLocations {
 		nextPending := make([]common.Location, 0, len(unindexedLocations))
 		for _, pendingLocation := range unindexedLocations {

@@ -5,16 +5,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"testing"
+
 	"github.com/lezhnev74/go-iterators"
 	"github.com/stretchr/testify/require"
+
 	"heaplog_2024/common"
 	"heaplog_2024/db"
 	"heaplog_2024/query_language"
 	"heaplog_2024/search"
 	"heaplog_2024/test_util"
 	"heaplog_2024/tokenizer"
-	"os"
-	"testing"
 )
 
 func TestSearchResults(t *testing.T) {
@@ -52,33 +54,33 @@ func TestSearchResults(t *testing.T) {
 			query:      "err",
 			isFullScan: true,
 			matchedMessages: []db.Message{
-				{Loc: common.Location{1, 64}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:00:10.100160+00:00")},
-				{Loc: common.Location{197, 258}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:03:30.449222+00:00")},
-				{Loc: common.Location{71, 130}, FileId: file2Id, Date: test_util.MakeTimeP("2024-08-01T00:02:02.967490+00:00")},
+				{Loc: common.Location{From: 1, To: 64}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:00:10.100160+00:00")},
+				{Loc: common.Location{From: 197, To: 258}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:03:30.449222+00:00")},
+				{Loc: common.Location{From: 71, To: 130}, FileId: file2Id, Date: test_util.MakeTimeP("2024-08-01T00:02:02.967490+00:00")},
 			},
 		},
 		{ // few short terms
 			query:      "err car",
 			isFullScan: true,
 			matchedMessages: []db.Message{
-				{Loc: common.Location{1, 64}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:00:10.100160+00:00")},
+				{Loc: common.Location{From: 1, To: 64}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:00:10.100160+00:00")},
 			},
 		},
 		{ // FULL-SCAN (re)
 			query:      "~err",
 			isFullScan: true,
 			matchedMessages: []db.Message{
-				{Loc: common.Location{1, 64}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:00:10.100160+00:00")},
-				{Loc: common.Location{197, 258}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:03:30.449222+00:00")},
-				{Loc: common.Location{71, 130}, FileId: file2Id, Date: test_util.MakeTimeP("2024-08-01T00:02:02.967490+00:00")},
+				{Loc: common.Location{From: 1, To: 64}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:00:10.100160+00:00")},
+				{Loc: common.Location{From: 197, To: 258}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:03:30.449222+00:00")},
+				{Loc: common.Location{From: 71, To: 130}, FileId: file2Id, Date: test_util.MakeTimeP("2024-08-01T00:02:02.967490+00:00")},
 			},
 		},
 		{ // FULL-SCAN (re)
 			query:      `~userid:\d+`,
 			isFullScan: true,
 			matchedMessages: []db.Message{
-				{Loc: common.Location{64, 135}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:01:10.100170+00:00")},
-				{Loc: common.Location{1, 71}, FileId: file2Id, Date: test_util.MakeTimeP("2024-08-01T00:01:01.285087+00:00")},
+				{Loc: common.Location{From: 64, To: 135}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:01:10.100170+00:00")},
+				{Loc: common.Location{From: 1, To: 71}, FileId: file2Id, Date: test_util.MakeTimeP("2024-08-01T00:01:01.285087+00:00")},
 			},
 		},
 		//{ // case-sensitive match
@@ -90,55 +92,55 @@ func TestSearchResults(t *testing.T) {
 			query:      "Event",
 			isFullScan: false,
 			matchedMessages: []db.Message{
-				{Loc: common.Location{64, 135}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:01:10.100170+00:00")},
-				{Loc: common.Location{1, 71}, FileId: file2Id, Date: test_util.MakeTimeP("2024-08-01T00:01:01.285087+00:00")},
+				{Loc: common.Location{From: 64, To: 135}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:01:10.100170+00:00")},
+				{Loc: common.Location{From: 1, To: 71}, FileId: file2Id, Date: test_util.MakeTimeP("2024-08-01T00:01:01.285087+00:00")},
 			},
 		},
 		{ // two terms
 			query:      "event signup",
 			isFullScan: false,
 			matchedMessages: []db.Message{
-				{Loc: common.Location{64, 135}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:01:10.100170+00:00")},
+				{Loc: common.Location{From: 64, To: 135}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:01:10.100170+00:00")},
 			},
 		},
 		{ // two terms with inversion
 			query:      "event !login",
 			isFullScan: false,
 			matchedMessages: []db.Message{
-				{Loc: common.Location{64, 135}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:01:10.100170+00:00")},
+				{Loc: common.Location{From: 64, To: 135}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:01:10.100170+00:00")},
 			},
 		},
 		{ // two terms OR
 			query:      "error or failure",
 			isFullScan: false,
 			matchedMessages: []db.Message{
-				{Loc: common.Location{1, 64}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:00:10.100160+00:00")},
-				{Loc: common.Location{135, 197}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:02:10.383227+00:00")},
-				{Loc: common.Location{197, 258}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:03:30.449222+00:00")},
-				{Loc: common.Location{71, 130}, FileId: file2Id, Date: test_util.MakeTimeP("2024-08-01T00:02:02.967490+00:00")},
+				{Loc: common.Location{From: 1, To: 64}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:00:10.100160+00:00")},
+				{Loc: common.Location{From: 135, To: 197}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:02:10.383227+00:00")},
+				{Loc: common.Location{From: 197, To: 258}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:03:30.449222+00:00")},
+				{Loc: common.Location{From: 71, To: 130}, FileId: file2Id, Date: test_util.MakeTimeP("2024-08-01T00:02:02.967490+00:00")},
 			},
 		},
 		{ // short and long terms
 			query:      "api failure",
 			isFullScan: false,
 			matchedMessages: []db.Message{
-				{Loc: common.Location{135, 197}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:02:10.383227+00:00")},
+				{Loc: common.Location{From: 135, To: 197}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:02:10.383227+00:00")},
 			},
 		},
 		{ // two not
 			query:      "!~err !~fail",
 			isFullScan: true,
 			matchedMessages: []db.Message{
-				{Loc: common.Location{64, 135}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:01:10.100170+00:00")},
-				{Loc: common.Location{258, 310}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:04:20.082156+00:00")},
-				{Loc: common.Location{1, 71}, FileId: file2Id, Date: test_util.MakeTimeP("2024-08-01T00:01:01.285087+00:00")},
+				{Loc: common.Location{From: 64, To: 135}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:01:10.100170+00:00")},
+				{Loc: common.Location{From: 258, To: 310}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:04:20.082156+00:00")},
+				{Loc: common.Location{From: 1, To: 71}, FileId: file2Id, Date: test_util.MakeTimeP("2024-08-01T00:01:01.285087+00:00")},
 			},
 		},
 		{ // compound literal
 			query:      `"payment accepted"`,
 			isFullScan: false,
 			matchedMessages: []db.Message{
-				{Loc: common.Location{258, 310}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:04:20.082156+00:00")},
+				{Loc: common.Location{From: 258, To: 310}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:04:20.082156+00:00")},
 			},
 		},
 		{ // compound literal must be exact
@@ -250,10 +252,10 @@ multile
 		{ // MATCH ALL
 			matcher: func(m db.Message, body []byte) bool { return true },
 			expectedMessages: []db.Message{
-				{SegmentId: 1, Loc: common.Location{1, 69}, RelDateLoc: common.Location{1, 32}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:00:04.000000+00:00")},
-				{SegmentId: 2, Loc: common.Location{69, 129}, RelDateLoc: common.Location{1, 32}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:00:05.111111+00:00")},
-				{SegmentId: 3, Loc: common.Location{1, 153}, RelDateLoc: common.Location{1, 32}, FileId: file2Id, Date: test_util.MakeTimeP("2024-07-30T00:00:06.222222+00:00")},
-				{SegmentId: 4, Loc: common.Location{153, 213}, RelDateLoc: common.Location{1, 32}, FileId: file2Id, Date: test_util.MakeTimeP("2024-07-30T00:00:08.444444+00:00")},
+				{SegmentId: 1, Loc: common.Location{From: 1, To: 69}, RelDateLoc: common.Location{From: 1, To: 32}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:00:04.000000+00:00")},
+				{SegmentId: 2, Loc: common.Location{From: 69, To: 129}, RelDateLoc: common.Location{From: 1, To: 32}, FileId: file1Id, Date: test_util.MakeTimeP("2024-07-30T00:00:05.111111+00:00")},
+				{SegmentId: 3, Loc: common.Location{From: 1, To: 153}, RelDateLoc: common.Location{From: 1, To: 32}, FileId: file2Id, Date: test_util.MakeTimeP("2024-07-30T00:00:06.222222+00:00")},
+				{SegmentId: 4, Loc: common.Location{From: 153, To: 213}, RelDateLoc: common.Location{From: 1, To: 32}, FileId: file2Id, Date: test_util.MakeTimeP("2024-07-30T00:00:08.444444+00:00")},
 			},
 		},
 		{ // MATCH NONE
@@ -263,7 +265,7 @@ multile
 		{ // MATCH ONE
 			matcher: func(m db.Message, body []byte) bool { return bytes.Contains(body, []byte("multile")) },
 			expectedMessages: []db.Message{
-				{SegmentId: 3, Loc: common.Location{1, 153}, RelDateLoc: common.Location{1, 32}, FileId: file2Id, Date: test_util.MakeTimeP("2024-07-30T00:00:06.222222+00:00")},
+				{SegmentId: 3, Loc: common.Location{From: 1, To: 153}, RelDateLoc: common.Location{From: 1, To: 32}, FileId: file2Id, Date: test_util.MakeTimeP("2024-07-30T00:00:06.222222+00:00")},
 			},
 		},
 	}

@@ -173,7 +173,7 @@ func ProfileCPU(fn func()) {
 
 	fn()
 
-	log.Printf("profiled in %s", time.Now().Sub(tt).String())
+	log.Printf("profiled in %s", time.Since(tt).String())
 	pprof.StopCPUProfile()
 	defer f.Close()
 }

@@ -65,10 +65,10 @@ multile
 				return it
 			},
 			expectedMessages: []db.Message{
-				{SegmentId: 1, Loc: common.Location{1, 69}, RelDateLoc: common.Location{1, 32}, FileId: file1Id},
-				{SegmentId: 2, Loc: common.Location{69, 129}, RelDateLoc: common.Location{1, 32}, FileId: file1Id},
-				{SegmentId: 3, Loc: common.Location{1, 153}, RelDateLoc: common.Location{1, 32}, FileId: file2Id},
-				{SegmentId: 4, Loc: common.Location{153, 213}, RelDateLoc: common.Location{1, 32}, FileId: file2Id},
+				{SegmentId: 1, Loc: common.Location{From: 1, To: 69}, RelDateLoc: common.Location{From: 1, To: 32}, FileId: file1Id},
+				{SegmentId: 2, Loc: common.Location{From: 69, To: 129}, RelDateLoc: common.Location{From: 1, To: 32}, FileId: file1Id},
+				{SegmentId: 3, Loc: common.Location{From: 1, To: 153}, RelDateLoc: common.Location{From: 1, To: 32}, FileId: file2Id},
+				{SegmentId: 4, Loc: common.Location{From: 153, To: 213}, RelDateLoc: common.Location{From: 1, To: 32}, FileId: file2Id},
 			},
 		},
 		{ // Read From file
@@ -78,8 +78,8 @@ multile
 				return it
 			},
 			expectedMessages: []db.Message{
-				{SegmentId: 3, Loc: common.Location{1, 153}, RelDateLoc: common.Location{1, 32}, FileId: file2Id},
-				{SegmentId: 4, Loc: common.Location{153, 213}, RelDateLoc: common.Location{1, 32}, FileId: file2Id},
+				{SegmentId: 3, Loc: common.Location{From: 1, To: 153}, RelDateLoc: common.Location{From: 1, To: 32}, FileId: file2Id},
+				{SegmentId: 4, Loc: common.Location{From: 153, To: 213}, RelDateLoc: common.Location{From: 1, To: 32}, FileId: file2Id},
 			},
 		},
 		{ // No File
@@ -97,8 +97,8 @@ multile
 				return it
 			},
 			expectedMessages: []db.Message{
-				{SegmentId: 2, Loc: common.Location{69, 129}, RelDateLoc: common.Location{1, 32}, FileId: file1Id},
-				{SegmentId: 4, Loc: common.Location{153, 213}, RelDateLoc: common.Location{1, 32}, FileId: file2Id},
+				{SegmentId: 2, Loc: common.Location{From: 69, To: 129}, RelDateLoc: common.Location{From: 1, To: 32}, FileId: file1Id},
+				{SegmentId: 4, Loc: common.Location{From: 153, To: 213}, RelDateLoc: common.Location{From: 1, To: 32}, FileId: file2Id},
 			},
 		},
 		{ // No segments
@@ -116,7 +116,7 @@ multile
 				return it
 			},
 			expectedMessages: []db.Message{
-				{SegmentId: 2, Loc: common.Location{69, 129}, RelDateLoc: common.Location{1, 32}, FileId: file1Id},
+				{SegmentId: 2, Loc: common.Location{From: 69, To: 129}, RelDateLoc: common.Location{From: 1, To: 32}, FileId: file1Id},
 			},
 		},
 	}

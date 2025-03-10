@@ -4,22 +4,24 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"os"
+	"testing"
+
 	"github.com/lezhnev74/go-iterators"
 	"github.com/stretchr/testify/require"
+
 	"heaplog_2024/common"
 	"heaplog_2024/db"
 	"heaplog_2024/test_util"
-	"os"
-	"testing"
 )
 
 func TestBatching(t *testing.T) {
 	src := []db.Message{
-		{SegmentId: 1, Loc: common.Location{1, 1}, FileId: 1},
-		{SegmentId: 1, Loc: common.Location{2, 2}, FileId: 1},
-		{SegmentId: 2, Loc: common.Location{3, 3}, FileId: 1},
-		{SegmentId: 3, Loc: common.Location{1, 1}, FileId: 2},
-		{SegmentId: 4, Loc: common.Location{2, 2}, FileId: 2},
+		{SegmentId: 1, Loc: common.Location{From: 1, To: 1}, FileId: 1},
+		{SegmentId: 1, Loc: common.Location{From: 2, To: 2}, FileId: 1},
+		{SegmentId: 2, Loc: common.Location{From: 3, To: 3}, FileId: 1},
+		{SegmentId: 3, Loc: common.Location{From: 1, To: 1}, FileId: 2},
+		{SegmentId: 4, Loc: common.Location{From: 2, To: 2}, FileId: 2},
 	}
 
 	// Group by file
@@ -30,13 +32,13 @@ func TestBatching(t *testing.T) {
 	)
 	expected := [][]db.Message{
 		{
-			{SegmentId: 1, Loc: common.Location{1, 1}, FileId: 1},
-			{SegmentId: 1, Loc: common.Location{2, 2}, FileId: 1},
-			{SegmentId: 2, Loc: common.Location{3, 3}, FileId: 1},
+			{SegmentId: 1, Loc: common.Location{From: 1, To: 1}, FileId: 1},
+			{SegmentId: 1, Loc: common.Location{From: 2, To: 2}, FileId: 1},
+			{SegmentId: 2, Loc: common.Location{From: 3, To: 3}, FileId: 1},
 		},
 		{
-			{SegmentId: 3, Loc: common.Location{1, 1}, FileId: 2},
-			{SegmentId: 4, Loc: common.Location{2, 2}, FileId: 2},
+			{SegmentId: 3, Loc: common.Location{From: 1, To: 1}, FileId: 2},
+			{SegmentId: 4, Loc: common.Location{From: 2, To: 2}, FileId: 2},
 		},
 	}
 	require.Equal(t, expected, go_iterators.ToSlice(groupedIt))
@@ -48,17 +50,17 @@ func TestBatching(t *testing.T) {
 	)
 	expected = [][]db.Message{
 		{
-			{SegmentId: 1, Loc: common.Location{1, 1}, FileId: 1},
-			{SegmentId: 1, Loc: common.Location{2, 2}, FileId: 1},
+			{SegmentId: 1, Loc: common.Location{From: 1, To: 1}, FileId: 1},
+			{SegmentId: 1, Loc: common.Location{From: 2, To: 2}, FileId: 1},
 		},
 		{
-			{SegmentId: 2, Loc: common.Location{3, 3}, FileId: 1},
+			{SegmentId: 2, Loc: common.Location{From: 3, To: 3}, FileId: 1},
 		},
 		{
-			{SegmentId: 3, Loc: common.Location{1, 1}, FileId: 2},
+			{SegmentId: 3, Loc: common.Location{From: 1, To: 1}, FileId: 2},
 		},
 		{
-			{SegmentId: 4, Loc: common.Location{2, 2}, FileId: 2},
+			{SegmentId: 4, Loc: common.Location{From: 2, To: 2}, FileId: 2},
 		},
 	}
 	require.Equal(t, expected, go_iterators.ToSlice(groupedIt))
@@ -90,31 +92,31 @@ multile
 	tests := []test{
 		{ // MATCH ALL
 			messages: []db.Message{
-				{Loc: common.Location{1, 152}, RelDateLoc: common.Location{1, 32}},
-				{Loc: common.Location{152, 194}, RelDateLoc: common.Location{1, 32}},
+				{Loc: common.Location{From: 1, To: 152}, RelDateLoc: common.Location{From: 1, To: 32}},
+				{Loc: common.Location{From: 152, To: 194}, RelDateLoc: common.Location{From: 1, To: 32}},
 			},
 			matcher: func(m db.Message, body []byte) bool { return true },
 			expectedMessages: []db.Message{
-				{Loc: common.Location{1, 152}, RelDateLoc: common.Location{1, 32}, Date: test_util.MakeTimeP("2023-01-05T23:42:00.213212+00:00")},
-				{Loc: common.Location{152, 194}, RelDateLoc: common.Location{1, 32}, Date: test_util.MakeTimeP("2023-01-05T23:48:00.213212+00:00")},
+				{Loc: common.Location{From: 1, To: 152}, RelDateLoc: common.Location{From: 1, To: 32}, Date: test_util.MakeTimeP("2023-01-05T23:42:00.213212+00:00")},
+				{Loc: common.Location{From: 152, To: 194}, RelDateLoc: common.Location{From: 1, To: 32}, Date: test_util.MakeTimeP("2023-01-05T23:48:00.213212+00:00")},
 			},
 		},
 		{ // MATCH NONE
 			messages: []db.Message{
-				{Loc: common.Location{1, 152}, RelDateLoc: common.Location{1, 32}},
-				{Loc: common.Location{152, 194}, RelDateLoc: common.Location{1, 32}},
+				{Loc: common.Location{From: 1, To: 152}, RelDateLoc: common.Location{From: 1, To: 32}},
+				{Loc: common.Location{From: 152, To: 194}, RelDateLoc: common.Location{From: 1, To: 32}},
 			},
 			matcher:          func(m db.Message, body []byte) bool { return false },
 			expectedMessages: nil,
 		},
 		{ // MATCH ONE
 			messages: []db.Message{
-				{Loc: common.Location{1, 152}, RelDateLoc: common.Location{1, 32}},
-				{Loc: common.Location{152, 194}, RelDateLoc: common.Location{1, 32}},
+				{Loc: common.Location{From: 1, To: 152}, RelDateLoc: common.Location{From: 1, To: 32}},
+				{Loc: common.Location{From: 152, To: 194}, RelDateLoc: common.Location{From: 1, To: 32}},
 			},
 			matcher: func(m db.Message, body []byte) bool { return bytes.Contains(body, []byte("multile")) },
 			expectedMessages: []db.Message{
-				{Loc: common.Location{1, 152}, RelDateLoc: common.Location{1, 32}, Date: test_util.MakeTimeP("2023-01-05T23:42:00.213212+00:00")},
+				{Loc: common.Location{From: 1, To: 152}, RelDateLoc: common.Location{From: 1, To: 32}, Date: test_util.MakeTimeP("2023-01-05T23:42:00.213212+00:00")},
 			},
 		},
 		//{ // ERROR: READ OUT OF BOUND

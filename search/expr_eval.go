@@ -134,7 +134,7 @@ func ExprMapLiteralsToSets(
 					}
 					sets = append(sets, termSet)
 				}
-				expr.Operands[i] = &query_language.Expression{query_language.AND, sets}
+				expr.Operands[i] = &query_language.Expression{Operator: query_language.AND, Operands: sets}
 			case query_language.RegExpLiteral:
 				expr.Operands[i] = allSegments // Full-Scan
 			}
