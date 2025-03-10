@@ -1,11 +1,13 @@
 package ingest
 
 import (
-	"golang.org/x/xerrors"
-	"heaplog_2024/common"
-	"heaplog_2024/db"
 	"log"
 	"path/filepath"
+
+	"golang.org/x/xerrors"
+
+	"heaplog_2024/common"
+	"heaplog_2024/db"
 )
 
 // Discover looks for files changes in the monitored locations.
@@ -19,7 +21,7 @@ type Discover struct {
 func (d *Discover) DiscoverFiles() (news, obsoletes []string, err error) {
 	allCurrentFiles := make([]string, 0, 20)
 	for _, g := range d.globs {
-		files := make([]string, 0)
+		var files []string
 		files, err = filepath.Glob(g)
 		if err != nil {
 			err = xerrors.Errorf("unable to discover files at %s: %w", g, err)

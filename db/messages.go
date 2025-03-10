@@ -3,14 +3,15 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"log"
+	"strings"
+	"time"
+
 	"github.com/lezhnev74/go-iterators"
 	"github.com/marcboeker/go-duckdb"
 	"golang.org/x/xerrors"
+
 	"heaplog_2024/common"
-	"log"
-	"strings"
-	"sync"
-	"time"
 )
 
 type MessagesDb struct {
@@ -18,7 +19,6 @@ type MessagesDb struct {
 
 	appenderChan chan MessageAppendPacket
 	appender     *duckdb.Appender // -> file_segments_messages
-	appenderM    sync.Mutex
 }
 
 type Message struct {
@@ -49,11 +49,8 @@ func NewMessagesDb(db *sql.DB, appender *duckdb.Appender) *MessagesDb {
 
 	go func() {
 		t := time.NewTicker(10 * time.Second)
-		for {
-			select {
-			case <-t.C:
-				mdb.Flush() // auto flush every
-			}
+		for range t.C {
+			mdb.Flush() // auto flush
 		}
 	}()
 
@@ -62,6 +59,9 @@ func NewMessagesDb(db *sql.DB, appender *duckdb.Appender) *MessagesDb {
 		for mp := range mdb.appenderChan {
 			if mp == flushPacket {
 				err = mdb.appender.Flush()
+				if err != nil {
+					log.Printf("check in message error: %s", err)
+				}
 				continue
 			}
 
@@ -162,7 +162,7 @@ func (mdb *MessagesDb) iterateRows(whereSql string, queryArgs []any) (go_iterato
 
 			segmentPosTo, m = lastSegmentPosTo, *lastMessage
 
-			for r.Next() {
+			if r.Next() {
 				err = r.Scan(
 					&lastMessage.SegmentId,
 					&lastMessage.Loc.From,
@@ -176,19 +176,19 @@ func (mdb *MessagesDb) iterateRows(whereSql string, queryArgs []any) (go_iterato
 					return
 				}
 
+				// one more message exists, so update the boundary of the current message
 				if m.SegmentId == lastMessage.SegmentId {
 					m.Loc.To = lastMessage.Loc.From
 				} else {
 					m.Loc.To = segmentPosTo
 				}
-
-				return
+			} else {
+				// no more messages are coming
+				m.Loc.To = segmentPosTo
+				lastMessage = nil
 			}
 
-			m.Loc.To = segmentPosTo
-			lastMessage = nil
-
-			return m, nil
+			return
 		},
 		func() error {
 			return r.Close()
@@ -238,7 +238,7 @@ func (mdb *MessagesDb) IterateRowsFromStatement(stmt *sql.Stmt, args []any) (go_
 
 			segmentPosTo, m = lastSegmentPosTo, *lastMessage
 
-			for r.Next() {
+			if r.Next() {
 				err = r.Scan(
 					&lastMessage.SegmentId,
 					&lastMessage.Loc.From,
@@ -252,19 +252,19 @@ func (mdb *MessagesDb) IterateRowsFromStatement(stmt *sql.Stmt, args []any) (go_
 					return
 				}
 
+				// one more message exists, so update the boundary of the current message
 				if m.SegmentId == lastMessage.SegmentId {
 					m.Loc.To = lastMessage.Loc.From
 				} else {
 					m.Loc.To = segmentPosTo
 				}
-
-				return
+			} else {
+				// no more messages are coming
+				m.Loc.To = segmentPosTo
+				lastMessage = nil
 			}
 
-			m.Loc.To = segmentPosTo
-			lastMessage = nil
-
-			return m, nil
+			return
 		},
 		func() error {
 			return r.Close()

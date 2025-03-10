@@ -25,7 +25,7 @@ func TestReadMessages(t *testing.T) {
 `
 
 	storageRoot := test_util.PrepareTempDir(t)
-	defer os.RemoveAll(storageRoot)
+	defer func() { _ = os.RemoveAll(storageRoot) }()
 	file1 := test_util.PopulateFile(storageRoot, []byte(sampleFile1))
 	file2 := test_util.PopulateFile(storageRoot, []byte(sampleFile2))
 

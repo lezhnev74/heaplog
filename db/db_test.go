@@ -13,7 +13,7 @@ import (
 func TestClearUp(t *testing.T) {
 	// Populate database with a few files and queries
 	_db, storageRoot := test_util.PrepareTestDb(t)
-	defer os.RemoveAll(storageRoot)
+	defer func() { _ = os.RemoveAll(storageRoot) }()
 
 	ii, err := inverted_index_2.NewInvertedIndex(storageRoot, true)
 	require.NoError(t, err)

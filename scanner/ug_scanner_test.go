@@ -2,13 +2,17 @@ package scanner_test
 
 import (
 	"fmt"
+	"os"
+	"testing"
+
 	"github.com/stretchr/testify/require"
+
 	"heaplog_2024/common"
 	"heaplog_2024/scanner"
 	"heaplog_2024/test_util"
-	"os"
-	"testing"
 )
+
+const DateRegex = `^\[([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}[+-][0-9]{2}:[0-9]{2})]`
 
 func TestUgScannerLocations(t *testing.T) {
 	sourceStream := []byte(`
@@ -33,10 +37,8 @@ trace: 386ddf2b-bd13-4f12-ac19-92262cbf9b63
 trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 `)
 	storageRoot, _ := os.MkdirTemp("", "")
-	defer os.RemoveAll(storageRoot)
+	defer func() { _ = os.RemoveAll(storageRoot) }()
 	file := test_util.PopulateFile(storageRoot, sourceStream)
-
-	re := `^\[([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}[+-][0-9]{2}:[0-9]{2})]`
 
 	type Test struct {
 		locations       []common.Location
@@ -136,7 +138,7 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("Test %d", i), func(t *testing.T) {
-			layouts, err := scanner.UgScanLocations(file, tt.locations, re)
+			layouts, err := scanner.UgScanLocations(file, tt.locations, DateRegex)
 			require.NoError(t, err)
 			require.Equal(t, tt.expectedLayouts, layouts)
 		})
@@ -171,11 +173,10 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 	}
 
 	storageRoot, _ := os.MkdirTemp("", "")
-	defer os.RemoveAll(storageRoot)
+	defer func() { _ = os.RemoveAll(storageRoot) }()
 	file := test_util.PopulateFile(storageRoot, hugeStream)
 
-	re := `^\[([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}[+-][0-9]{2}:[0-9]{2})]`
-	messages, err := scanner.UgScan(file, re, []common.Location{{From: 0, To: 1_000_000}})
+	messages, err := scanner.UgScan(file, DateRegex, []common.Location{{From: 0, To: 1_000_000}})
 	require.NoError(t, err)
 	require.Len(t, messages, 3000)
 
@@ -204,11 +205,10 @@ trace: 386ddf2b-bd13-4f12-ac19-92262cbf9b63
 trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 `)
 	storageRoot, _ := os.MkdirTemp("", "")
-	defer os.RemoveAll(storageRoot)
+	defer func() { _ = os.RemoveAll(storageRoot) }()
 	file := test_util.PopulateFile(storageRoot, sourceStream)
 
-	re := `^\[([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}[+-][0-9]{2}:[0-9]{2})]`
-	messages, err := scanner.UgScan(file, re, []common.Location{{From: 0, To: 10000}})
+	messages, err := scanner.UgScan(file, DateRegex, []common.Location{{From: 0, To: 10000}})
 	require.NoError(t, err)
 	expectedMessages := []scanner.MessageLayout{
 		{

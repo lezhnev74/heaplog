@@ -2,9 +2,10 @@ package search
 
 import (
 	"errors"
-	"heaplog_2024/common"
 	"log"
 	"os"
+
+	"heaplog_2024/common"
 )
 
 // MessageAddr describes one message's bytes in a file
@@ -30,17 +31,15 @@ func ReadMessages(mAddrs []MessageAddr) (messages [][]byte, err error) {
 		}
 		defer f.Close()
 
-		buf := make([]byte, 0)
 		for _, addr := range batch {
 			messageLen := addr.loc.To - addr.loc.From
-			buf = make([]byte, messageLen)
+			buf := make([]byte, messageLen)
 
 			_, err = f.ReadAt(buf, int64(addr.loc.From))
 			if err != nil {
 				return
 			}
 			messages = append(messages, buf)
-			buf = nil
 		}
 		return
 	}

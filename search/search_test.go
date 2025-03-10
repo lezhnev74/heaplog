@@ -22,7 +22,7 @@ import (
 func TestSearchResults(t *testing.T) {
 
 	_db, storageRoot := test_util.PrepareTestDb(t)
-	defer os.RemoveAll(storageRoot)
+	defer func() { _ = os.RemoveAll(storageRoot) }()
 	files := PrepareTestFiles(t, storageRoot)
 
 	_, _, err := _db.CheckInFiles(files)
@@ -206,7 +206,7 @@ func PrepareTestFiles(t *testing.T, storageRoot string) (files []string) {
 
 func TestFullScan(t *testing.T) {
 	_db, storageRoot := test_util.PrepareTestDb(t)
-	defer os.RemoveAll(storageRoot)
+	defer func() { _ = os.RemoveAll(storageRoot) }()
 
 	// Populate files for tests
 	sampleFile1 := `
@@ -242,7 +242,6 @@ multile
 	_db.MessagesDb.Flush()
 
 	type test struct {
-		messages         []db.Message
 		matcher          search.SearchMatcher
 		expectedMessages []db.Message
 		err              error

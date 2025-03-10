@@ -6,12 +6,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"golang.org/x/xerrors"
-	"heaplog_2024/common"
 	"log"
 	"os/exec"
 	"strconv"
 	"unsafe"
+
+	"golang.org/x/xerrors"
+
+	"heaplog_2024/common"
 )
 
 var (
@@ -82,7 +84,7 @@ func UgScanLocation(file string, loc common.Location, re string) (layouts []Mess
 		if err != nil {
 			err = xerrors.Errorf("ug finish: %w", err)
 		}
-		cmd.Wait()
+		_ = cmd.Wait() // as we called Cancel above, so it returns non-nil error
 	}()
 
 	scanner := bufio.NewScanner(stdout)

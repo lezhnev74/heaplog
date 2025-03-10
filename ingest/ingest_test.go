@@ -2,13 +2,15 @@ package ingest_test
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
-	"heaplog_2024/common"
-	"heaplog_2024/db"
-	"heaplog_2024/test_util"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+
+	"heaplog_2024/common"
+	"heaplog_2024/db"
+	"heaplog_2024/test_util"
 )
 
 func TestSmallSegmentsMerging(t *testing.T) {
@@ -19,11 +21,11 @@ func TestSmallSegmentsMerging(t *testing.T) {
 	}
 
 	_db, storageRoot := test_util.PrepareTestDb(t)
-	defer os.RemoveAll(storageRoot)
+	defer func() { _ = os.RemoveAll(storageRoot) }()
 	ing, _ := test_util.PrepareTestIngest(t, 80 /*2 messages*/, storageRoot, _db)
 
 	file := test_util.PopulateFile(storageRoot, messages[0])
-	_db.CheckInFiles([]string{file})
+	_, _, _ = _db.CheckInFiles([]string{file})
 	fileId, _ := _db.GetFileId(file)
 
 	err := ing.Index([]string{file})
@@ -63,10 +65,6 @@ multile
 [2023-01-05T23:42:00.213212+00:00] testing.DEBUG: message 2
 `)
 
-	type test struct {
-		segmentSize      int64
-		expectedMessages []db.Message
-	}
 	expectedMessages := []db.Message{
 		{
 			SegmentId:  0, // do not compare
@@ -84,11 +82,11 @@ multile
 	for segmentSize := 1; segmentSize < len(sourceStream)+1; segmentSize++ {
 		t.Run(fmt.Sprintf("test_util %d", segmentSize), func(t *testing.T) {
 			_db, storageRoot := test_util.PrepareTestDb(t)
-			defer os.RemoveAll(storageRoot)
+			defer func() { _ = os.RemoveAll(storageRoot) }()
 			ing, _ := test_util.PrepareTestIngest(t, uint64(segmentSize), storageRoot, _db)
 
 			file := test_util.PopulateFile(storageRoot, sourceStream)
-			_db.CheckInFiles([]string{file})
+			_, _, _ = _db.CheckInFiles([]string{file})
 			fileId, _ := _db.GetFileId(file)
 
 			err := ing.Index([]string{file})

@@ -56,7 +56,11 @@ func (happ *HeaplogApp) Test() error {
 		return xerrors.Errorf("unable to find files at %s: no files found", happ.cfg.FilesGlobPattern)
 	}
 
-	file, err := filepath.Abs(files[0])
+	var file string
+	file, err = filepath.Abs(files[0])
+	if err != nil {
+		return xerrors.Errorf("unable to find the file at %s: %w", file, err)
+	}
 	layouts, err := scanner.UgScan(file, happ.cfg.MessageStartRE, []common.Location{{From: 0, To: 10000}})
 	if err != nil {
 		return xerrors.Errorf("unable to test the file at %s: %w", file, err)
@@ -109,7 +113,9 @@ func (happ *HeaplogApp) NewQuery(text string, min *time.Time, max *time.Time) (n
 	for _, q := range queries {
 		if q.Text == text && cmpTime(q.Min, min) && cmpTime(q.Max, max) {
 			// found the same query, so remove it
-			go happ.db.RemoveQuery(q.Id)
+			go func() {
+				_ = happ.db.RemoveQuery(q.Id)
+			}()
 		}
 	}
 
@@ -132,6 +138,11 @@ func (happ *HeaplogApp) NewQuery(text string, min *time.Time, max *time.Time) (n
 		},
 		int(happ.cfg.Concurrency),
 	)
+	if err != nil {
+		err = xerrors.Errorf("new query: %w", err)
+		return
+	}
+
 	newQuery, err = happ.db.CheckinQuery(happ.ctx, text, min, max, messagesIt)
 
 	return
@@ -308,8 +319,7 @@ func NewHeaplog(ctx context.Context, cfg Config, startBackground bool) (*Heaplog
 		// Clear up queries
 		go func() {
 			t := common.InstantTick(time.Minute)
-			for {
-				<-t
+			for range t {
 				queries, err := dbContainer.List()
 				if err != nil {
 					log.Printf("cleanup queries: %s", err.Error())
@@ -332,50 +342,44 @@ func NewHeaplog(ctx context.Context, cfg Config, startBackground bool) (*Heaplog
 		// Ingest
 		go func() {
 			t := common.InstantTick(time.Minute * 10)
-			for {
-				select {
-				case <-t:
-					_, obsoletes, err := _discover.DiscoverFiles()
+			for range t {
+				_, obsoletes, err := _discover.DiscoverFiles()
+				if err != nil {
+					log.Printf("discovering files stopped: %s", err)
+					return
+				}
+				if len(obsoletes) > 0 {
+					err = db.ClearUp(dbContainer, ii)
 					if err != nil {
-						log.Printf("discovering files stopped: %s", err)
+						log.Printf("cleaning up: %s", err)
 						return
 					}
-					if len(obsoletes) > 0 {
-						err = db.ClearUp(dbContainer, ii)
-						if err != nil {
-							log.Printf("cleaning up: %s", err)
-							return
-						}
-					}
+				}
 
-					allFiles, err := dbContainer.AllFiles()
-					if err != nil {
-						log.Printf("unable to read files for ingesting: %s", err)
-						return
-					}
+				allFiles, err := dbContainer.AllFiles()
+				if err != nil {
+					log.Printf("unable to read files for ingesting: %s", err)
+					return
+				}
 
-					err = ingestor.IndexConcurrent(allFiles, int(cfg.Concurrency))
-					if err != nil {
-						log.Printf("ingest: %s", err)
-						return
-					}
+				err = ingestor.IndexConcurrent(allFiles, int(cfg.Concurrency))
+				if err != nil {
+					log.Printf("ingest: %s", err)
+					return
 				}
 			}
 		}()
 		//Merge
 		go func() {
 			t := common.InstantTick(time.Minute * 10)
-			for {
-				select {
-				case <-t:
-					for {
-						merged, err := ii.Merge(30, 30, int(cfg.Concurrency))
-						if err != nil {
-							log.Printf("merging inverted index segments: %s", err)
-						}
-						if merged == 0 {
-							break
-						}
+			for range t {
+				for {
+					merged, err := ii.Merge(30, 30, int(cfg.Concurrency))
+					if err != nil {
+						log.Printf("merging inverted index segments: %s", err)
+					}
+					if merged == 0 {
+						break
 					}
 				}
 			}

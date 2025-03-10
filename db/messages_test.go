@@ -19,7 +19,7 @@ func TestIterateMessages(t *testing.T) {
 
 	// 1. Ingest Messages
 	_db, storageRoot := test_util.PrepareTestDb(t)
-	defer os.RemoveAll(storageRoot)
+	defer func() { _ = os.RemoveAll(storageRoot) }()
 	ing, _ := test_util.PrepareTestIngest(t, 50, storageRoot, _db)
 
 	// Populate files for tests

@@ -4,11 +4,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"golang.org/x/xerrors"
-	"heaplog_2024/common"
 	"math"
 	"strings"
 	"time"
+
+	"golang.org/x/xerrors"
+
+	"heaplog_2024/common"
 )
 
 type SegmentsDb struct {
@@ -181,13 +183,6 @@ func (sdb *SegmentsDb) SelectSegmentThatAdjoins(fileId int, messagePos uint64) (
 	err = r.Scan(&s.Id, &s.FileId, &s.Loc.From, &s.Loc.To, &dateMin, &dateMax)
 	s.DateMin = time.UnixMicro(dateMin)
 	s.DateMax = time.UnixMicro(dateMax)
-	return
-}
-
-func (sdb *SegmentsDb) Count() (count int) {
-	query := `SELECT count(*) FROM file_segments`
-	r := sdb.db.QueryRow(query)
-	r.Scan(&count)
 	return
 }
 

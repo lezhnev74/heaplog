@@ -40,7 +40,7 @@ func TestResultsRead(t *testing.T) {
 
 	// Exec:
 	dbContainer, storageRoot := test_util.PrepareTestDb(t)
-	defer os.RemoveAll(storageRoot)
+	defer func() { _ = os.RemoveAll(storageRoot) }()
 
 	// 1. Imitate slow message ingestion
 	ticks := make(chan bool)
@@ -116,7 +116,7 @@ func TestStreamResults(t *testing.T) {
 
 	// Exec:
 	dbContainer, storageRoot := test_util.PrepareTestDb(t)
-	defer os.RemoveAll(storageRoot)
+	defer func() { _ = os.RemoveAll(storageRoot) }()
 
 	// 1. Imitate slow message ingestion
 	t0 := time.Now().Round(time.Microsecond)

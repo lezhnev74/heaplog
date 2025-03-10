@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"golang.org/x/xerrors"
 	"hash/crc32"
 	"log"
 	"os"
@@ -13,6 +12,8 @@ import (
 	"runtime/debug"
 	"runtime/pprof"
 	"time"
+
+	"golang.org/x/xerrors"
 )
 
 var (
@@ -82,15 +83,12 @@ func FileSize(path string) (uint64, error) {
 
 // InstantTick is a forever ticker that starts instantly
 func InstantTick(d time.Duration) chan time.Time {
-	tick := time.Tick(d)
+	tick := time.NewTicker(d)
 	ret := make(chan time.Time)
 	go func() {
-		ret <- time.Now()
+		ret <- time.Now() // instant tick happens here
 		for {
-			select {
-			case n := <-tick:
-				ret <- n
-			}
+			ret <- <-tick.C // then we just connect it to the ticker
 		}
 	}()
 	return ret

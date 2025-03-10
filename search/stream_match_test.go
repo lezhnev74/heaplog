@@ -80,7 +80,7 @@ multile
 [2023-01-05T23:48:00.213212+00:00] testing.DEBUG: message 2
 `
 	file := test_util.PopulateFile(storageRoot, []byte(sampleFile))
-	defer os.RemoveAll(storageRoot)
+	defer func() { _ = os.RemoveAll(storageRoot) }()
 
 	type test struct {
 		messages         []db.Message

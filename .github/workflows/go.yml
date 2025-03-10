@@ -14,12 +14,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Set up Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v5
       with:
-        go-version: '1.22'
+        go-version: '1.24'
 
     - name: Install ugrep
       run: sudo apt-get install -y ugrep
@@ -29,3 +29,8 @@ jobs:
 
     - name: Test
       run: go test -p 2 -v ./...
+
+    - name: Golangci-lint
+      uses: golangci/golangci-lint-action@v6
+      with:
+        version: v1.64 # fix the version for reproducibility

@@ -23,7 +23,7 @@ func TestItDiscoversFiles(t *testing.T) {
 	// 1. Put 2 files in the folder
 	storageRoot, err := os.MkdirTemp("", "")
 	require.NoError(t, err)
-	defer os.RemoveAll(storageRoot)
+	defer func() { _ = os.RemoveAll(storageRoot) }()
 
 	_db, err := db.OpenDb(storageRoot, 100)
 	require.NoError(t, err)

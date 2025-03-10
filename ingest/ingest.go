@@ -229,7 +229,6 @@ func (ing *Ingest) saveBatch(file string, messages <-chan *ScannedTokenizedMessa
 
 		// Cleanup
 		curSegmentTermsMap = make(map[string]struct{}) // reset for the next segment
-		segmentTerms = nil
 
 		t0 = time.Now()
 		return nil
@@ -278,8 +277,8 @@ func (ing *Ingest) saveBatch(file string, messages <-chan *ScannedTokenizedMessa
 
 	for message := range messages {
 		if message.Err != nil {
-			err = message.Err
-			break // no more messages
+			err = xerrors.Errorf("message scan failed: %w", message.Err)
+			return
 		}
 
 		segmentId, serr := selectSegment(message)

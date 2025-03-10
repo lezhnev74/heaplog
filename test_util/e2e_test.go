@@ -1,3 +1,4 @@
+//nolint:unused
 package test_util_test
 
 import (
@@ -5,10 +6,19 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
+	"os"
+	"runtime"
+	"runtime/debug"
+	"runtime/trace"
+	"testing"
+	"time"
+
 	"github.com/lezhnev74/go-iterators"
 	"github.com/lezhnev74/inverted_index_2"
 	"github.com/marcboeker/go-duckdb"
 	"github.com/stretchr/testify/require"
+
 	"heaplog_2024/common"
 	"heaplog_2024/db"
 	"heaplog_2024/ingest"
@@ -17,13 +27,6 @@ import (
 	"heaplog_2024/search"
 	"heaplog_2024/test_util"
 	"heaplog_2024/tokenizer"
-	"log"
-	"os"
-	"runtime"
-	"runtime/debug"
-	"runtime/trace"
-	"testing"
-	"time"
 )
 
 var (
@@ -85,12 +88,9 @@ func _TestIngest(t *testing.T) {
 	//defer stop()
 	go func() {
 		t := time.NewTicker(5 * time.Second)
-		for {
-			select {
-			case <-t.C:
-				test_util.ProcStat()
-				debug.FreeOSMemory()
-			}
+		for range t.C {
+			test_util.ProcStat()
+			debug.FreeOSMemory()
 		}
 	}()
 

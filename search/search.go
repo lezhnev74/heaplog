@@ -5,15 +5,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/lezhnev74/go-iterators"
-	"github.com/lezhnev74/inverted_index_2"
-	"golang.org/x/xerrors"
-	"heaplog_2024/db"
-	"heaplog_2024/query_language"
 	"log"
 	"slices"
 	"sync"
 	"time"
+
+	"github.com/lezhnev74/go-iterators"
+	"github.com/lezhnev74/inverted_index_2"
+	"golang.org/x/xerrors"
+
+	"heaplog_2024/db"
+	"heaplog_2024/query_language"
 )
 
 type Search struct {
@@ -141,9 +143,16 @@ func (s *Search) Search(
 
 				// Instead of just keeping potential messages here, we can run filtering,
 				// so results contains only matched messages.
-				matchedMessages := []db.Message{}
 				matched, err := s.FilterMessagesStream(segmentMessagesIt, matcher)
-				defer matched.Close()
+				if err != nil {
+					log.Fatalf("search segment filter: %s", err)
+					return
+				}
+				defer func() {
+					_ = matched.Close()
+				}()
+
+				matchedMessages := make([]db.Message, 0)
 				for {
 					m, err := matched.Next()
 					if errors.Is(err, go_iterators.EmptyIterator) {
@@ -159,8 +168,6 @@ func (s *Search) Search(
 				segmentsResults[i] = matchedMessages
 				segmentsResultsCondvar.Signal()
 				segmentsResultsLock.Unlock()
-
-				return
 			}()
 		}
 	}()

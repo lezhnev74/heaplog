@@ -4,18 +4,22 @@ import (
 	"bytes"
 	"database/sql"
 	"fmt"
-	"github.com/stretchr/testify/require"
-	"heaplog_2024/common"
-	"heaplog_2024/db"
 	"os"
 	"path"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+
+	"heaplog_2024/common"
+	"heaplog_2024/db"
 )
 
 func TestSegmentSelection(t *testing.T) {
 	_db, sdb, fdb, root := PrepareSegmentsForTesting(t)
-	defer os.RemoveAll(root)
+	defer func() {
+		_ = os.RemoveAll(root)
+	}()
 	dbc := &db.DbContainer{FilesDb: fdb, MessagesDb: nil, SegmentsDb: sdb, QueryDB: nil, DB: _db}
 
 	file1 := path.Join(root, "file1.log")
@@ -78,7 +82,7 @@ func TestSegmentSelection(t *testing.T) {
 
 	for i := range tests {
 		t.Run(fmt.Sprintf("test_util %d", i), func(t *testing.T) {
-			_db.Exec("DELETE FROM file_segments") // cleanup the state
+			_, _ = _db.Exec("DELETE FROM file_segments") // cleanup the state
 			for j := range tests[i].indexedLocations {
 				_, err := sdb.CheckinSegment(file1Id, tests[i].indexedLocations[j], time.Now(), time.Now())
 				require.NoError(t, err)
@@ -93,9 +97,9 @@ func TestSegmentSelection(t *testing.T) {
 }
 
 func PopulateFiles(t *testing.T, spec map[string]int) {
-	for path, size := range spec {
+	for spath, size := range spec {
 		payload := bytes.Repeat([]byte("A"), size)
-		err := os.WriteFile(path, payload, os.ModePerm)
+		err := os.WriteFile(spath, payload, os.ModePerm)
 		require.NoError(t, err)
 	}
 }

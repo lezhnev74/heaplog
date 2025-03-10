@@ -4,12 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"github.com/lezhnev74/go-iterators"
-	"github.com/marcboeker/go-duckdb"
-	"golang.org/x/xerrors"
 	"log"
 	"math"
 	"time"
+
+	"github.com/lezhnev74/go-iterators"
+	"github.com/marcboeker/go-duckdb"
+	"golang.org/x/xerrors"
 )
 
 type QueryDB struct {
@@ -47,11 +48,8 @@ func NewQueryDb(_db *sql.DB, appender *duckdb.Appender) *QueryDB {
 
 	go func() {
 		t := time.NewTicker(10 * time.Second)
-		for {
-			select {
-			case <-t.C:
-				qdb.Flush() // auto flush every
-			}
+		for range t.C {
+			qdb.Flush() // auto flush
 		}
 	}()
 
@@ -60,6 +58,9 @@ func NewQueryDb(_db *sql.DB, appender *duckdb.Appender) *QueryDB {
 		for mp := range qdb.appenderChan {
 			if mp.queryId == 0 {
 				err = qdb.appender.Flush()
+				if err != nil {
+					log.Printf("check in result error: %s", err)
+				}
 				continue
 			} else {
 				err = qdb.appender.AppendRow(mp.queryId, uint32(mp.fileId), mp.from, mp.len, uint64(mp.date.UnixMicro()))
@@ -101,6 +102,7 @@ func (q *QueryDB) CheckinQuery(ctx context.Context, text string, min, max *time.
 	queryId, err := q.ReserveQueryId()
 	if err != nil {
 		err = xerrors.Errorf("query checkin: %w", err)
+		return
 	}
 
 	var minMicro, maxMicro int64
@@ -115,6 +117,7 @@ func (q *QueryDB) CheckinQuery(ctx context.Context, text string, min, max *time.
 	_, err = q.db.Exec("INSERT INTO queries VALUES (?,?,?,?,?,?,?)", queryId, text, minMicro, maxMicro, 0, false, now)
 	if err != nil {
 		err = xerrors.Errorf("query checkin: %w", err)
+		return
 	}
 
 	// load all query Messages from the iterator in the background
@@ -125,7 +128,10 @@ func (q *QueryDB) CheckinQuery(ctx context.Context, text string, min, max *time.
 			q.appenderChan <- QueryMessagePacker{} // ask for flush
 
 			// mark as Finished
-			q.db.Exec("UPDATE queries SET finished=true WHERE queryId=?", queryId)
+			_, err = q.db.Exec("UPDATE queries SET finished=true WHERE queryId=?", queryId)
+			if err != nil {
+				log.Printf("query %d: checkin query defer: %s", queryId, err)
+			}
 		}()
 
 		var (
@@ -144,7 +150,7 @@ func (q *QueryDB) CheckinQuery(ctx context.Context, text string, min, max *time.
 			if errors.Is(err, go_iterators.EmptyIterator) {
 				break
 			} else if err != nil {
-				log.Printf("query %d: ingest messages: %s", queryId, err)
+				log.Printf("query %d: checkin query: %s", queryId, err)
 				return
 			}
 

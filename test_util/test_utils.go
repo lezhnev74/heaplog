@@ -3,19 +3,19 @@ package test_util
 import (
 	"database/sql"
 	"fmt"
-	"github.com/prometheus/procfs"
-	"heaplog_2024/common"
 	"log"
 	"os"
 	"path"
-	"regexp"
 	"time"
+
+	"github.com/prometheus/procfs"
+
+	"heaplog_2024/common"
 )
 
 var (
 	// these are default formats used in my tests:
-	messageStartPattern = regexp.MustCompile(`(?m)^\[(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}\.?(\d{6}([+-]\d\d:\d\d)?)?)]`)
-	dateLayout          = "2006-01-02T15:04:05.000000-07:00"
+	dateLayout = "2006-01-02T15:04:05.000000-07:00"
 )
 
 func MakeTimeV(value string) time.Time {
@@ -80,7 +80,7 @@ func DumpTable(db *sql.DB, table string, arguments int) {
 
 func PopulateFile(root string, content []byte) string {
 	fname := path.Join(root, fmt.Sprintf("%d.log", time.Now().UnixMicro()))
-	os.WriteFile(fname, content, os.ModePerm)
+	_ = os.WriteFile(fname, content, os.ModePerm)
 	return fname
 }
 

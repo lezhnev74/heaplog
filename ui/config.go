@@ -66,6 +66,9 @@ func (cfg Config) Validate() error {
 		_, err := os.Stat(path)
 		return err == nil
 	})
+	if err != nil {
+		return err
+	}
 
 	err = cfgValidate.RegisterValidation("regexp", func(fl validator.FieldLevel) bool {
 		_, err := regexp.Compile(fl.Field().String())
