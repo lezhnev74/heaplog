@@ -3,9 +3,6 @@ package test_util
 import (
 	"context"
 	"database/sql"
-	"github.com/lezhnev74/inverted_index_2"
-	"github.com/marcboeker/go-duckdb"
-	"github.com/stretchr/testify/require"
 	"heaplog_2024/common"
 	"heaplog_2024/db"
 	"heaplog_2024/ingest"
@@ -14,6 +11,10 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/lezhnev74/inverted_index_2"
+	"github.com/marcboeker/go-duckdb"
+	"github.com/stretchr/testify/require"
 )
 
 var (

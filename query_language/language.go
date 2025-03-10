@@ -1,11 +1,12 @@
 package query_language
 
 import (
-	"github.com/antlr4-go/antlr/v4"
-	"golang.org/x/xerrors"
 	"heaplog_2024/query_language/query_antlr"
 	"strconv"
 	"strings"
+
+	"github.com/antlr4-go/antlr/v4"
+	"golang.org/x/xerrors"
 )
 
 var errorUserQueryInvalidSyntax = xerrors.Errorf("invalid query_language syntax")

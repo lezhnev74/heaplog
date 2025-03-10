@@ -3,6 +3,10 @@ package ui
 import (
 	"embed"
 	"fmt"
+	"io/fs"
+	"net/http"
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -10,9 +14,6 @@ import (
 	"github.com/gofiber/template/html/v2"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/maps"
-	"io/fs"
-	"net/http"
-	"strings"
 )
 
 //go:embed web_templates/*

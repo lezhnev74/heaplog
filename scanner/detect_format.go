@@ -2,12 +2,13 @@ package scanner
 
 import (
 	"fmt"
-	"github.com/araddon/dateparse"
-	"golang.org/x/xerrors"
 	"regexp"
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/araddon/dateparse"
+	"golang.org/x/xerrors"
 )
 
 // DetectMessageLine accepts a line with a known Date and extracts the settings

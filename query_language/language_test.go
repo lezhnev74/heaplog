@@ -1,9 +1,10 @@
 package query_language
 
 import (
-	"github.com/stretchr/testify/require"
 	"log"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestAntlrQueryParser(t *testing.T) {

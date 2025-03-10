@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/lezhnev74/go-iterators"
+	go_iterators "github.com/lezhnev74/go-iterators"
 	"github.com/stretchr/testify/require"
 
 	"heaplog_2024/common"

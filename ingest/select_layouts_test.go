@@ -2,10 +2,11 @@ package ingest
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"heaplog_2024/common"
 	"heaplog_2024/scanner"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestSelectLayouts(t *testing.T) {

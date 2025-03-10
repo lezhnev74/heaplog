@@ -2,9 +2,10 @@ package ingest
 
 import (
 	"errors"
-	"golang.org/x/xerrors"
 	"heaplog_2024/common"
 	"heaplog_2024/db"
+
+	"golang.org/x/xerrors"
 )
 
 // SelectLocationsForIndexing returns contiguous file runs that were never indexed.

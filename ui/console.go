@@ -5,9 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	go_iterators "github.com/lezhnev74/go-iterators"
-	"github.com/urfave/cli/v2"
-	"gopkg.in/yaml.v3"
 	"heaplog_2024/common"
 	"heaplog_2024/scanner"
 	"log"
@@ -17,8 +14,13 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	go_iterators "github.com/lezhnev74/go-iterators"
+	"github.com/urfave/cli/v2"
+	"gopkg.in/yaml.v3"
+
+	_ "net/http/pprof"
 )
-import _ "net/http/pprof"
 
 func overrideConfig(cfg Config, ctx *cli.Context) Config {
 	if ctx.String("FilesGlobPattern") != "" {

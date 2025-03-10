@@ -2,10 +2,11 @@ package scanner
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"regexp"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestDetectMessages(t *testing.T) {

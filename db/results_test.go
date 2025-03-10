@@ -2,8 +2,6 @@ package db_test
 
 import (
 	"context"
-	"github.com/lezhnev74/go-iterators"
-	"github.com/stretchr/testify/require"
 	"heaplog_2024/common"
 	"heaplog_2024/db"
 	"heaplog_2024/test_util"
@@ -11,6 +9,9 @@ import (
 	"slices"
 	"testing"
 	"time"
+
+	go_iterators "github.com/lezhnev74/go-iterators"
+	"github.com/stretchr/testify/require"
 )
 
 func cmpResults(a, b []db.Message) bool {

@@ -2,9 +2,10 @@ package query_language
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"log"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestString(t *testing.T) {

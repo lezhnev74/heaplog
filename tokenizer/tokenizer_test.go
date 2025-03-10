@@ -3,10 +3,11 @@ package tokenizer
 import (
 	"bytes"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"log"
 	"slices"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestFilterShortTokensInPlaceCutLongTokens(t *testing.T) {

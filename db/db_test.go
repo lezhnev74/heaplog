@@ -1,13 +1,14 @@
 package db_test
 
 import (
-	"github.com/lezhnev74/go-iterators"
-	"github.com/lezhnev74/inverted_index_2"
-	"github.com/stretchr/testify/require"
 	"heaplog_2024/db"
 	"heaplog_2024/test_util"
 	"os"
 	"testing"
+
+	go_iterators "github.com/lezhnev74/go-iterators"
+	"github.com/lezhnev74/inverted_index_2"
+	"github.com/stretchr/testify/require"
 )
 
 func TestClearUp(t *testing.T) {

@@ -1,11 +1,12 @@
 package search
 
 import (
-	"github.com/lezhnev74/go-iterators"
-	"golang.org/x/exp/mmap"
-	"golang.org/x/xerrors"
 	"heaplog_2024/db"
 	"time"
+
+	go_iterators "github.com/lezhnev74/go-iterators"
+	"golang.org/x/exp/mmap"
+	"golang.org/x/xerrors"
 )
 
 // StreamFileMatch streams matched messages out of the file.

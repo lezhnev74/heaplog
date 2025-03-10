@@ -2,9 +2,10 @@ package common
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"strconv"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestGroupSlice(t *testing.T) {

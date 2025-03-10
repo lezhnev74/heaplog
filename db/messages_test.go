@@ -3,13 +3,14 @@ package db_test
 import (
 	"errors"
 	"fmt"
-	"github.com/lezhnev74/go-iterators"
-	"github.com/stretchr/testify/require"
 	"heaplog_2024/common"
 	"heaplog_2024/db"
 	"heaplog_2024/test_util"
 	"os"
 	"testing"
+
+	go_iterators "github.com/lezhnev74/go-iterators"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIterateMessages(t *testing.T) {

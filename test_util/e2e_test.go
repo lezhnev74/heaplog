@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lezhnev74/go-iterators"
+	go_iterators "github.com/lezhnev74/go-iterators"
 	"github.com/lezhnev74/inverted_index_2"
 	"github.com/marcboeker/go-duckdb"
 	"github.com/stretchr/testify/require"

@@ -2,10 +2,11 @@ package search
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"heaplog_2024/query_language"
 	"heaplog_2024/tokenizer"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestSetOps(t *testing.T) {
