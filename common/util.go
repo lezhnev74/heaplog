@@ -173,5 +173,5 @@ func ProfileCPU(fn func()) {
 
 	log.Printf("profiled in %s", time.Since(tt).String())
 	pprof.StopCPUProfile()
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 }

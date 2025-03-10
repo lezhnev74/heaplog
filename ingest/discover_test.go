@@ -2,12 +2,14 @@ package ingest
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
-	"heaplog_2024/db"
 	"os"
 	"path"
 	"slices"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	"heaplog_2024/db"
 )
 
 func TestItDiscoversFiles(t *testing.T) {
@@ -27,7 +29,7 @@ func TestItDiscoversFiles(t *testing.T) {
 
 	_db, err := db.OpenDb(storageRoot, 100)
 	require.NoError(t, err)
-	defer _db.Close()
+	defer func() { _ = _db.Close() }()
 
 	_storage := db.NewFilesDb(_db)
 

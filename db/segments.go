@@ -39,7 +39,7 @@ func (sdb *SegmentsDb) ReadIndexedLocations(fileId int) ([]common.Location, erro
 	if err != nil {
 		return nil, xerrors.Errorf("unable to read existing file segments: %w", err)
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	indexedLocations := make([]common.Location, 0, 20)
 	for r.Next() {
@@ -162,7 +162,7 @@ func (sdb *SegmentsDb) AllSegmentIds(min, max *time.Time) ([]uint32, error) {
 	if err != nil {
 		return nil, xerrors.Errorf("unable to read existing file segments: %w", err)
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	segments := make([]uint32, 0)
 	for r.Next() {
@@ -214,7 +214,7 @@ SELECT Id FROM file_segments
 	if err != nil {
 		return nil, xerrors.Errorf("unable to read existing file segments: %w", err)
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	filteredSegments := make([]uint32, 0)
 	for r.Next() {

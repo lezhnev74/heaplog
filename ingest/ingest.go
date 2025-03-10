@@ -108,7 +108,7 @@ func (ing *Ingest) indexFile(file string, locations []common.Location) error {
 	if err != nil {
 		return xerrors.Errorf("index file: %w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	allMessageLayouts, err := ing.findMessages(file, locations)
 	if errors.Is(err, scanner.NoMessageStartFound) || len(allMessageLayouts) == 0 {

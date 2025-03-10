@@ -29,7 +29,7 @@ func ReadMessages(mAddrs []MessageAddr) (messages [][]byte, err error) {
 			}
 			return
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 
 		for _, addr := range batch {
 			messageLen := addr.loc.To - addr.loc.From

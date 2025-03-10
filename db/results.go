@@ -124,7 +124,11 @@ func (q *QueryDB) CheckinQuery(ctx context.Context, text string, min, max *time.
 	// return query Id instantly to start listening for the first result.
 	go func() {
 		defer func() {
-			messages.Close()
+			err = messages.Close()
+			if err != nil {
+				log.Printf("query %d: checkin query defer: %s", queryId, err)
+			}
+
 			q.appenderChan <- QueryMessagePacker{} // ask for flush
 
 			// mark as Finished
@@ -241,7 +245,7 @@ func (q *QueryDB) Page(queryId int, min, max *time.Time, page, pageLen int) (mes
 	if err != nil {
 		return
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	for r.Next() {
 		m := Message{}
@@ -286,7 +290,7 @@ func (q *QueryDB) Stream(queryId int, min, max *time.Time) (messages go_iterator
 			if err != nil {
 				return nil, err
 			}
-			defer r.Close()
+			defer func() { _ = r.Close() }()
 
 			for r.Next() {
 				m := Message{}
