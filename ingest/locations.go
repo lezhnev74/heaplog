@@ -1,7 +1,6 @@
 package ingest
 
 import (
-	"errors"
 	"heaplog_2024/common"
 	"heaplog_2024/db"
 
@@ -13,8 +12,8 @@ import (
 func SelectLocationsForIndexing(_db *db.DbContainer, file string) ([]common.Location, error) {
 
 	fileSize, err := common.FileSize(file)
-	if errors.Is(err, db.ErrNoData) {
-		return nil, xerrors.Errorf("file %s is not indexed: %w", file, err)
+	if err != nil {
+		return nil, xerrors.Errorf("file %s: %w", file, err)
 	}
 
 	fileId, err := _db.GetFileId(file)

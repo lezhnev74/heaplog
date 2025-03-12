@@ -95,6 +95,13 @@ func InstantTick(d time.Duration) chan time.Time {
 }
 
 func PrintMem(db *sql.DB) (rss uint64) {
+
+	// Connections stats:
+	dbStats := db.Stats()
+	fmt.Printf("db2: %p", db)
+	Out("db/connections_idle: %d", dbStats.Idle)
+	Out("db/connections_in_use: %d", dbStats.InUse)
+
 	// DuckDB:
 	var (
 		name, dbSize, blockSize, walSize, memSize, memLimit string

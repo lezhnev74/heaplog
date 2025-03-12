@@ -267,7 +267,10 @@ func NewHeaplog(ctx context.Context, cfg Config, startBackground bool) (*Heaplog
 	if err != nil {
 		return nil, err
 	}
+
 	_db := sql.OpenDB(connector)
+	_db.SetConnMaxIdleTime(5 * time.Second)
+
 	err = db.Migrate(_db)
 	if err != nil {
 		return nil, err

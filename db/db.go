@@ -11,10 +11,7 @@ import (
 
 	"github.com/lezhnev74/inverted_index_2"
 	"github.com/marcboeker/go-duckdb"
-	"golang.org/x/xerrors"
 )
-
-var ErrNoData error = xerrors.Errorf("no data available")
 
 type DbContainer struct {
 	*FilesDb
@@ -22,6 +19,41 @@ type DbContainer struct {
 	*SegmentsDb
 	*QueryDB
 	*sql.DB
+}
+
+func OpenDb(storageDir string, duckdbMemLimitMb int) (*sql.DB, error) {
+	connector, err := PrepareDuckDB(storageDir, duckdbMemLimitMb)
+	if err != nil {
+		return nil, err
+	}
+	db := sql.OpenDB(connector)
+
+	err = Migrate(db)
+
+	return db, err
+}
+
+func PrepareDuckDB(storageDir string, duckdbMemLimitMb int) (driver.Connector, error) {
+	duckFile := filepath.Join(storageDir, "db")
+
+	// add config values
+	if duckdbMemLimitMb < 100 {
+		log.Fatalf("Duckdb mem limit is too low: %d", duckdbMemLimitMb)
+	}
+	duckdbMemLimit := fmt.Sprintf("%dMb", duckdbMemLimitMb)
+	duckOptions := map[string]string{
+		"memory_limit":               duckdbMemLimit,
+		"temp_directory":             storageDir,
+		"immediate_transaction_mode": "true",
+	}
+	duckFile += "?"
+	for k, v := range duckOptions {
+		duckFile += fmt.Sprintf("%s=%s&", k, v)
+	}
+
+	connector, err := duckdb.NewConnector(duckFile, nil)
+
+	return connector, err
 }
 
 // ClearUp removes all data associated with removed files
@@ -87,39 +119,4 @@ func ClearUp(db *DbContainer, ii *inverted_index_2.InvertedIndex) error {
 	}
 
 	return nil
-}
-
-func OpenDb(storageDir string, duckdbMemLimitMb int) (*sql.DB, error) {
-	connector, err := PrepareDuckDB(storageDir, duckdbMemLimitMb)
-	if err != nil {
-		return nil, err
-	}
-	db := sql.OpenDB(connector)
-
-	err = Migrate(db)
-
-	return db, err
-}
-
-func PrepareDuckDB(storageDir string, duckdbMemLimitMb int) (driver.Connector, error) {
-	duckFile := filepath.Join(storageDir, "db")
-
-	// add config values
-	if duckdbMemLimitMb < 100 {
-		log.Fatalf("Duckdb mem limit is too low: %d", duckdbMemLimitMb)
-	}
-	duckdbMemLimit := fmt.Sprintf("%dMb", duckdbMemLimitMb)
-	duckOptions := map[string]string{
-		"memory_limit":               duckdbMemLimit,
-		"temp_directory":             storageDir,
-		"immediate_transaction_mode": "true",
-	}
-	duckFile += "?"
-	for k, v := range duckOptions {
-		duckFile += fmt.Sprintf("%s=%s&", k, v)
-	}
-
-	connector, err := duckdb.NewConnector(duckFile, nil)
-
-	return connector, err
 }
