@@ -1,9 +1,10 @@
 package main
 
 import (
-	"heaplog_2024/ui"
 	"log"
 	"os"
+
+	"heaplog_2024/ui"
 )
 
 func main() {

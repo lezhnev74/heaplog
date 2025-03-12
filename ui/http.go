@@ -14,6 +14,8 @@ import (
 	"github.com/gofiber/template/html/v2"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/maps"
+
+	"heaplog_2024/common"
 )
 
 //go:embed web_templates/*
@@ -177,6 +179,18 @@ func makeHttpApp(happ *HeaplogApp, viewsDirectory string) *fiber.App {
 	// The bus executes the command and accumulates HTML changes to apply to the UI (via htmx).
 	bus := &CommandBus{happ, viewsEngine}
 	httpApp.Get("/cmd/:cmd", func(c *fiber.Ctx) error { return bus.Command(c) })
+
+	httpApp.Use("/debug/mem", func(c *fiber.Ctx) error {
+		common.CleanMem()
+
+		tmp := common.EnableLogging
+		common.EnableLogging = true
+		common.PrintMem(happ.db.DB)
+		common.EnableLogging = tmp
+
+		c.Response().AppendBodyString("printed.")
+		return nil
+	})
 
 	return httpApp
 }

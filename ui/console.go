@@ -5,9 +5,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"heaplog_2024/common"
-	"heaplog_2024/scanner"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"regexp"
@@ -15,11 +15,12 @@ import (
 	"syscall"
 	"time"
 
+	"heaplog_2024/common"
+	"heaplog_2024/scanner"
+
 	go_iterators "github.com/lezhnev74/go-iterators"
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
-
-	_ "net/http/pprof"
 )
 
 func overrideConfig(cfg Config, ctx *cli.Context) Config {
@@ -151,10 +152,10 @@ func PrepareConsoleApp() (app *cli.App) {
 						}
 					}()
 
-					//go func() {
-					//	log.Printf("Listening pprof on port 6060")
-					//	log.Println(http.ListenAndServe(":6060", nil))
-					//}()
+					go func() {
+						log.Println("Listening pprof on port 6060")
+						log.Println(http.ListenAndServe(":6060", nil))
+					}()
 
 					log.Printf("Listening on port 8393")
 					log.Fatal(httpApp.Listen(":8393"))

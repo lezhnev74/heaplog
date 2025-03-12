@@ -95,6 +95,7 @@ func InstantTick(d time.Duration) chan time.Time {
 }
 
 func PrintMem(db *sql.DB) (rss uint64) {
+	// DuckDB:
 	var (
 		name, dbSize, blockSize, walSize, memSize, memLimit string
 		totalBlocks, usedBlocks, freeBlocks                 int64
@@ -102,7 +103,7 @@ func PrintMem(db *sql.DB) (rss uint64) {
 	r := db.QueryRow(`PRAGMA database_size`)
 	err := r.Scan(&name, &dbSize, &blockSize, &totalBlocks, &usedBlocks, &freeBlocks, &walSize, &memSize, &memLimit)
 	if err != nil {
-		log.Print(err)
+		log.Print("duckdb db size: ", err)
 		return
 	}
 	freeBlocksPct := 0
@@ -112,6 +113,7 @@ func PrintMem(db *sql.DB) (rss uint64) {
 	Out("DuckDB: fileSize:%s, walSize:%s, mem:%s/%s, Blcs[total/used/free/freePcs]:%d,%d,%d,%d%% ",
 		dbSize, walSize, memSize, memLimit, totalBlocks, usedBlocks, freeBlocks, freeBlocksPct)
 
+	// Go Runtime Memory Usage:
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 
@@ -129,6 +131,11 @@ var EnableLogging bool
 func Out(pattern string, args ...any) {
 	if EnableLogging {
 		log.Printf(pattern, args...)
+	}
+}
+func OutS(s string) {
+	if EnableLogging {
+		log.Println(s)
 	}
 }
 

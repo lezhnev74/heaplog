@@ -51,7 +51,7 @@ func (d *Discover) DiscoverFiles() (news, obsoletes []string, err error) {
 		for i := range obsoletes {
 			report += "- " + obsoletes[i] + "\n"
 		}
-		common.Out(report)
+		common.OutS(report)
 	}
 
 	return
