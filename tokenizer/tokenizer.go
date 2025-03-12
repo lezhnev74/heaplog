@@ -3,7 +3,6 @@ package tokenizer
 import (
 	"bytes"
 	"log"
-	"slices"
 	"unicode/utf8"
 )
 
@@ -11,17 +10,14 @@ import (
 type Tokenizer func([]byte, int, int) [][]byte
 
 var (
-	seps     = []byte(" \r\n\t!()-[]{};:`'\"\\,<>./?@#$%^&*_~")
-	sepRunes = bytes.Runes(seps)
+	seps        = " \r\n\t!()-[]{};:`'\"\\,<>./?@#$%^&*_~"
+	sepRunesSet = make(map[rune]struct{}, len(seps))
 )
 
 func init() {
-	for i := 0; i < len(seps); {
-		r, ri := utf8.DecodeRune(seps[i:])
-		sepRunes = append(sepRunes, r)
-		i += ri
+	for _, r := range seps {
+		sepRunesSet[r] = struct{}{}
 	}
-	slices.Sort(sepRunes)
 }
 
 func Tokenize(input []byte, minSize, maxSize int) [][]byte {
@@ -57,13 +53,12 @@ func filterShortTokensInPlaceCutLongTokens(tokens [][]byte, minRunes, maxRunes i
 			continue
 		}
 
+		// this copies runes, so original source of runes is not referenced
 		tokens[x] = append([]byte{}, tokens[i][:cut]...)
 		x++
 	}
-	for i := x; i < len(tokens); i++ {
-		tokens[i] = nil // gc
-	}
-	return tokens[:x]
+
+	return append([][]byte{}, tokens[:x]...) // gc: forget filtered tokens (the tail)
 }
 
 func split(s []byte) [][]byte {
@@ -72,7 +67,7 @@ func split(s []byte) [][]byte {
 	}
 
 	f := func(r rune) bool {
-		_, ok := slices.BinarySearch(sepRunes, r)
+		_, ok := sepRunesSet[r]
 		return ok
 	}
 	return bytes.FieldsFunc(s, f)
