@@ -367,6 +367,9 @@ func NewHeaplog(ctx context.Context, cfg Config, startBackground bool) (*Heaplog
 					log.Printf("ingest: %s", err)
 					return
 				}
+
+				// After each ingestion cycle, give up memory to OS
+				common.CleanMem()
 			}
 		}()
 		//Merge
