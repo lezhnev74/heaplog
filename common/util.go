@@ -125,9 +125,12 @@ func PrintMem(db *sql.DB) (rss uint64) {
 	runtime.ReadMemStats(&m)
 
 	Out(
-		"System: %s, %s",
+		"System: %s, %s, %s, %s, %s",
 		fmt.Sprintf("RSS:%dMiB", m.Sys/1024/1024),             // total virtual memory reserved from OS
 		fmt.Sprintf("HeapAlloc:%dMiB", m.HeapAlloc/1024/1024), // HeapAlloc is bytes of allocated heap objects.
+		fmt.Sprintf("StackSys:%dMiB", m.StackSys/1024/1024),   // StackSys is bytes of stack memory obtained from the OS.
+		fmt.Sprintf("MSpanSys:%dMiB", m.MSpanSys/1024/1024),   // MSpanSys is bytes of memory obtained from the OS for mspan
+		fmt.Sprintf("OtherSys:%dMiB", m.OtherSys/1024/1024),   // OtherSys is bytes of memory in miscellaneous off-heap
 	)
 
 	return m.Sys
