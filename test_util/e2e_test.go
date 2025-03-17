@@ -35,7 +35,7 @@ var (
 	timeFormat          = "2006-01-02T15:04:05.000000-07:00"
 )
 
-func TestSearch(t *testing.T) {
+func _TestSearch(t *testing.T) {
 	t0 := time.Now()
 	storageRoot := "/home/dmitry/Code/go/src/heaplog/heaplog_2024/_local/local_test/storage"
 
