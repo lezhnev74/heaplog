@@ -16,7 +16,7 @@ const (
 	NOT
 )
 
-type MatchFunc func(CachedString) bool
+type MatchFunc func(*CachedString) bool
 
 // CachedString contains the original string + optionally generated and cached toLower version
 type CachedString struct {
@@ -32,8 +32,8 @@ func (c *CachedString) toLower() string {
 	return c.low
 }
 
-func NewCachedString(s string) CachedString {
-	return CachedString{origin: s}
+func NewCachedString(s string) *CachedString {
+	return &CachedString{origin: s}
 }
 
 type operator int8
@@ -249,12 +249,12 @@ func (qe *Expression) GetMatcher() MatchFunc {
 			switch o := operand.(type) {
 			case string:
 				o = strings.ToLower(o)
-				operandFunc = func(s CachedString) bool {
+				operandFunc = func(s *CachedString) bool {
 					return strings.Contains(s.toLower(), o) // case-insensitive matching is expensive, but greatly improves UX...
 				}
 			case RegExpLiteral:
 				p := regexp.MustCompile(string(o)) // RE match
-				operandFunc = func(s CachedString) bool { return p.MatchString(s.origin) }
+				operandFunc = func(s *CachedString) bool { return p.MatchString(s.origin) }
 			case *Expression:
 				operandFunc = expr2match(o)
 			}
@@ -262,7 +262,7 @@ func (qe *Expression) GetMatcher() MatchFunc {
 			operandFuncs = append(operandFuncs, operandFunc)
 		}
 
-		return func(message CachedString) bool {
+		return func(message *CachedString) bool {
 			switch qe.Operator {
 			case AND:
 				for _, opFunc := range operandFuncs {

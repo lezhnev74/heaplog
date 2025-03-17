@@ -3,20 +3,46 @@ package query_language
 import (
 	"fmt"
 	"log"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
 func BenchmarkToLower(b *testing.B) {
-	expr, err := ParseUserQuery("error1 error2")
+	expr, err := ParseUserQuery("error1 error2 error3")
 	require.NoError(b, err)
 
 	m := expr.GetMatcher()
 	input := "error1 error2 abcdefg abcdefg abcdefg abcdefg abcdefg abcdefg"
+	cs := NewCachedString(input)
 	for i := 0; i < b.N; i++ {
-		m(NewCachedString(input))
+		m(cs)
 	}
+}
+
+func TestMatcherCachedString(t *testing.T) {
+	expr, err := ParseUserQuery("error1 error2 error3")
+	require.NoError(t, err)
+	m := expr.GetMatcher()
+	input := "error1 error2 abcdefg"
+	cs := NewCachedString(input)
+	m(cs)
+}
+
+func TestMatcherConcurrent(t *testing.T) {
+	expr, err := ParseUserQuery("error1 error2 error3")
+	require.NoError(t, err)
+
+	m := expr.GetMatcher()
+
+	wg := sync.WaitGroup{}
+	for i := 0; i < 100; i++ {
+		input := "error1 error2 abcdefg abcdefg abcdefg abcdefg abcdefg abcdefg"
+		cs := NewCachedString(input)
+		m(cs)
+	}
+	wg.Wait()
 }
 
 func TestString(t *testing.T) {
