@@ -2,11 +2,12 @@ package query_language
 
 import (
 	"fmt"
-	"heaplog_2024/common"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+
+	"heaplog_2024/common"
 )
 
 const (
@@ -15,7 +16,25 @@ const (
 	NOT
 )
 
-type MatchFunc func(string) bool
+type MatchFunc func(CachedString) bool
+
+// CachedString contains the original string + optionally generated and cached toLower version
+type CachedString struct {
+	origin string
+	low    string
+}
+
+func (c *CachedString) toLower() string {
+	if c.low == "" {
+		// cached toLower version is only generated on demand.
+		c.low = strings.ToLower(c.origin)
+	}
+	return c.low
+}
+
+func NewCachedString(s string) CachedString {
+	return CachedString{origin: s}
+}
 
 type operator int8
 
@@ -222,21 +241,20 @@ func (qe *Expression) GetMatcher() MatchFunc {
 	var expr2match func(qe *Expression) MatchFunc
 	expr2match = func(qe *Expression) MatchFunc {
 
-		operandFuncs := make([]func(string) bool, 0, len(qe.Operands))
+		operandFuncs := make([]MatchFunc, 0, len(qe.Operands))
 
 		for _, operand := range qe.Operands {
-			var operandFunc func(string) bool
+			var operandFunc MatchFunc
 
 			switch o := operand.(type) {
 			case string:
 				o = strings.ToLower(o)
-				operandFunc = func(s string) bool {
-					s = strings.ToLower(s)
-					return strings.Contains(s, o) // case-insensitive matching is expensive, but greatly improves UX...
+				operandFunc = func(s CachedString) bool {
+					return strings.Contains(s.toLower(), o) // case-insensitive matching is expensive, but greatly improves UX...
 				}
 			case RegExpLiteral:
 				p := regexp.MustCompile(string(o)) // RE match
-				operandFunc = p.MatchString
+				operandFunc = func(s CachedString) bool { return p.MatchString(s.origin) }
 			case *Expression:
 				operandFunc = expr2match(o)
 			}
@@ -244,7 +262,7 @@ func (qe *Expression) GetMatcher() MatchFunc {
 			operandFuncs = append(operandFuncs, operandFunc)
 		}
 
-		return func(message string) bool {
+		return func(message CachedString) bool {
 			switch qe.Operator {
 			case AND:
 				for _, opFunc := range operandFuncs {

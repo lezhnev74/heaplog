@@ -14,10 +14,11 @@ import (
 	"testing"
 	"time"
 
-	go_iterators "github.com/lezhnev74/go-iterators"
-	"github.com/lezhnev74/inverted_index_2"
 	"github.com/marcboeker/go-duckdb"
 	"github.com/stretchr/testify/require"
+
+	go_iterators "github.com/lezhnev74/go-iterators"
+	"github.com/lezhnev74/inverted_index_2"
 
 	"heaplog_2024/common"
 	"heaplog_2024/db"
@@ -34,9 +35,9 @@ var (
 	timeFormat          = "2006-01-02T15:04:05.000000-07:00"
 )
 
-func _TestSearch(t *testing.T) {
+func TestSearch(t *testing.T) {
 	t0 := time.Now()
-	storageRoot := "/home/dmitry/Code/go/src/heaplog_2024/_local/s2"
+	storageRoot := "/home/dmitry/Code/go/src/heaplog/heaplog_2024/_local/local_test/storage"
 
 	//go func() {
 	//	t := time.NewTicker(time.Second)
@@ -54,7 +55,7 @@ func _TestSearch(t *testing.T) {
 
 	s, _, _, _, tok := buildDependencies(t, 5_000_000, storageRoot)
 
-	query := `454533`
+	query := `error`
 	expr, err := query_language.ParseUserQuery(query)
 	require.NoError(t, err)
 
@@ -64,7 +65,7 @@ func _TestSearch(t *testing.T) {
 
 	c := 0
 	for {
-		_, err := messagesIt.Next()
+		_, err := messagesIt.Next() // discard messages
 
 		if errors.Is(err, go_iterators.EmptyIterator) {
 			break

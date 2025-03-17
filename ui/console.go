@@ -18,9 +18,10 @@ import (
 	"heaplog_2024/common"
 	"heaplog_2024/scanner"
 
-	go_iterators "github.com/lezhnev74/go-iterators"
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
+
+	go_iterators "github.com/lezhnev74/go-iterators"
 )
 
 func overrideConfig(cfg Config, ctx *cli.Context) Config {
@@ -225,6 +226,7 @@ func PrepareConsoleApp() (app *cli.App) {
 						} else if err != nil {
 							return err
 						}
+
 						_, err = outStream.Write([]byte(messageString + "\n"))
 						if err != nil {
 							return err

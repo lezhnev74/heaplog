@@ -8,6 +8,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func BenchmarkToLower(b *testing.B) {
+	expr, err := ParseUserQuery("error1 error2")
+	require.NoError(b, err)
+
+	m := expr.GetMatcher()
+	input := "error1 error2 abcdefg abcdefg abcdefg abcdefg abcdefg abcdefg"
+	for i := 0; i < b.N; i++ {
+		m(NewCachedString(input))
+	}
+}
+
 func TestString(t *testing.T) {
 	type test struct {
 		query          *Expression
@@ -78,7 +89,7 @@ BING ADS response (recorded):
 			expr, err := ParseUserQuery(tt.query)
 			require.NoError(t, err)
 			log.Print(expr.String())
-			require.Equal(t, tt.expectedMatch, expr.GetMatcher()(message))
+			require.Equal(t, tt.expectedMatch, expr.GetMatcher()(NewCachedString(message)))
 		})
 	}
 }

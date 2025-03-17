@@ -9,10 +9,12 @@ import (
 	"slices"
 	"sync"
 	"time"
+	"unsafe"
+
+	"golang.org/x/xerrors"
 
 	go_iterators "github.com/lezhnev74/go-iterators"
 	"github.com/lezhnev74/inverted_index_2"
-	"golang.org/x/xerrors"
 
 	"heaplog_2024/db"
 	"heaplog_2024/query_language"
@@ -71,12 +73,14 @@ func (s *Search) Search(
 	exprMatcher := expr.GetMatcher()
 	matcher := func(m db.Message, body []byte) bool {
 
-		// put the date to the message (saving search results needs it)
-		t, err := time.Parse(dateFormat, string(body[m.RelDateLoc.From:m.RelDateLoc.From+m.RelDateLoc.To]))
-		if err != nil {
-			return false
+		if m.Date == nil {
+			// put the date to the message (saving search results needs it)
+			t, err := time.Parse(dateFormat, string(body[m.RelDateLoc.From:m.RelDateLoc.From+m.RelDateLoc.To]))
+			if err != nil {
+				return false
+			}
+			m.Date = &t
 		}
-		m.Date = &t
 
 		if (min != nil && m.Date.Before(*min)) || (max != nil && m.Date.After(*max)) {
 			return false
@@ -85,7 +89,8 @@ func (s *Search) Search(
 		// exclude date from matching
 		body = append(body[:m.RelDateLoc.From], body[m.RelDateLoc.From+m.RelDateLoc.To:]...)
 
-		result := exprMatcher(string(body))
+		bodyString := unsafe.String(unsafe.SliceData(body), len(body))
+		result := exprMatcher(query_language.NewCachedString(bodyString))
 
 		return result
 	}
@@ -130,6 +135,7 @@ func (s *Search) Search(
 				// get the slot and process the segment
 			}
 
+			// each segment is processed concurrently
 			go func() {
 				defer func() {
 					<-freeList // release the slot
@@ -164,10 +170,10 @@ func (s *Search) Search(
 					matchedMessages = append(matchedMessages, m)
 				}
 
-				segmentsResultsLock.Lock()
+				segmentsResultsCondvar.L.Lock()
 				segmentsResults[i] = matchedMessages
 				segmentsResultsCondvar.Signal()
-				segmentsResultsLock.Unlock()
+				segmentsResultsCondvar.L.Unlock()
 			}()
 		}
 	}()
@@ -181,7 +187,7 @@ func (s *Search) Search(
 		}
 		// we must wait until the next segment is processed, so we maintain the order of messages
 		var curSegmentResults []db.Message
-		segmentsResultsLock.Lock()
+		segmentsResultsCondvar.L.Lock()
 
 		// check if it available already before going to sleep-wait
 		curSegmentResults = segmentsResults[curSegmentIndex]
@@ -196,7 +202,7 @@ func (s *Search) Search(
 
 		segmentsResults[curSegmentIndex] = nil //gc
 		curSegmentIndex++
-		segmentsResultsLock.Unlock()
+		segmentsResultsCondvar.L.Unlock()
 
 		return go_iterators.NewSliceIterator(curSegmentResults), nil
 	})
