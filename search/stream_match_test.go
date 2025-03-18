@@ -7,8 +7,9 @@ import (
 	"os"
 	"testing"
 
-	go_iterators "github.com/lezhnev74/go-iterators"
 	"github.com/stretchr/testify/require"
+
+	go_iterators "github.com/lezhnev74/go-iterators"
 
 	"heaplog_2024/common"
 	"heaplog_2024/db"
@@ -137,15 +138,14 @@ multile
 			require.NoError(t, err)
 
 			var matchedMessages []db.Message
-			for {
-				m, err := matchedIt.Next()
-				if err != nil {
+			for ev := range matchedIt {
+				if ev.Err != nil {
 					if errors.Is(err, go_iterators.EmptyIterator) {
 						break
 					}
-					require.ErrorIs(t, err, tt.err)
+					require.ErrorIs(t, ev.Err, tt.err)
 				}
-				matchedMessages = append(matchedMessages, m)
+				matchedMessages = append(matchedMessages, ev.Val)
 			}
 
 			require.Equal(t, tt.expectedMessages, matchedMessages)

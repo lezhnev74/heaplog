@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"log"
 	"slices"
 	"sync"
@@ -15,6 +16,7 @@ import (
 
 	go_iterators "github.com/lezhnev74/go-iterators"
 	"github.com/lezhnev74/inverted_index_2"
+	"heaplog_2024/common"
 
 	"heaplog_2024/db"
 	"heaplog_2024/query_language"
@@ -148,26 +150,20 @@ func (s *Search) Search(
 				defer segmentMessagesIt.Close()
 
 				// Instead of just keeping potential messages here, we can run filtering,
-				// so results contains only matched messages.
-				matched, err := s.FilterMessagesStream(segmentMessagesIt, matcher)
+				// so results contains only matchedIt messages.
+				matchedIt, err := s.FilterMessagesStream(segmentMessagesIt, matcher)
 				if err != nil {
 					log.Fatalf("search segment filter: %s", err)
 					return
 				}
-				defer func() {
-					_ = matched.Close()
-				}()
 
 				matchedMessages := make([]db.Message, 0)
-				for {
-					m, err := matched.Next()
-					if errors.Is(err, go_iterators.EmptyIterator) {
-						break
-					} else if err != nil {
-						log.Printf("unable to match message: %s", err)
+				for ev := range matchedIt {
+					if ev.Err != nil {
+						log.Printf("unable to match message: %s", ev.Err)
 						break
 					}
-					matchedMessages = append(matchedMessages, m)
+					matchedMessages = append(matchedMessages, ev.Val)
 				}
 
 				segmentsResultsCondvar.L.Lock()
@@ -211,7 +207,7 @@ func (s *Search) Search(
 }
 
 // FullScan will read all messages registered in the system (indexed) and apply match func to each
-func (s *Search) FullScan(matchFunc SearchMatcher) (go_iterators.Iterator[db.Message], error) {
+func (s *Search) FullScan(matchFunc SearchMatcher) (iter.Seq[common.ErrVal[db.Message]], error) {
 	messages, err := s.db.AllMessagesIt()
 	if err != nil {
 		return nil, err
@@ -225,14 +221,12 @@ func (s *Search) FilterFile(file string, messages []db.Message, matchFunc Search
 	if err != nil {
 		return nil, xerrors.Errorf("scan: %w", err)
 	}
-	defer fileIterator.Close()
 
-	for {
-		message, err := fileIterator.Next()
-		if errors.Is(err, go_iterators.EmptyIterator) {
+	for ev := range fileIterator {
+		if errors.Is(ev.Err, go_iterators.EmptyIterator) {
 			break
 		}
-		matched = append(matched, message)
+		matched = append(matched, ev.Val)
 	}
 
 	return
@@ -240,7 +234,7 @@ func (s *Search) FilterFile(file string, messages []db.Message, matchFunc Search
 
 // FilterMessagesStream accepts messages to match, groups it by file and scans for their bytes from the heapfiles.
 // Matched messages are streamed out.
-func (s *Search) FilterMessagesStream(messages go_iterators.Iterator[db.Message], matchFunc SearchMatcher) (go_iterators.Iterator[db.Message], error) {
+func (s *Search) FilterMessagesStream(messages go_iterators.Iterator[db.Message], matchFunc SearchMatcher) (iter.Seq[common.ErrVal[db.Message]], error) {
 
 	messagesBySegment := go_iterators.NewGroupingIterator(
 		messages,
@@ -248,57 +242,48 @@ func (s *Search) FilterMessagesStream(messages go_iterators.Iterator[db.Message]
 	)
 
 	var (
-		fileIterator go_iterators.Iterator[db.Message]
-		batch        []db.Message
+		file           string
+		fileMessagesIt iter.Seq[common.ErrVal[db.Message]]
+		batch          []db.Message
 	)
 
-	it := go_iterators.NewCallbackIterator(
-		func() (matched db.Message, err error) {
+	return func(yield func(val common.ErrVal[db.Message]) bool) {
+		defer messages.Close()
+		var ret common.ErrVal[db.Message]
 
-			for {
-				if fileIterator == nil {
-					// All incoming messages must be grouped by the segment,
-					// so we can read them efficiently. If there is no file iterator,
-					// we accumulate messages (batch) for the same file until another message is found (or eof).
-					batch, err = messagesBySegment.Next()
-					if err != nil {
-						break
-					}
-
-					file, err2 := s.db.GetFile(batch[0].FileId)
-					if err2 != nil {
-						err = xerrors.Errorf("scan: %w", err2)
-						return
-					}
-
-					fileIterator, err = StreamFileMatch(file, batch, matchFunc, s.dateFormat)
-					if err != nil {
-						err = xerrors.Errorf("scan: %w", err)
-						return
-					}
-				}
-
-				matched, err = fileIterator.Next()
-				if errors.Is(err, go_iterators.EmptyIterator) {
-					fileIterator.Close()
-					fileIterator = nil
-					continue
-				}
-
+		for {
+			// All incoming messages must be grouped by the segment,
+			// so we can read them efficiently. If there is no file iterator,
+			// we accumulate messages (batch) for the same file until another message is found (or eof).
+			batch, ret.Err = messagesBySegment.Next()
+			if errors.Is(ret.Err, go_iterators.EmptyIterator) {
+				return
+			} else if ret.Err != nil {
+				yield(ret)
 				return
 			}
 
-			err = go_iterators.EmptyIterator
-			return
-		},
-		func() error {
-			if fileIterator != nil {
-				fileIterator.Close()
+			file, ret.Err = s.db.GetFile(batch[0].FileId)
+			if ret.Err != nil {
+				ret.Err = xerrors.Errorf("scan: %w", ret.Err)
+				yield(ret)
+				return
 			}
-			return messages.Close()
-		},
-	)
-	return it, nil
+
+			fileMessagesIt, ret.Err = StreamFileMatch(file, batch, matchFunc, s.dateFormat)
+			if ret.Err != nil {
+				ret.Err = xerrors.Errorf("scan: %w", ret.Err)
+				yield(ret)
+				return
+			}
+
+			for ev := range fileMessagesIt {
+				if !yield(ev) {
+					return
+				}
+			}
+		}
+	}, nil
 }
 
 func (s *Search) filterSegmentsWithInvertedIndex(expr *query_language.Expression, allSegments []uint32, tokenize func([]byte) [][]byte) ([]uint32, error) {

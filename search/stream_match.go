@@ -1,16 +1,19 @@
 package search
 
 import (
-	"heaplog_2024/db"
+	"iter"
 	"time"
 
-	go_iterators "github.com/lezhnev74/go-iterators"
+	"heaplog_2024/common"
+	"heaplog_2024/db"
+
 	"golang.org/x/exp/mmap"
 	"golang.org/x/xerrors"
 )
 
 // StreamFileMatch streams matched messages out of the file.
-func StreamFileMatch(file string, messages []db.Message, mf SearchMatcher, dateFormat string) (go_iterators.Iterator[db.Message], error) {
+// todo: use iterator for the messages
+func StreamFileMatch(file string, messages []db.Message, mf SearchMatcher, dateFormat string) (iter.Seq[common.ErrVal[db.Message]], error) {
 	buf := make([]byte, 0, 1000)
 	maxBufLen := 10_000_000
 
@@ -24,71 +27,67 @@ func StreamFileMatch(file string, messages []db.Message, mf SearchMatcher, dateF
 	refreshMmapBytes := 500_000_000
 	n := 0
 
-	it := go_iterators.NewCallbackIterator(
-		func() (m db.Message, err error) {
+	return func(yield func(v common.ErrVal[db.Message]) bool) {
+		defer stream.Close()
 
-			// Check every message in the messages iterator until one matched
-			for {
-				// experiment: release mmap after reading N bytes
-				if mmapScannedBytes > refreshMmapBytes {
-					mmapScannedBytes = 0
-					_ = stream.Close()
-					stream, err = mmap.Open(file)
-					if err != nil {
-						err = xerrors.Errorf("match message: mmap open: %w", err)
-						return
-					}
-				}
-				////////////////////////////////////////////////////
-
-				if messageIndex == len(messages) {
-					break
-				}
-				m = messages[messageIndex]
-				messageIndex++
-
-				mLen := m.Loc.To - m.Loc.From
-				if cap(buf) < int(mLen) {
-					buf = make([]byte, 0, mLen)
-				}
-				buf = buf[:mLen]
-
-				n, err = stream.ReadAt(buf, int64(m.Loc.From))
+		// Check every message in the messages iterator until one matched
+		for {
+			ret := common.ErrVal[db.Message]{}
+			// experiment: release mmap after reading N bytes
+			if mmapScannedBytes > refreshMmapBytes {
+				mmapScannedBytes = 0
+				_ = stream.Close()
+				stream, err = mmap.Open(file)
 				if err != nil {
-					err = xerrors.Errorf("match message: %w", err)
+					ret.Err = xerrors.Errorf("match message: mmap open: %w", err)
+					yield(ret)
 					return
 				}
-				mmapScannedBytes += n
+			}
+			////////////////////////////////////////////////////
 
-				// parse the date of the message
-				var t time.Time
-				t, err = time.Parse(dateFormat, string(buf[m.RelDateLoc.From:m.RelDateLoc.From+m.RelDateLoc.To]))
-				t = t.UTC()
-				if err != nil {
-					err = xerrors.Errorf("match message: parse date: %w", err)
-					return
-				}
-				m.Date = &t
+			if messageIndex == len(messages) {
+				break
+			}
+			m := messages[messageIndex]
+			messageIndex++
 
-				matchedMessage := mf(m, buf)
-				if len(buf) > maxBufLen {
-					buf = nil // release buffer allocated for a big message quickly
-				}
+			mLen := m.Loc.To - m.Loc.From
+			if cap(buf) < int(mLen) {
+				buf = make([]byte, 0, mLen)
+			}
+			buf = buf[:mLen]
 
-				if !matchedMessage {
-					continue // bad message
-				}
+			n, err = stream.ReadAt(buf, int64(m.Loc.From))
+			if err != nil {
+				ret.Err = xerrors.Errorf("match message: %w", err)
+				yield(ret)
+				return
+			}
+			mmapScannedBytes += n
 
-				return // good message, return to the iterator
+			// parse the date of the message
+			var t time.Time
+			t, err = time.Parse(dateFormat, string(buf[m.RelDateLoc.From:m.RelDateLoc.From+m.RelDateLoc.To]))
+			t = t.UTC()
+			if err != nil {
+				ret.Err = xerrors.Errorf("match message: parse date: %w", err)
+				yield(ret)
+				return
+			}
+			m.Date = &t
+
+			matchedMessage := mf(m, buf)
+			if len(buf) > maxBufLen {
+				buf = nil // release buffer allocated for a big message quickly
 			}
 
-			err = go_iterators.EmptyIterator
-			return
-		},
-		func() error {
-			return stream.Close()
-		},
-	)
+			if !matchedMessage {
+				continue // bad message
+			}
 
-	return it, nil
+			ret.Val = m
+			yield(ret) // good message, return to the iterator
+		}
+	}, nil
 }

@@ -192,3 +192,10 @@ func ProfileCPU(fn func()) {
 	pprof.StopCPUProfile()
 	defer func() { _ = f.Close() }()
 }
+
+// ErrVal is a container for passing values with optional errors
+// corresponding to the value calculation.
+type ErrVal[V any] struct {
+	Val V
+	Err error
+}
