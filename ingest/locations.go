@@ -1,10 +1,10 @@
 package ingest
 
 import (
+	"fmt"
+
 	"heaplog_2024/common"
 	"heaplog_2024/db"
-
-	"golang.org/x/xerrors"
 )
 
 // SelectLocationsForIndexing returns contiguous file runs that were never indexed.
@@ -13,12 +13,12 @@ func SelectLocationsForIndexing(_db *db.DbContainer, file string) ([]common.Loca
 
 	fileSize, err := common.FileSize(file)
 	if err != nil {
-		return nil, xerrors.Errorf("file %s: %w", file, err)
+		return nil, fmt.Errorf("file %s: %w", file, err)
 	}
 
 	fileId, err := _db.GetFileId(file)
 	if err != nil {
-		err = xerrors.Errorf("get file: %w", err)
+		err = fmt.Errorf("get file: %w", err)
 		return nil, err
 	}
 

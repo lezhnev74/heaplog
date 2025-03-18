@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"slices"
@@ -12,7 +13,6 @@ import (
 
 	"github.com/lezhnev74/inverted_index_2"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/xerrors"
 
 	"heaplog_2024/common"
 	"heaplog_2024/db"
@@ -80,11 +80,11 @@ func (ing *Ingest) Index(files []string) error {
 		wg.Go(func() (err error) {
 			locations, err := SelectLocationsForIndexing(ing.db, file)
 			if err != nil {
-				return xerrors.Errorf("index: %w", err)
+				return fmt.Errorf("index: %w", err)
 			}
 			err = ing.indexFile(file, locations)
 			if err != nil {
-				return xerrors.Errorf("index file: %w", err)
+				return fmt.Errorf("index file: %w", err)
 			}
 			return
 		})
@@ -100,21 +100,21 @@ func (ing *Ingest) indexFile(file string, locations []common.Location) error {
 
 	fileId, err := ing.db.GetFileId(file)
 	if err != nil {
-		return xerrors.Errorf("index file: %w", err)
+		return fmt.Errorf("index file: %w", err)
 	}
 
 	// file indexing goes over segments one-by-one
 	reader, err := os.Open(file)
 	if err != nil {
-		return xerrors.Errorf("index file: %w", err)
+		return fmt.Errorf("index file: %w", err)
 	}
 	defer func() { _ = reader.Close() }()
 
 	allMessageLayouts, err := ing.findMessages(file, locations)
 	if errors.Is(err, scanner.NoMessageStartFound) || len(allMessageLayouts) == 0 {
-		return xerrors.Errorf("no messages found")
+		return fmt.Errorf("no messages found")
 	} else if err != nil {
-		return xerrors.Errorf("message scan failed: %w", err)
+		return fmt.Errorf("message scan failed: %w", err)
 	}
 
 	// pickNextLocation returns the next contiguous run (that is at most segmentSize long)
@@ -130,7 +130,7 @@ func (ing *Ingest) indexFile(file string, locations []common.Location) error {
 
 	lastSegmentLoc, err := ing.db.LastSegmentLocation(fileId)
 	if err != nil {
-		err = xerrors.Errorf("index file: %w", err)
+		err = fmt.Errorf("index file: %w", err)
 		return err
 	}
 
@@ -152,7 +152,7 @@ func (ing *Ingest) indexFile(file string, locations []common.Location) error {
 		tokenizedMessages := ing.readMessagesInStream(file, reader, locMessageLayouts)
 		lastSegmentLoc, err = ing.saveBatch(file, tokenizedMessages)
 		if err != nil {
-			return xerrors.Errorf("save segment failed: %w", err)
+			return fmt.Errorf("save segment failed: %w", err)
 		}
 
 		loops++
@@ -172,7 +172,7 @@ func (ing *Ingest) saveBatch(file string, messages <-chan *ScannedTokenizedMessa
 
 	fileId, err := ing.db.GetFileId(file)
 	if err != nil {
-		err = xerrors.Errorf("file is missing: %w", err)
+		err = fmt.Errorf("file is missing: %w", err)
 		return
 	}
 
@@ -207,7 +207,7 @@ func (ing *Ingest) saveBatch(file string, messages <-chan *ScannedTokenizedMessa
 		}
 		iiErr := ing.ii.Put(segmentTerms, uint32(curSegment.Id))
 		if iiErr != nil {
-			return xerrors.Errorf("save segment: ii: %w", iiErr)
+			return fmt.Errorf("save segment: ii: %w", iiErr)
 		}
 
 		// as the last step, persist the segment
@@ -219,7 +219,7 @@ func (ing *Ingest) saveBatch(file string, messages <-chan *ScannedTokenizedMessa
 			curSegment.DateMax,
 		)
 		if syncErr != nil {
-			return xerrors.Errorf("sync segment: %w", syncErr)
+			return fmt.Errorf("sync segment: %w", syncErr)
 		}
 
 		// Report
@@ -277,13 +277,13 @@ func (ing *Ingest) saveBatch(file string, messages <-chan *ScannedTokenizedMessa
 
 	for message := range messages {
 		if message.Err != nil {
-			err = xerrors.Errorf("message scan failed: %w", message.Err)
+			err = fmt.Errorf("message scan failed: %w", message.Err)
 			return
 		}
 
 		segmentId, serr := selectSegment(message)
 		if serr != nil {
-			err = xerrors.Errorf("segment selection failed: %w", serr)
+			err = fmt.Errorf("segment selection failed: %w", serr)
 			return
 		}
 
@@ -292,7 +292,7 @@ func (ing *Ingest) saveBatch(file string, messages <-chan *ScannedTokenizedMessa
 
 		checkInErr := ing.db.CheckinMessage(segmentId, message.From, relDateFrom, dateLen)
 		if checkInErr != nil {
-			err = xerrors.Errorf("checking messages failed: %w", checkInErr)
+			err = fmt.Errorf("checking messages failed: %w", checkInErr)
 			return
 		}
 
@@ -341,14 +341,14 @@ func (ing *Ingest) readMessagesInStream(name string, stream io.ReaderAt, message
 				// Read the beginning of the message
 				_, err := stream.ReadAt(buf[:halfSize], int64(layout.From))
 				if err != nil {
-					err = xerrors.Errorf("file read: %w", err)
+					err = fmt.Errorf("file read: %w", err)
 					r <- &ScannedTokenizedMessage{Err: err}
 				}
 
 				// Read the end of the message
 				_, err = stream.ReadAt(buf[halfSize:], int64(layout.To-halfSize))
 				if err != nil {
-					err = xerrors.Errorf("file read: %w", err)
+					err = fmt.Errorf("file read: %w", err)
 					r <- &ScannedTokenizedMessage{Err: err}
 				}
 
@@ -362,7 +362,7 @@ func (ing *Ingest) readMessagesInStream(name string, stream io.ReaderAt, message
 
 				_, err := stream.ReadAt(buf, int64(layout.From))
 				if err != nil {
-					err = xerrors.Errorf("file read: %w", err)
+					err = fmt.Errorf("file read: %w", err)
 					r <- &ScannedTokenizedMessage{Err: err}
 				}
 			}
@@ -378,7 +378,7 @@ func (ing *Ingest) readMessagesInStream(name string, stream io.ReaderAt, message
 
 			tm.DateTime, err = ing.parseTime(buf[dateFrom:dateTo])
 			if err != nil {
-				err = xerrors.Errorf("date parse: %w", err)
+				err = fmt.Errorf("date parse: %w", err)
 				r <- &ScannedTokenizedMessage{Err: err}
 			}
 

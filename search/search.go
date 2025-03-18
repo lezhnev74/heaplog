@@ -12,8 +12,6 @@ import (
 	"time"
 	"unsafe"
 
-	"golang.org/x/xerrors"
-
 	go_iterators "github.com/lezhnev74/go-iterators"
 	"github.com/lezhnev74/inverted_index_2"
 
@@ -56,7 +54,7 @@ func (s *Search) Search(
 ) (matchedIt iter.Seq[common.ErrVal[db.Message]], isFullScan bool, err error) {
 	segments, err := s.db.AllSegmentIds(min, max)
 	if err != nil {
-		err = xerrors.Errorf("all segments query: %w", err)
+		err = fmt.Errorf("all segments query: %w", err)
 		return
 	}
 
@@ -67,7 +65,7 @@ func (s *Search) Search(
 		// ingestion assigns segment ids (within the same file) in the same order.
 		segments, err = s.filterSegmentsWithInvertedIndex(expr, segments, tokenize)
 		if err != nil {
-			err = xerrors.Errorf("inverted index failure: %w", err)
+			err = fmt.Errorf("inverted index failure: %w", err)
 			return
 		}
 		fmt.Printf("Selected segments: %d\n", len(segments))
@@ -229,7 +227,7 @@ func (s *Search) FilterFile(file string, messages []db.Message, matchFunc Search
 
 	fileIterator, err := StreamFileMatch(file, messages, matchFunc, s.dateFormat)
 	if err != nil {
-		return nil, xerrors.Errorf("scan: %w", err)
+		return nil, fmt.Errorf("scan: %w", err)
 	}
 
 	for ev := range fileIterator {
@@ -262,14 +260,14 @@ func (s *Search) FilterMessagesStream(messages iter.Seq[common.ErrVal[db.Message
 			// we accumulate messages (batch) for the same file until another message is found (or eof).
 			file, ret.Err = s.db.GetFile(batch[0].FileId)
 			if ret.Err != nil {
-				ret.Err = xerrors.Errorf("scan: %w", ret.Err)
+				ret.Err = fmt.Errorf("scan: %w", ret.Err)
 				yield(ret)
 				return
 			}
 
 			fileMessagesIt, ret.Err = StreamFileMatch(file, batch, matchFunc, s.dateFormat)
 			if ret.Err != nil {
-				ret.Err = xerrors.Errorf("scan: %w", ret.Err)
+				ret.Err = fmt.Errorf("scan: %w", ret.Err)
 				yield(ret)
 				return
 			}
@@ -298,7 +296,7 @@ func (s *Search) filterSegmentsWithInvertedIndex(expr *query_language.Expression
 	// iiTermValues contain allSegments for long term prefixes found in the expression
 	iiTermValues, err := s.ii.PrefixSearch(terms)
 	if err != nil {
-		return nil, xerrors.Errorf("ii prefix: %w", err)
+		return nil, fmt.Errorf("ii prefix: %w", err)
 	}
 
 	// Now we can map the whole expression to sets of segment (prepare for evaluation)

@@ -1,10 +1,9 @@
 package ingest
 
 import (
+	"fmt"
 	"log"
 	"path/filepath"
-
-	"golang.org/x/xerrors"
 
 	"heaplog_2024/common"
 	"heaplog_2024/db"
@@ -24,7 +23,7 @@ func (d *Discover) DiscoverFiles() (news, obsoletes []string, err error) {
 		var files []string
 		files, err = filepath.Glob(g)
 		if err != nil {
-			err = xerrors.Errorf("unable to discover files at %s: %w", g, err)
+			err = fmt.Errorf("unable to discover files at %s: %w", g, err)
 			return
 		}
 		for _, f := range files {
@@ -39,7 +38,7 @@ func (d *Discover) DiscoverFiles() (news, obsoletes []string, err error) {
 
 	news, obsoletes, err = d.storage.CheckInFiles(allCurrentFiles)
 	if err != nil {
-		err = xerrors.Errorf("failed to check in discovered files: %w", err)
+		err = fmt.Errorf("failed to check in discovered files: %w", err)
 		return
 	}
 

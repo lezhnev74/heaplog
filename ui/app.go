@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"iter"
 	"log"
 	"os"
@@ -15,7 +16,6 @@ import (
 	"github.com/lezhnev74/inverted_index_2"
 	"github.com/marcboeker/go-duckdb"
 	"golang.org/x/exp/mmap"
-	"golang.org/x/xerrors"
 
 	"heaplog_2024/common"
 	"heaplog_2024/db"
@@ -50,40 +50,40 @@ func (happ *HeaplogApp) ListQueries() ([]db.Query, error) {
 func (happ *HeaplogApp) Test() error {
 	files, err := filepath.Glob(happ.cfg.FilesGlobPattern)
 	if err != nil {
-		return xerrors.Errorf("unable to find files at %s: %w", happ.cfg.FilesGlobPattern, err)
+		return fmt.Errorf("unable to find files at %s: %w", happ.cfg.FilesGlobPattern, err)
 	}
 	if len(files) == 0 {
-		return xerrors.Errorf("unable to find files at %s: no files found", happ.cfg.FilesGlobPattern)
+		return fmt.Errorf("unable to find files at %s: no files found", happ.cfg.FilesGlobPattern)
 	}
 
 	var file string
 	file, err = filepath.Abs(files[0])
 	if err != nil {
-		return xerrors.Errorf("unable to find the file at %s: %w", file, err)
+		return fmt.Errorf("unable to find the file at %s: %w", file, err)
 	}
 	layouts, err := scanner.UgScan(file, happ.cfg.MessageStartRE, []common.Location{{From: 0, To: 10000}})
 	if err != nil {
-		return xerrors.Errorf("unable to test the file at %s: %w", file, err)
+		return fmt.Errorf("unable to test the file at %s: %w", file, err)
 	}
 
 	if len(layouts) == 0 {
-		return xerrors.Errorf("no messages found in %s (check regular expression again)", file)
+		return fmt.Errorf("no messages found in %s (check regular expression again)", file)
 	}
 	ml := layouts[0]
 
 	// test date extraction:
 	f, err := os.Open(file)
 	if err != nil {
-		return xerrors.Errorf("unable to test the file at %s: %w", file, err)
+		return fmt.Errorf("unable to test the file at %s: %w", file, err)
 	}
 	dateBuf := make([]byte, ml.DateTo-ml.DateFrom)
 	_, err = f.ReadAt(dateBuf, int64(ml.DateFrom))
 	if err != nil {
-		return xerrors.Errorf("unable to test the file at %s: %w", file, err)
+		return fmt.Errorf("unable to test the file at %s: %w", file, err)
 	}
 	_, err = time.Parse(happ.cfg.DateFormat, string(dateBuf))
 	if err != nil {
-		return xerrors.Errorf("unable to test the file at %s: parse date: %w", file, err)
+		return fmt.Errorf("unable to test the file at %s: parse date: %w", file, err)
 	}
 
 	log.Printf("Great! Found a message in %s\n", file)
@@ -123,7 +123,7 @@ func (happ *HeaplogApp) NewQuery(text string, min *time.Time, max *time.Time) (n
 	var queryExpr *query_language.Expression
 	queryExpr, err = query_language.ParseUserQuery(text)
 	if err != nil {
-		err = xerrors.Errorf("parse query text: %w", err)
+		err = fmt.Errorf("parse query text: %w", err)
 		return
 	}
 
@@ -139,7 +139,7 @@ func (happ *HeaplogApp) NewQuery(text string, min *time.Time, max *time.Time) (n
 		int(happ.cfg.Concurrency),
 	)
 	if err != nil {
-		err = xerrors.Errorf("new query: %w", err)
+		err = fmt.Errorf("new query: %w", err)
 		return
 	}
 
@@ -151,7 +151,7 @@ func (happ *HeaplogApp) NewQuery(text string, min *time.Time, max *time.Time) (n
 func (happ *HeaplogApp) Page(queryId int, from, to *time.Time, page, pageSize, pageSkip int) (rows []string, err error) {
 	messages, err := happ.db.QueryDB.Page(queryId, from, to, page, pageSize)
 	if err != nil {
-		err = xerrors.Errorf("page failed: %w", err)
+		err = fmt.Errorf("page failed: %w", err)
 		return
 	}
 
@@ -222,7 +222,7 @@ func (happ *HeaplogApp) fetchMessages(queryId int, messages []db.Message) (rows 
 					log.Printf("query %d page: looks like the file[%d] is removed", queryId, m.FileId)
 					continue
 				}
-				err = xerrors.Errorf("page failed: find file: %w", err)
+				err = fmt.Errorf("page failed: find file: %w", err)
 				return
 			}
 
@@ -231,7 +231,7 @@ func (happ *HeaplogApp) fetchMessages(queryId int, messages []db.Message) (rows 
 			}
 			lastFileReader, err = mmap.Open(file)
 			if err != nil {
-				err = xerrors.Errorf("page failed: mmap file: %w", err)
+				err = fmt.Errorf("page failed: mmap file: %w", err)
 				return
 			}
 		}
@@ -239,7 +239,7 @@ func (happ *HeaplogApp) fetchMessages(queryId int, messages []db.Message) (rows 
 		b := make([]byte, m.Loc.To)
 		_, err = lastFileReader.ReadAt(b, int64(m.Loc.From))
 		if err != nil {
-			err = xerrors.Errorf("page failed: mmap read: %w", err)
+			err = fmt.Errorf("page failed: mmap read: %w", err)
 			return
 		}
 		rows = append(rows, string(bytes.TrimRight(b, "\n")))

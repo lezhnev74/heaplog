@@ -8,8 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/xerrors"
-
 	"heaplog_2024/common"
 )
 
@@ -37,7 +35,7 @@ func (sdb *SegmentsDb) ReadIndexedLocations(fileId int) ([]common.Location, erro
 `
 	r, err := sdb.db.Query(selectSql, fileId)
 	if err != nil {
-		return nil, xerrors.Errorf("unable to read existing file segments: %w", err)
+		return nil, fmt.Errorf("unable to read existing file segments: %w", err)
 	}
 	defer func() { _ = r.Close() }()
 
@@ -46,7 +44,7 @@ func (sdb *SegmentsDb) ReadIndexedLocations(fileId int) ([]common.Location, erro
 		is := common.Location{}
 		err = r.Scan(&is.From, &is.To)
 		if err != nil {
-			return nil, xerrors.Errorf("unable to read existing file segments: %w", err)
+			return nil, fmt.Errorf("unable to read existing file segments: %w", err)
 		}
 		indexedLocations = append(indexedLocations, is)
 	}
@@ -60,7 +58,7 @@ func (sdb *SegmentsDb) CheckinSegment(
 ) (segmentId uint32, err error) {
 	segmentId, err = sdb.ReserveSegmentId()
 	if err != nil {
-		err = xerrors.Errorf("unable to check in segments (1): %w", err)
+		err = fmt.Errorf("unable to check in segments (1): %w", err)
 		return
 	}
 
@@ -99,7 +97,7 @@ func (sdb *SegmentsDb) CheckinSegmentWithId(
 			uint64(max.UnixMicro()),
 		)
 		if err != nil {
-			err = xerrors.Errorf("unable to check in segments with id (1): %w", err)
+			err = fmt.Errorf("unable to check in segments with id (1): %w", err)
 		}
 		return
 	}
@@ -118,7 +116,7 @@ func (sdb *SegmentsDb) CheckinSegmentWithId(
 		segmentId,
 	)
 	if err != nil {
-		err = xerrors.Errorf("unable to check in segments with id: %w", err)
+		err = fmt.Errorf("unable to check in segments with id: %w", err)
 	}
 	return
 }
@@ -127,7 +125,7 @@ func (sdb *SegmentsDb) ReserveSegmentId() (segmentId uint32, err error) {
 	r := sdb.db.QueryRow(`SELECT nextval('segment_ids');`)
 	err = r.Scan(&segmentId)
 	if err != nil {
-		err = xerrors.Errorf("unable to check in a segment: %w", err)
+		err = fmt.Errorf("unable to check in a segment: %w", err)
 	}
 	return
 }
@@ -138,7 +136,7 @@ func (sdb *SegmentsDb) LastSegmentLocation(fileId int) (location common.Location
 		err = nil // return empty location
 		return
 	} else if err != nil {
-		err = xerrors.Errorf("unable to read a segment: %w", err)
+		err = fmt.Errorf("unable to read a segment: %w", err)
 	}
 	return
 }
@@ -160,7 +158,7 @@ func (sdb *SegmentsDb) AllSegmentIds(min, max *time.Time) ([]uint32, error) {
 
 	r, err := sdb.db.Query(q, minDate, maxDate)
 	if err != nil {
-		return nil, xerrors.Errorf("unable to read existing file segments: %w", err)
+		return nil, fmt.Errorf("unable to read existing file segments: %w", err)
 	}
 	defer func() { _ = r.Close() }()
 
@@ -169,7 +167,7 @@ func (sdb *SegmentsDb) AllSegmentIds(min, max *time.Time) ([]uint32, error) {
 		id := uint32(0)
 		err = r.Scan(&id)
 		if err != nil {
-			return nil, xerrors.Errorf("unable to read segments: %w", err)
+			return nil, fmt.Errorf("unable to read segments: %w", err)
 		}
 		segments = append(segments, id)
 	}
@@ -212,7 +210,7 @@ SELECT Id FROM file_segments
 
 	r, err := sdb.db.Query(q, queryArgs...)
 	if err != nil {
-		return nil, xerrors.Errorf("unable to read existing file segments: %w", err)
+		return nil, fmt.Errorf("unable to read existing file segments: %w", err)
 	}
 	defer func() { _ = r.Close() }()
 
@@ -221,7 +219,7 @@ SELECT Id FROM file_segments
 		id := uint32(0)
 		err = r.Scan(&id)
 		if err != nil {
-			return nil, xerrors.Errorf("unable to read segments: %w", err)
+			return nil, fmt.Errorf("unable to read segments: %w", err)
 		}
 		filteredSegments = append(filteredSegments, id)
 	}

@@ -3,14 +3,15 @@ package test_util
 import (
 	"context"
 	"database/sql"
+	"os"
+	"testing"
+	"time"
+
 	"heaplog_2024/common"
 	"heaplog_2024/db"
 	"heaplog_2024/ingest"
 	"heaplog_2024/scanner"
 	"heaplog_2024/tokenizer"
-	"os"
-	"testing"
-	"time"
 
 	"github.com/lezhnev74/inverted_index_2"
 	"github.com/marcboeker/go-duckdb"
