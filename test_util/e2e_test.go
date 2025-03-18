@@ -4,7 +4,6 @@ package test_util_test
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -17,7 +16,6 @@ import (
 	"github.com/marcboeker/go-duckdb"
 	"github.com/stretchr/testify/require"
 
-	go_iterators "github.com/lezhnev74/go-iterators"
 	"github.com/lezhnev74/inverted_index_2"
 
 	"heaplog_2024/common"
@@ -66,9 +64,6 @@ func _TestSearch(t *testing.T) {
 	c := 0
 	for range messagesIt {
 
-		if errors.Is(err, go_iterators.EmptyIterator) {
-			break
-		}
 		require.NoError(t, err)
 		c++
 

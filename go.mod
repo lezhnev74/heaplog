@@ -10,7 +10,6 @@ require (
 	github.com/go-playground/validator v9.31.0+incompatible
 	github.com/gofiber/fiber/v2 v2.52.6
 	github.com/gofiber/template/html/v2 v2.1.3
-	github.com/lezhnev74/go-iterators v0.0.0-20240902070734-4c1f359dc381
 	github.com/lezhnev74/inverted_index_2 v0.0.0-20241025145959-abaf487ff656
 	github.com/marcboeker/go-duckdb v1.8.5
 	github.com/pkg/errors v0.9.1
@@ -44,6 +43,7 @@ require (
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
+	github.com/lezhnev74/go-iterators v0.0.0-20240902070734-4c1f359dc381 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect

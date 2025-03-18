@@ -3,7 +3,6 @@ package search
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"iter"
 	"log"
@@ -12,7 +11,6 @@ import (
 	"time"
 	"unsafe"
 
-	go_iterators "github.com/lezhnev74/go-iterators"
 	"github.com/lezhnev74/inverted_index_2"
 
 	"heaplog_2024/common"
@@ -231,8 +229,8 @@ func (s *Search) FilterFile(file string, messages []db.Message, matchFunc Search
 	}
 
 	for ev := range fileIterator {
-		if errors.Is(ev.Err, go_iterators.EmptyIterator) {
-			break
+		if ev.Err != nil {
+			return nil, fmt.Errorf("scan: %w", ev.Err)
 		}
 		matched = append(matched, ev.Val)
 	}

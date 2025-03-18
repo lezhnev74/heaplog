@@ -2,70 +2,16 @@ package search
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	go_iterators "github.com/lezhnev74/go-iterators"
-
 	"heaplog_2024/common"
 	"heaplog_2024/db"
 	"heaplog_2024/test_util"
 )
-
-func TestBatching(t *testing.T) {
-	src := []db.Message{
-		{SegmentId: 1, Loc: common.Location{From: 1, To: 1}, FileId: 1},
-		{SegmentId: 1, Loc: common.Location{From: 2, To: 2}, FileId: 1},
-		{SegmentId: 2, Loc: common.Location{From: 3, To: 3}, FileId: 1},
-		{SegmentId: 3, Loc: common.Location{From: 1, To: 1}, FileId: 2},
-		{SegmentId: 4, Loc: common.Location{From: 2, To: 2}, FileId: 2},
-	}
-
-	// Group by file
-
-	groupedIt := go_iterators.NewGroupingIterator(
-		go_iterators.NewSliceIterator(src),
-		func(m db.Message) any { return m.FileId },
-	)
-	expected := [][]db.Message{
-		{
-			{SegmentId: 1, Loc: common.Location{From: 1, To: 1}, FileId: 1},
-			{SegmentId: 1, Loc: common.Location{From: 2, To: 2}, FileId: 1},
-			{SegmentId: 2, Loc: common.Location{From: 3, To: 3}, FileId: 1},
-		},
-		{
-			{SegmentId: 3, Loc: common.Location{From: 1, To: 1}, FileId: 2},
-			{SegmentId: 4, Loc: common.Location{From: 2, To: 2}, FileId: 2},
-		},
-	}
-	require.Equal(t, expected, go_iterators.ToSlice(groupedIt))
-
-	// Group by segment
-	groupedIt = go_iterators.NewGroupingIterator(
-		go_iterators.NewSliceIterator(src),
-		func(m db.Message) any { return m.SegmentId },
-	)
-	expected = [][]db.Message{
-		{
-			{SegmentId: 1, Loc: common.Location{From: 1, To: 1}, FileId: 1},
-			{SegmentId: 1, Loc: common.Location{From: 2, To: 2}, FileId: 1},
-		},
-		{
-			{SegmentId: 2, Loc: common.Location{From: 3, To: 3}, FileId: 1},
-		},
-		{
-			{SegmentId: 3, Loc: common.Location{From: 1, To: 1}, FileId: 2},
-		},
-		{
-			{SegmentId: 4, Loc: common.Location{From: 2, To: 2}, FileId: 2},
-		},
-	}
-	require.Equal(t, expected, go_iterators.ToSlice(groupedIt))
-}
 
 func TestReadMatch(t *testing.T) {
 
@@ -140,9 +86,6 @@ multile
 			var matchedMessages []db.Message
 			for ev := range matchedIt {
 				if ev.Err != nil {
-					if errors.Is(err, go_iterators.EmptyIterator) {
-						break
-					}
 					require.ErrorIs(t, ev.Err, tt.err)
 				}
 				matchedMessages = append(matchedMessages, ev.Val)

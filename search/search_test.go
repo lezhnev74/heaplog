@@ -3,15 +3,12 @@ package search_test
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	go_iterators "github.com/lezhnev74/go-iterators"
 
 	"heaplog_2024/common"
 	"heaplog_2024/db"
@@ -279,9 +276,6 @@ multile
 			var matchedMessages []db.Message
 			for ev := range matchedIt {
 				if ev.Err != nil {
-					if errors.Is(err, go_iterators.EmptyIterator) {
-						break
-					}
 					require.ErrorIs(t, ev.Err, tt.err)
 				}
 				matchedMessages = append(matchedMessages, ev.Val)
