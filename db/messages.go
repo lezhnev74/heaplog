@@ -3,13 +3,13 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"iter"
 	"log"
+	"slices"
 	"strings"
 	"time"
 
-	go_iterators "github.com/lezhnev74/go-iterators"
 	"github.com/marcboeker/go-duckdb"
-	"golang.org/x/xerrors"
 
 	"heaplog_2024/common"
 )
@@ -89,19 +89,19 @@ func (mdb *MessagesDb) Flush() {
 	mdb.appenderChan <- flushPacket
 }
 
-func (mdb *MessagesDb) AllMessagesIt() (messages go_iterators.Iterator[Message], err error) {
+func (mdb *MessagesDb) AllMessagesIt() (messages iter.Seq[common.ErrVal[Message]], err error) {
 	whereSql := `1=1`
 	args := []any{}
 	return mdb.iterateRows(whereSql, args)
 }
 
-func (mdb *MessagesDb) AllMessagesInFileIt(fileId int) (messages go_iterators.Iterator[Message], err error) {
+func (mdb *MessagesDb) AllMessagesInFileIt(fileId int) (messages iter.Seq[common.ErrVal[Message]], err error) {
 	whereSql := `s.fileId=?`
 	args := []any{fileId}
 	return mdb.iterateRows(whereSql, args)
 }
 
-func (mdb *MessagesDb) AllMessagesInSegmentsIt(segments []uint32) (messages go_iterators.Iterator[Message], err error) {
+func (mdb *MessagesDb) AllMessagesInSegmentsIt(segments []uint32) (messages iter.Seq[common.ErrVal[Message]], err error) {
 	whereSql := `m.segmentId IN (%s)`
 	whereSql = fmt.Sprintf(whereSql, strings.TrimRight(strings.Repeat("?,", len(segments)), ","))
 	args := common.SliceToAny(segments)
@@ -110,12 +110,12 @@ func (mdb *MessagesDb) AllMessagesInSegmentsIt(segments []uint32) (messages go_i
 
 func (mdb *MessagesDb) AllMessages(fileId int) (messages []Message, err error) {
 	it, err := mdb.AllMessagesInFileIt(fileId)
-	return go_iterators.ToSlice(it), err
+	return common.ExpandValues(slices.Collect(it)), err
 }
 
 // iterateRows gives row iterator and ability to change the query with
 // whereSql/queryArgs parameters.
-func (mdb *MessagesDb) iterateRows(whereSql string, queryArgs []any) (go_iterators.Iterator[Message], error) {
+func (mdb *MessagesDb) iterateRows(whereSql string, queryArgs []any) (iter.Seq[common.ErrVal[Message]], error) {
 
 	sqlSelect := `
 		SELECT m.*, s.posTo as lastMessageTo, s.fileId   
@@ -126,85 +126,21 @@ func (mdb *MessagesDb) iterateRows(whereSql string, queryArgs []any) (go_iterato
 		`
 	sqlSelect = fmt.Sprintf(sqlSelect, whereSql)
 
-	r, err := mdb.db.Query(sqlSelect, queryArgs...)
+	stmt, err := mdb.db.Prepare(sqlSelect)
 	if err != nil {
-		return nil, xerrors.Errorf("all Messages: %w", err)
+		return nil, fmt.Errorf("all Messages: %w", err)
 	}
 
-	// Messages do not keep their len(or end position),
-	// so it must be calculated against the next message or the segment's right boundary.
-
-	// Read the first row to the memory before proceeding
-	var lastSegmentPosTo, segmentPosTo uint64
-	var lastMessage *Message
-	if r.Next() {
-		lastMessage = &Message{}
-		err = r.Scan(
-			&lastMessage.SegmentId,
-			&lastMessage.Loc.From,
-			&lastMessage.RelDateLoc.From,
-			&lastMessage.RelDateLoc.To,
-			&lastSegmentPosTo,
-			&lastMessage.FileId,
-		)
-		if err != nil {
-			err = xerrors.Errorf("all Messages: %w", err)
-			return go_iterators.NewSliceIterator[Message](nil), err
-		}
-	}
-
-	it := go_iterators.NewCallbackIterator(
-		func() (m Message, err error) {
-			if lastMessage == nil {
-				err = go_iterators.EmptyIterator
-				return
-			}
-
-			segmentPosTo, m = lastSegmentPosTo, *lastMessage
-
-			if r.Next() {
-				err = r.Scan(
-					&lastMessage.SegmentId,
-					&lastMessage.Loc.From,
-					&lastMessage.RelDateLoc.From,
-					&lastMessage.RelDateLoc.To,
-					&lastSegmentPosTo,
-					&lastMessage.FileId,
-				)
-				if err != nil {
-					err = xerrors.Errorf("all Messages: %w", err)
-					return
-				}
-
-				// one more message exists, so update the boundary of the current message
-				if m.SegmentId == lastMessage.SegmentId {
-					m.Loc.To = lastMessage.Loc.From
-				} else {
-					m.Loc.To = segmentPosTo
-				}
-			} else {
-				// no more messages are coming
-				m.Loc.To = segmentPosTo
-				lastMessage = nil
-			}
-
-			return
-		},
-		func() error {
-			return r.Close()
-		},
-	)
-
-	return it, nil
+	return mdb.IterateRowsFromStatement(stmt, queryArgs)
 }
 
 // IterateRowsFromStatement gives row iterator and ability to change the query with
 // whereSql/queryArgs parameters.
-func (mdb *MessagesDb) IterateRowsFromStatement(stmt *sql.Stmt, args []any) (go_iterators.Iterator[Message], error) {
+func (mdb *MessagesDb) IterateRowsFromStatement(stmt *sql.Stmt, args []any) (iter.Seq[common.ErrVal[Message]], error) {
 
 	r, err := stmt.Query(args...)
 	if err != nil {
-		return nil, xerrors.Errorf("all Messages: %w", err)
+		return nil, fmt.Errorf("all Messages: %w", err)
 	}
 
 	// Messages do not keep their len(or end position),
@@ -224,19 +160,21 @@ func (mdb *MessagesDb) IterateRowsFromStatement(stmt *sql.Stmt, args []any) (go_
 			&lastMessage.FileId,
 		)
 		if err != nil {
-			err = xerrors.Errorf("all Messages: %w", err)
-			return go_iterators.NewSliceIterator[Message](nil), err
+			err = fmt.Errorf("all Messages: %w", err)
+			return nil, err
 		}
 	}
 
-	it := go_iterators.NewCallbackIterator(
-		func() (m Message, err error) {
+	return func(yield func(val common.ErrVal[Message]) bool) {
+		defer func() { _ = r.Close() }()
+		var ret common.ErrVal[Message]
+
+		for {
 			if lastMessage == nil {
-				err = go_iterators.EmptyIterator
 				return
 			}
 
-			segmentPosTo, m = lastSegmentPosTo, *lastMessage
+			segmentPosTo, ret.Val = lastSegmentPosTo, *lastMessage
 
 			if r.Next() {
 				err = r.Scan(
@@ -248,28 +186,27 @@ func (mdb *MessagesDb) IterateRowsFromStatement(stmt *sql.Stmt, args []any) (go_
 					&lastMessage.FileId,
 				)
 				if err != nil {
-					err = xerrors.Errorf("all Messages: %w", err)
+					ret.Err = fmt.Errorf("all Messages: %w", err)
+					yield(ret)
 					return
 				}
 
 				// one more message exists, so update the boundary of the current message
-				if m.SegmentId == lastMessage.SegmentId {
-					m.Loc.To = lastMessage.Loc.From
+				if ret.Val.SegmentId == lastMessage.SegmentId {
+					ret.Val.Loc.To = lastMessage.Loc.From
 				} else {
-					m.Loc.To = segmentPosTo
+					ret.Val.Loc.To = segmentPosTo
 				}
 			} else {
 				// no more messages are coming
-				m.Loc.To = segmentPosTo
+				ret.Val.Loc.To = segmentPosTo
 				lastMessage = nil
 			}
 
-			return
-		},
-		func() error {
-			return r.Close()
-		},
-	)
+			if !yield(ret) {
+				return
+			}
+		}
 
-	return it, nil
+	}, nil
 }

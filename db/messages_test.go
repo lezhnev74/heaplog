@@ -1,15 +1,15 @@
 package db_test
 
 import (
-	"errors"
 	"fmt"
-	"heaplog_2024/common"
-	"heaplog_2024/db"
-	"heaplog_2024/test_util"
+	"iter"
 	"os"
 	"testing"
 
-	go_iterators "github.com/lezhnev74/go-iterators"
+	"heaplog_2024/common"
+	"heaplog_2024/db"
+	"heaplog_2024/test_util"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -54,13 +54,13 @@ multile
 	_db.MessagesDb.Flush()
 
 	type test struct {
-		it               func() go_iterators.Iterator[db.Message]
+		it               func() iter.Seq[common.ErrVal[db.Message]]
 		expectedMessages []db.Message
 	}
 
 	tests := []test{
 		{ // Read All
-			it: func() go_iterators.Iterator[db.Message] {
+			it: func() iter.Seq[common.ErrVal[db.Message]] {
 				it, err := _db.AllMessagesIt()
 				require.NoError(t, err)
 				return it
@@ -73,7 +73,7 @@ multile
 			},
 		},
 		{ // Read From file
-			it: func() go_iterators.Iterator[db.Message] {
+			it: func() iter.Seq[common.ErrVal[db.Message]] {
 				it, err := _db.AllMessagesInFileIt(file2Id)
 				require.NoError(t, err)
 				return it
@@ -84,7 +84,7 @@ multile
 			},
 		},
 		{ // No File
-			it: func() go_iterators.Iterator[db.Message] {
+			it: func() iter.Seq[common.ErrVal[db.Message]] {
 				it, err := _db.AllMessagesInFileIt(3)
 				require.NoError(t, err)
 				return it
@@ -92,7 +92,7 @@ multile
 			expectedMessages: []db.Message{},
 		},
 		{ // Read Segments
-			it: func() go_iterators.Iterator[db.Message] {
+			it: func() iter.Seq[common.ErrVal[db.Message]] {
 				it, err := _db.AllMessagesInSegmentsIt([]uint32{2, 4})
 				require.NoError(t, err)
 				return it
@@ -103,7 +103,7 @@ multile
 			},
 		},
 		{ // No segments
-			it: func() go_iterators.Iterator[db.Message] {
+			it: func() iter.Seq[common.ErrVal[db.Message]] {
 				it, err := _db.AllMessagesInSegmentsIt([]uint32{99})
 				require.NoError(t, err)
 				return it
@@ -111,7 +111,7 @@ multile
 			expectedMessages: []db.Message{},
 		},
 		{ // Half segments
-			it: func() go_iterators.Iterator[db.Message] {
+			it: func() iter.Seq[common.ErrVal[db.Message]] {
 				it, err := _db.AllMessagesInSegmentsIt([]uint32{99, 2})
 				require.NoError(t, err)
 				return it
@@ -126,15 +126,9 @@ multile
 		t.Run(fmt.Sprintf("test %d", i), func(t *testing.T) {
 			it := tt.it()
 			matchedMessages := []db.Message{}
-			for {
-				m, err := it.Next()
-				if err != nil {
-					if errors.Is(err, go_iterators.EmptyIterator) {
-						break
-					}
-					require.NoError(t, err)
-				}
-				matchedMessages = append(matchedMessages, m)
+			for ev := range it {
+				require.NoError(t, ev.Err)
+				matchedMessages = append(matchedMessages, ev.Val)
 			}
 
 			require.Equal(t, tt.expectedMessages, matchedMessages)

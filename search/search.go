@@ -16,6 +16,7 @@ import (
 
 	go_iterators "github.com/lezhnev74/go-iterators"
 	"github.com/lezhnev74/inverted_index_2"
+
 	"heaplog_2024/common"
 
 	"heaplog_2024/db"
@@ -147,7 +148,6 @@ func (s *Search) Search(
 					log.Fatalf("search segment: %s", err)
 					return
 				}
-				defer segmentMessagesIt.Close()
 
 				// Instead of just keeping potential messages here, we can run filtering,
 				// so results contains only matchedIt messages.
@@ -244,35 +244,22 @@ func (s *Search) FilterFile(file string, messages []db.Message, matchFunc Search
 
 // FilterMessagesStream accepts messages to match, groups it by file and scans for their bytes from the heapfiles.
 // Matched messages are streamed out.
-func (s *Search) FilterMessagesStream(messages go_iterators.Iterator[db.Message], matchFunc SearchMatcher) (iter.Seq[common.ErrVal[db.Message]], error) {
-
-	messagesBySegment := go_iterators.NewGroupingIterator(
-		messages,
-		func(m db.Message) any { return m.SegmentId },
-	)
+func (s *Search) FilterMessagesStream(messages iter.Seq[common.ErrVal[db.Message]], matchFunc SearchMatcher) (iter.Seq[common.ErrVal[db.Message]], error) {
 
 	var (
 		file           string
 		fileMessagesIt iter.Seq[common.ErrVal[db.Message]]
-		batch          []db.Message
 	)
 
+	messagesBySegmentIt := common.SeqBatchGroup(messages, func(m common.ErrVal[db.Message]) uint32 { return m.Val.SegmentId })
 	return func(yield func(val common.ErrVal[db.Message]) bool) {
-		defer messages.Close()
 		var ret common.ErrVal[db.Message]
 
-		for {
+		for messagesBatchEV := range messagesBySegmentIt {
+			batch := common.ExpandValues(messagesBatchEV)
 			// All incoming messages must be grouped by the segment,
 			// so we can read them efficiently. If there is no file iterator,
 			// we accumulate messages (batch) for the same file until another message is found (or eof).
-			batch, ret.Err = messagesBySegment.Next()
-			if errors.Is(ret.Err, go_iterators.EmptyIterator) {
-				return
-			} else if ret.Err != nil {
-				yield(ret)
-				return
-			}
-
 			file, ret.Err = s.db.GetFile(batch[0].FileId)
 			if ret.Err != nil {
 				ret.Err = xerrors.Errorf("scan: %w", ret.Err)

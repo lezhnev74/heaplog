@@ -1,12 +1,14 @@
 package db_test
 
 import (
-	"heaplog_2024/db"
-	"heaplog_2024/test_util"
 	"os"
+	"slices"
 	"testing"
 
-	go_iterators "github.com/lezhnev74/go-iterators"
+	"heaplog_2024/common"
+	"heaplog_2024/db"
+	"heaplog_2024/test_util"
+
 	"github.com/lezhnev74/inverted_index_2"
 	"github.com/stretchr/testify/require"
 )
@@ -52,7 +54,7 @@ func TestClearUp(t *testing.T) {
 	// Assert segment messages
 	messagesIt, err := _db.MessagesDb.AllMessagesIt()
 	require.NoError(t, err)
-	messages := go_iterators.ToSlice(messagesIt)
+	messages := common.ExpandValues(slices.Collect(messagesIt))
 	require.Len(t, messages, 1)
 
 	// Assert query results
