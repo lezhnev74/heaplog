@@ -3,7 +3,6 @@ package ui
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -20,8 +19,6 @@ import (
 
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
-
-	go_iterators "github.com/lezhnev74/go-iterators"
 )
 
 func overrideConfig(cfg Config, ctx *cli.Context) Config {
@@ -214,20 +211,14 @@ func PrepareConsoleApp() (app *cli.App) {
 					}
 
 					// 2. Read all the data into a destination stream
-					rows, err := happ.All(q.Id, nil, nil)
-					if err != nil {
-						return err
-					}
+					rowsIt := happ.All(q.Id, nil, nil)
 
-					for {
-						messageString, err := rows.Next()
-						if errors.Is(err, go_iterators.EmptyIterator) {
-							break
-						} else if err != nil {
+					for ev := range rowsIt {
+						if ev.Err != nil {
 							return err
 						}
 
-						_, err = outStream.Write([]byte(messageString + "\n"))
+						_, err = outStream.Write([]byte(ev.Val + "\n"))
 						if err != nil {
 							return err
 						}

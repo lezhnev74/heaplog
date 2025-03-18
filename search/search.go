@@ -52,7 +52,7 @@ func (s *Search) Search(
 	dateFormat string,
 	tokenize func([]byte) [][]byte,
 	concurrency int,
-) (matchedIt go_iterators.Iterator[db.Message], isFullScan bool, err error) {
+) (matchedIt iter.Seq[common.ErrVal[db.Message]], isFullScan bool, err error) {
 	segments, err := s.db.AllSegmentIds(min, max)
 	if err != nil {
 		err = xerrors.Errorf("all segments query: %w", err)
@@ -177,31 +177,41 @@ func (s *Search) Search(
 	// This iterator returns messages from each segment sequentially (sorted by segment min date)
 	// so the output stream contains messages sorted.
 	curSegmentIndex := 0
-	matchedIt = go_iterators.NewSequentialDynamicIterator(func() (go_iterators.Iterator[db.Message], error) {
-		if curSegmentIndex == len(segmentsResults) {
-			return nil, go_iterators.EmptyIterator
-		}
-		// we must wait until the next segment is processed, so we maintain the order of messages
-		var curSegmentResults []db.Message
-		segmentsResultsCondvar.L.Lock()
+	matchedIt = func(yield func(val common.ErrVal[db.Message]) bool) {
+		var ret common.ErrVal[db.Message]
 
-		// check if it available already before going to sleep-wait
-		curSegmentResults = segmentsResults[curSegmentIndex]
+		// loop for each segment
+		for {
+			if curSegmentIndex == len(segmentsResults) {
+				return
+			}
+			// we must wait until the next segment is processed, so we maintain the order of messages
+			var curSegmentResults []db.Message
+			segmentsResultsCondvar.L.Lock()
 
-		for curSegmentResults == nil {
-			segmentsResultsCondvar.Wait()
+			// check if it available already before going to sleep-wait
 			curSegmentResults = segmentsResults[curSegmentIndex]
-			if curSegmentResults != nil {
-				break
+
+			for curSegmentResults == nil {
+				segmentsResultsCondvar.Wait()
+				curSegmentResults = segmentsResults[curSegmentIndex]
+				if curSegmentResults != nil {
+					break
+				}
+			}
+
+			segmentsResults[curSegmentIndex] = nil //gc
+			curSegmentIndex++
+			segmentsResultsCondvar.L.Unlock()
+
+			for _, m := range curSegmentResults {
+				ret.Val = m
+				if !yield(ret) {
+					return
+				}
 			}
 		}
-
-		segmentsResults[curSegmentIndex] = nil //gc
-		curSegmentIndex++
-		segmentsResultsCondvar.L.Unlock()
-
-		return go_iterators.NewSliceIterator(curSegmentResults), nil
-	})
+	}
 
 	return
 }

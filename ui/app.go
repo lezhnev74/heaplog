@@ -5,13 +5,13 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"iter"
 	"log"
 	"os"
 	"path/filepath"
 	"runtime/debug"
 	"time"
 
-	go_iterators "github.com/lezhnev74/go-iterators"
 	"github.com/lezhnev74/inverted_index_2"
 	"github.com/marcboeker/go-duckdb"
 	"golang.org/x/exp/mmap"
@@ -127,7 +127,7 @@ func (happ *HeaplogApp) NewQuery(text string, min *time.Time, max *time.Time) (n
 		return
 	}
 
-	var messagesIt go_iterators.Iterator[db.Message]
+	var messagesIt iter.Seq[common.ErrVal[db.Message]]
 	messagesIt, isFullscan, err = happ.search.Search(
 		queryExpr,
 		min,
@@ -161,37 +161,30 @@ func (happ *HeaplogApp) Page(queryId int, from, to *time.Time, page, pageSize, p
 	return happ.fetchMessages(queryId, messages)
 }
 
-func (happ *HeaplogApp) All(queryId int, from, to *time.Time) (rows go_iterators.Iterator[string], err error) {
-	// stream from the query storage
-	messages, err := happ.db.QueryDB.Stream(queryId, from, to)
-	if err != nil {
-		err = xerrors.Errorf("page failed: %w", err)
-		return
-	}
+func (happ *HeaplogApp) All(queryId int, from, to *time.Time) (rows iter.Seq[common.ErrVal[string]]) {
+	messagesIt := happ.db.QueryDB.Stream(queryId, from, to)
+	messageBatchesIt := common.SeqBatch(messagesIt, 1000)
+	return func(yield func(val common.ErrVal[string]) bool) {
+		for batch := range messageBatchesIt {
+			for _, ev := range batch {
+				if ev.Err != nil {
+					yield(common.ErrVal[string]{Err: ev.Err})
+					return
+				}
+			}
 
-	// batch messages
-	messageBatchesIt := go_iterators.NewBatchingIterator(messages, 1000)
-
-	// map stream to message strings (read from heap files)
-	retIterator := go_iterators.NewMappingIterator(messageBatchesIt, func(messageBatch []db.Message) []string {
-		rowBatch, err := happ.fetchMessages(queryId, messageBatch)
-		if err != nil {
-			log.Fatal(err)
+			rows, err := happ.fetchMessages(queryId, common.ExpandValues(batch))
+			if err != nil {
+				yield(common.ErrVal[string]{Err: err})
+				return
+			}
+			for _, r := range rows {
+				if !yield(common.ErrVal[string]{Val: r}) {
+					return
+				}
+			}
 		}
-		return rowBatch
-	})
-
-	// flatten
-	flatRows := go_iterators.NewDynamicSliceIterator(
-		func() ([]string, error) {
-			return retIterator.Next()
-		},
-		func() error {
-			return nil
-		},
-	)
-
-	return flatRows, nil
+	}
 }
 
 // Query returns query description with sub-query support (time scope on the query)

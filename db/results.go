@@ -3,12 +3,13 @@ package db
 import (
 	"context"
 	"database/sql"
-	"errors"
+	"iter"
 	"log"
 	"math"
 	"time"
 
-	go_iterators "github.com/lezhnev74/go-iterators"
+	"heaplog_2024/common"
+
 	"github.com/marcboeker/go-duckdb"
 	"golang.org/x/xerrors"
 )
@@ -98,7 +99,7 @@ func (q *QueryDB) Flush() {
 }
 
 // CheckinQuery returns queryId instantly while ingesting the Messages.
-func (q *QueryDB) CheckinQuery(ctx context.Context, text string, min, max *time.Time, messages go_iterators.Iterator[Message]) (query Query, err error) {
+func (q *QueryDB) CheckinQuery(ctx context.Context, text string, min, max *time.Time, messages iter.Seq[common.ErrVal[Message]]) (query Query, err error) {
 	queryId, err := q.ReserveQueryId()
 	if err != nil {
 		err = xerrors.Errorf("query checkin: %w", err)
@@ -124,7 +125,6 @@ func (q *QueryDB) CheckinQuery(ctx context.Context, text string, min, max *time.
 	// return query Id instantly to start listening for the first result.
 	go func() {
 		defer func() {
-			err = messages.Close()
 			if err != nil {
 				log.Printf("query %d: checkin query defer: %s", queryId, err)
 			}
@@ -139,10 +139,9 @@ func (q *QueryDB) CheckinQuery(ctx context.Context, text string, min, max *time.
 		}()
 
 		var (
-			m Message
 			n int
 		)
-		for {
+		for ev := range messages {
 			// Cancellation test:
 			select {
 			case <-ctx.Done():
@@ -150,15 +149,12 @@ func (q *QueryDB) CheckinQuery(ctx context.Context, text string, min, max *time.
 			default:
 			}
 
-			m, err = messages.Next()
-			if errors.Is(err, go_iterators.EmptyIterator) {
-				break
-			} else if err != nil {
-				log.Printf("query %d: checkin query: %s", queryId, err)
+			if ev.Err != nil {
+				log.Printf("query %d: checkin query: %s", queryId, ev.Err)
 				return
 			}
 
-			q.appenderChan <- QueryMessagePacker{queryId, m.FileId, m.Loc.From, uint32(m.Loc.Len()), *m.Date}
+			q.appenderChan <- QueryMessagePacker{queryId, ev.Val.FileId, ev.Val.Loc.From, uint32(ev.Val.Loc.Len()), *ev.Val.Date}
 
 			n++
 		}
@@ -261,71 +257,76 @@ func (q *QueryDB) Page(queryId int, min, max *time.Time, page, pageLen int) (mes
 
 // Stream all messages for a query.
 // If the query is still in-flight, it will push messages as they appear.
-func (q *QueryDB) Stream(queryId int, min, max *time.Time) (messages go_iterators.Iterator[Message], err error) {
+func (q *QueryDB) Stream(queryId int, min, max *time.Time) (messages iter.Seq[common.ErrVal[Message]]) {
 
-	totalRead := 0
 	// confirm query has finished twice as these are two separate query ops
 	doubleConfirm := 0
+	offset := 0
 
-	readBatch := func() (messages []Message, err error) {
-		sqlSelect := `
+	sqlSelect := `
 	SELECT fileId,pos,len 
 	FROM query_results
 	WHERE queryId=? AND date>=? and date<=?
 	ORDER BY date ASC -- show early messages first (just like in a file)
-	OFFSET ?
+	OFFSET ? -- to read out more messages as they appear
 `
-		minMicro := int64(0)
-		maxMicro := int64(math.MaxInt64)
-		if min != nil {
-			minMicro = min.UnixMicro()
-		}
-		if max != nil {
-			maxMicro = max.UnixMicro()
-		}
+	minMicro := int64(0)
+	maxMicro := int64(math.MaxInt64)
+	if min != nil {
+		minMicro = min.UnixMicro()
+	}
+	if max != nil {
+		maxMicro = max.UnixMicro()
+	}
+
+	return func(yield func(val common.ErrVal[Message]) bool) {
+		var ret common.ErrVal[Message]
+		var r *sql.Rows
 
 		// Keep reading until the query is finished (double confirm) or we get a batch of rows
 		for {
-			r, err := q.db.Query(sqlSelect, queryId, minMicro, maxMicro, totalRead)
-			if err != nil {
-				return nil, err
+			if r != nil {
+				_ = r.Close()
 			}
+			r, ret.Err = q.db.Query(sqlSelect, queryId, minMicro, maxMicro, offset)
 			defer func() { _ = r.Close() }()
 
+			if ret.Err != nil {
+				yield(ret)
+				return
+			}
+
 			for r.Next() {
-				m := Message{}
-				err = r.Scan(&m.FileId, &m.Loc.From, &m.Loc.To)
-				if err != nil {
-					return nil, err
+				ret.Err = r.Scan(&ret.Val.FileId, &ret.Val.Loc.From, &ret.Val.Loc.To)
+				if !yield(ret) {
+					return
 				}
-				messages = append(messages, m)
-				totalRead++
+				if ret.Err != nil {
+					return
+				}
+				offset++
 			}
 
-			if len(messages) == 0 {
-				// maybe the query is still fetching rows, or maybe it has no data, test the query itself
-				query, err := q.FindQuery(queryId)
-				if err != nil {
-					return nil, err
-				}
-				if query.Finished {
-					doubleConfirm++
-					if doubleConfirm >= 2 {
-						return messages, nil
-					}
-				}
-				time.Sleep(time.Millisecond * 100) // no data available and query is still in-flight
-				continue                           // read again
+			// here we see no more rows
+			// maybe the query is still fetching rows, or maybe it has no data, test the query itself
+			query, err := q.FindQuery(queryId)
+			if err != nil {
+				ret.Err = err
+				yield(ret)
+				return
 			}
 
-			break // return messages that we got so far
+			if query.Finished {
+				doubleConfirm++
+				if doubleConfirm >= 2 {
+					return
+				}
+			}
+
+			// Sleep before trying to query rows again
+			time.Sleep(time.Millisecond * 100)
 		}
-
-		return
 	}
-
-	retIterator := go_iterators.NewDynamicSliceIterator(readBatch, func() error { return nil })
-	return retIterator, nil
 }
 
 func (q *QueryDB) List() (queries []Query, err error) {

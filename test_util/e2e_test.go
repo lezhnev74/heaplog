@@ -64,8 +64,7 @@ func _TestSearch(t *testing.T) {
 	log.Printf("Full_scan: %t\n", isFullScan)
 
 	c := 0
-	for {
-		_, err := messagesIt.Next() // discard messages
+	for range messagesIt {
 
 		if errors.Is(err, go_iterators.EmptyIterator) {
 			break

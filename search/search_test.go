@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -158,13 +159,13 @@ func TestSearchResults(t *testing.T) {
 			it, isFullScan, err := s.Search(expr, nil, nil, dateFormat, tokenize, 1)
 			require.NoError(t, err)
 			require.Equal(t, tt.isFullScan, isFullScan)
-			messages := go_iterators.ToSlice(it)
+			messages := slices.Collect(it)
 
 			require.Equal(t, len(tt.matchedMessages), len(messages))
-			for i, mm := range messages {
-				require.Equal(t, tt.matchedMessages[i].FileId, mm.FileId)
-				require.Equal(t, tt.matchedMessages[i].Loc, mm.Loc)
-				require.Equal(t, tt.matchedMessages[i].Date, mm.Date)
+			for i, ev := range messages {
+				require.Equal(t, tt.matchedMessages[i].FileId, ev.Val.FileId)
+				require.Equal(t, tt.matchedMessages[i].Loc, ev.Val.Loc)
+				require.Equal(t, tt.matchedMessages[i].Date, ev.Val.Date)
 			}
 		})
 	}

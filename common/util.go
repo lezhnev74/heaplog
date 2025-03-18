@@ -199,3 +199,11 @@ type ErrVal[V any] struct {
 	Val V
 	Err error
 }
+
+func ExpandValues[V any](v []ErrVal[V]) []V {
+	ret := make([]V, 0, len(v))
+	for _, ev := range v {
+		ret = append(ret, ev.Val)
+	}
+	return ret
+}

@@ -2,15 +2,15 @@ package db_test
 
 import (
 	"context"
-	"heaplog_2024/common"
-	"heaplog_2024/db"
-	"heaplog_2024/test_util"
 	"os"
 	"slices"
 	"testing"
 	"time"
 
-	go_iterators "github.com/lezhnev74/go-iterators"
+	"heaplog_2024/common"
+	"heaplog_2024/db"
+	"heaplog_2024/test_util"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -53,17 +53,12 @@ func TestResultsRead(t *testing.T) {
 		{2, common.Location{From: 10, To: 20}, common.Location{}, 1, &t1},
 		{3, common.Location{From: 2, To: 4}, common.Location{}, 2, &t2},
 	}
-	curMessage := 0
-	it := go_iterators.NewCallbackIterator(func() (m db.Message, err error) {
-		<-ticks // hold until tick is allowed
-		if curMessage == len(messages) {
-			err = go_iterators.EmptyIterator
-		} else {
-			m = messages[curMessage]
-			curMessage++
+	it := func(yield func(val common.ErrVal[db.Message]) bool) {
+		for _, m := range messages {
+			<-ticks // hold until tick is allowed
+			yield(common.ErrVal[db.Message]{Val: m})
 		}
-		return
-	}, func() error { return nil })
+	}
 
 	r, err := dbContainer.QueryDB.CheckinQuery(context.Background(), "sample", &t0, &t2, it)
 	require.NoError(t, err)
@@ -128,16 +123,11 @@ func TestStreamResults(t *testing.T) {
 		{2, common.Location{From: 10, To: 20}, common.Location{}, 1, &t1},
 		{3, common.Location{From: 2, To: 4}, common.Location{}, 2, &t2},
 	}
-	curMessage := 0
-	it := go_iterators.NewCallbackIterator(func() (m db.Message, err error) {
-		if curMessage == len(messages) {
-			err = go_iterators.EmptyIterator
-		} else {
-			m = messages[curMessage]
-			curMessage++
+	it := func(yield func(val common.ErrVal[db.Message]) bool) {
+		for _, m := range messages {
+			yield(common.ErrVal[db.Message]{Val: m})
 		}
-		return
-	}, func() error { return nil })
+	}
 
 	r, err := dbContainer.QueryDB.CheckinQuery(context.Background(), "sample", &t0, &t2, it)
 	require.NoError(t, err)
@@ -145,15 +135,15 @@ func TestStreamResults(t *testing.T) {
 	dbContainer.QueryDB.Flush()
 
 	// 2. Stream query results:
-	stream, err := dbContainer.QueryDB.Stream(r.Id, nil, nil)
+	streamIt := dbContainer.QueryDB.Stream(r.Id, nil, nil)
 	require.NoError(t, err)
-	streamedMessages := go_iterators.ToSlice(stream)
+	streamedMessages := slices.Collect(streamIt)
 
 	// 3. Test
 	// normalize streamed results as they do not include the date column
 	require.Len(t, streamedMessages, len(messages))
 	for i := 0; i < len(messages); i++ {
-		require.Equal(t, messages[i].FileId, streamedMessages[i].FileId)
-		require.Equal(t, messages[i].Loc.From, streamedMessages[i].Loc.From)
+		require.Equal(t, messages[i].FileId, streamedMessages[i].Val.FileId)
+		require.Equal(t, messages[i].Loc.From, streamedMessages[i].Val.Loc.From)
 	}
 }
