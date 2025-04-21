@@ -9,7 +9,6 @@ import (
 
 	go_iterators "github.com/lezhnev74/go-iterators"
 	"github.com/marcboeker/go-duckdb"
-	"golang.org/x/xerrors"
 
 	"heaplog_2024/common"
 )
@@ -128,7 +127,7 @@ func (mdb *MessagesDb) iterateRows(whereSql string, queryArgs []any) (go_iterato
 
 	r, err := mdb.db.Query(sqlSelect, queryArgs...)
 	if err != nil {
-		return nil, xerrors.Errorf("all Messages: %w", err)
+		return nil, fmt.Errorf("all Messages: %w", err)
 	}
 
 	// Messages do not keep their len(or end position),
@@ -148,7 +147,7 @@ func (mdb *MessagesDb) iterateRows(whereSql string, queryArgs []any) (go_iterato
 			&lastMessage.FileId,
 		)
 		if err != nil {
-			err = xerrors.Errorf("all Messages: %w", err)
+			err = fmt.Errorf("all Messages: %w", err)
 			return go_iterators.NewSliceIterator[Message](nil), err
 		}
 	}
@@ -172,7 +171,7 @@ func (mdb *MessagesDb) iterateRows(whereSql string, queryArgs []any) (go_iterato
 					&lastMessage.FileId,
 				)
 				if err != nil {
-					err = xerrors.Errorf("all Messages: %w", err)
+					err = fmt.Errorf("all Messages: %w", err)
 					return
 				}
 
@@ -204,7 +203,7 @@ func (mdb *MessagesDb) IterateRowsFromStatement(stmt *sql.Stmt, args []any) (go_
 
 	r, err := stmt.Query(args...)
 	if err != nil {
-		return nil, xerrors.Errorf("all Messages: %w", err)
+		return nil, fmt.Errorf("all Messages: %w", err)
 	}
 
 	// Messages do not keep their len(or end position),
@@ -224,7 +223,7 @@ func (mdb *MessagesDb) IterateRowsFromStatement(stmt *sql.Stmt, args []any) (go_
 			&lastMessage.FileId,
 		)
 		if err != nil {
-			err = xerrors.Errorf("all Messages: %w", err)
+			err = fmt.Errorf("all Messages: %w", err)
 			return go_iterators.NewSliceIterator[Message](nil), err
 		}
 	}
@@ -248,7 +247,7 @@ func (mdb *MessagesDb) IterateRowsFromStatement(stmt *sql.Stmt, args []any) (go_
 					&lastMessage.FileId,
 				)
 				if err != nil {
-					err = xerrors.Errorf("all Messages: %w", err)
+					err = fmt.Errorf("all Messages: %w", err)
 					return
 				}
 

@@ -12,8 +12,6 @@ import (
 	"runtime/debug"
 	"runtime/pprof"
 	"time"
-
-	"golang.org/x/xerrors"
 )
 
 var (
@@ -75,7 +73,7 @@ func MakeTime(format, value string) time.Time {
 func FileSize(path string) (uint64, error) {
 	fi, err := os.Stat(path)
 	if err != nil {
-		err = xerrors.Errorf("all files: %w", err)
+		err = fmt.Errorf("all files: %w", err)
 		return 0, err
 	}
 	return uint64(fi.Size()), nil

@@ -8,7 +8,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/araddon/dateparse"
-	"golang.org/x/xerrors"
 )
 
 // DetectMessageLine accepts a line with a known Date and extracts the settings
@@ -48,7 +47,7 @@ func DetectMessageLine(text []byte) (startPattern string, dateFormat string, err
 		startPattern = fmt.Sprintf("(?m)^%s(%s)", escapedPrefix, TimeFormatToRegexp(dateFormat))
 		return startPattern, dateFormat, nil
 	}
-	return "", "", xerrors.Errorf("unable to detect messages")
+	return "", "", fmt.Errorf("unable to detect messages")
 }
 
 // TimeFormatToRegexp returns a regexp pattern that can recognize any Date in the given Time Format

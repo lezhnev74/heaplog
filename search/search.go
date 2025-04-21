@@ -11,8 +11,6 @@ import (
 	"time"
 	"unsafe"
 
-	"golang.org/x/xerrors"
-
 	go_iterators "github.com/lezhnev74/go-iterators"
 	"github.com/lezhnev74/inverted_index_2"
 
@@ -53,7 +51,7 @@ func (s *Search) Search(
 ) (matchedIt go_iterators.Iterator[db.Message], isFullScan bool, err error) {
 	segments, err := s.db.AllSegmentIds(min, max)
 	if err != nil {
-		err = xerrors.Errorf("all segments query: %w", err)
+		err = fmt.Errorf("all segments query: %w", err)
 		return
 	}
 
@@ -64,7 +62,7 @@ func (s *Search) Search(
 		// ingestion assigns segment ids (within the same file) in the same order.
 		segments, err = s.filterSegmentsWithInvertedIndex(expr, segments, tokenize)
 		if err != nil {
-			err = xerrors.Errorf("inverted index failure: %w", err)
+			err = fmt.Errorf("inverted index failure: %w", err)
 			return
 		}
 		fmt.Printf("Selected segments: %d\n", len(segments))
@@ -223,7 +221,7 @@ func (s *Search) FilterFile(file string, messages []db.Message, matchFunc Search
 
 	fileIterator, err := StreamFileMatch(file, messages, matchFunc, s.dateFormat)
 	if err != nil {
-		return nil, xerrors.Errorf("scan: %w", err)
+		return nil, fmt.Errorf("scan: %w", err)
 	}
 	defer fileIterator.Close()
 
@@ -267,13 +265,13 @@ func (s *Search) FilterMessagesStream(messages go_iterators.Iterator[db.Message]
 
 					file, err2 := s.db.GetFile(batch[0].FileId)
 					if err2 != nil {
-						err = xerrors.Errorf("scan: %w", err2)
+						err = fmt.Errorf("scan: %w", err2)
 						return
 					}
 
 					fileIterator, err = StreamFileMatch(file, batch, matchFunc, s.dateFormat)
 					if err != nil {
-						err = xerrors.Errorf("scan: %w", err)
+						err = fmt.Errorf("scan: %w", err)
 						return
 					}
 				}
@@ -316,7 +314,7 @@ func (s *Search) filterSegmentsWithInvertedIndex(expr *query_language.Expression
 	// iiTermValues contain allSegments for long term prefixes found in the expression
 	iiTermValues, err := s.ii.PrefixSearch(terms)
 	if err != nil {
-		return nil, xerrors.Errorf("ii prefix: %w", err)
+		return nil, fmt.Errorf("ii prefix: %w", err)
 	}
 
 	// Now we can map the whole expression to sets of segment (prepare for evaluation)

@@ -1,12 +1,13 @@
 package search
 
 import (
-	"heaplog_2024/db"
+	"fmt"
 	"time"
+
+	"heaplog_2024/db"
 
 	go_iterators "github.com/lezhnev74/go-iterators"
 	"golang.org/x/exp/mmap"
-	"golang.org/x/xerrors"
 )
 
 // StreamFileMatch streams matched messages out of the file.
@@ -17,7 +18,7 @@ func StreamFileMatch(file string, messages []db.Message, mf SearchMatcher, dateF
 	messageIndex := 0
 	stream, err := mmap.Open(file)
 	if err != nil {
-		return nil, xerrors.Errorf("match messages: mmap open: %w", err)
+		return nil, fmt.Errorf("match messages: mmap open: %w", err)
 	}
 
 	mmapScannedBytes := 0
@@ -35,7 +36,7 @@ func StreamFileMatch(file string, messages []db.Message, mf SearchMatcher, dateF
 					_ = stream.Close()
 					stream, err = mmap.Open(file)
 					if err != nil {
-						err = xerrors.Errorf("match message: mmap open: %w", err)
+						err = fmt.Errorf("match message: mmap open: %w", err)
 						return
 					}
 				}
@@ -55,7 +56,7 @@ func StreamFileMatch(file string, messages []db.Message, mf SearchMatcher, dateF
 
 				n, err = stream.ReadAt(buf, int64(m.Loc.From))
 				if err != nil {
-					err = xerrors.Errorf("match message: %w", err)
+					err = fmt.Errorf("match message: %w", err)
 					return
 				}
 				mmapScannedBytes += n
@@ -65,7 +66,7 @@ func StreamFileMatch(file string, messages []db.Message, mf SearchMatcher, dateF
 				t, err = time.Parse(dateFormat, string(buf[m.RelDateLoc.From:m.RelDateLoc.From+m.RelDateLoc.To]))
 				t = t.UTC()
 				if err != nil {
-					err = xerrors.Errorf("match message: parse date: %w", err)
+					err = fmt.Errorf("match message: parse date: %w", err)
 					return
 				}
 				m.Date = &t

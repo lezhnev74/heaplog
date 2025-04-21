@@ -1,15 +1,16 @@
 package query_language
 
 import (
-	"heaplog_2024/query_language/query_antlr"
+	"fmt"
 	"strconv"
 	"strings"
 
+	"heaplog_2024/query_language/query_antlr"
+
 	"github.com/antlr4-go/antlr/v4"
-	"golang.org/x/xerrors"
 )
 
-var errorUserQueryInvalidSyntax = xerrors.Errorf("invalid query_language syntax")
+var errorUserQueryInvalidSyntax = fmt.Errorf("invalid query_language syntax")
 
 // RegExpLiteral is a string that contains regular expression as given from the user
 type RegExpLiteral string
@@ -101,7 +102,7 @@ func (el *AntlrErrorListener) SyntaxError(
 	msg string,
 	e antlr.RecognitionException,
 ) {
-	el.syntaxError = xerrors.Errorf("line " + strconv.Itoa(line) + ":" + strconv.Itoa(column) + " " + msg)
+	el.syntaxError = fmt.Errorf("line %s: %s %s", strconv.Itoa(line), strconv.Itoa(column), msg)
 }
 
 func ParseUserQuery(query string) (*Expression, error) {
@@ -128,7 +129,7 @@ func ParseUserQuery(query string) (*Expression, error) {
 	antlr.ParseTreeWalkerDefault.Walk(listener, tree)
 
 	if errorListener.syntaxError != nil {
-		return nil, xerrors.Errorf("%s: %w", errorUserQueryInvalidSyntax, errorListener.syntaxError)
+		return nil, fmt.Errorf("%s: %w", errorUserQueryInvalidSyntax, errorListener.syntaxError)
 	}
 
 	return listener.qe, nil

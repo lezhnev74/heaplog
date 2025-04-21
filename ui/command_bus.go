@@ -362,7 +362,7 @@ func (bus *CommandBus) NewQuery(c *fiber.Ctx) error {
 //	tplBuf := bytes.NewBuffer(nil)
 //	err = bus.viewEngine.Render(tplBuf, fragmentName, payload)
 //	if err != nil {
-//		return nil, xerrors.Errorf("unable to render a fragment %s: %w", fragmentName, err)
+//		return nil, fmt.Errorf("unable to render a fragment %s: %w", fragmentName, err)
 //	}
 //	fragmentString := fmt.Sprintf("<div id=\"%s\" hx-swap-oob=\"true\">\n%s\n</div>", targetHtmlId, tplBuf.Bytes())
 //	return []byte(fragmentString), nil

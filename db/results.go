@@ -4,13 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"log"
 	"math"
 	"time"
 
 	go_iterators "github.com/lezhnev74/go-iterators"
 	"github.com/marcboeker/go-duckdb"
-	"golang.org/x/xerrors"
 )
 
 type QueryDB struct {
@@ -87,7 +87,7 @@ func (q *QueryDB) ReserveQueryId() (queryId uint32, err error) {
 	r := q.db.QueryRow(`SELECT nextval('query_ids');`)
 	err = r.Scan(&queryId)
 	if err != nil {
-		err = xerrors.Errorf("unable to check in a query: %w", err)
+		err = fmt.Errorf("unable to check in a query: %w", err)
 	}
 	return
 }
@@ -101,7 +101,7 @@ func (q *QueryDB) Flush() {
 func (q *QueryDB) CheckinQuery(ctx context.Context, text string, min, max *time.Time, messages go_iterators.Iterator[Message]) (query Query, err error) {
 	queryId, err := q.ReserveQueryId()
 	if err != nil {
-		err = xerrors.Errorf("query checkin: %w", err)
+		err = fmt.Errorf("query checkin: %w", err)
 		return
 	}
 
@@ -116,7 +116,7 @@ func (q *QueryDB) CheckinQuery(ctx context.Context, text string, min, max *time.
 
 	_, err = q.db.Exec("INSERT INTO queries VALUES (?,?,?,?,?,?,?)", queryId, text, minMicro, maxMicro, 0, false, now)
 	if err != nil {
-		err = xerrors.Errorf("query checkin: %w", err)
+		err = fmt.Errorf("query checkin: %w", err)
 		return
 	}
 
@@ -184,7 +184,7 @@ func (q *QueryDB) FindQuery(queryId int) (query Query, err error) {
 	var dateMin, dateMax, builtAt int64
 	err = r.Scan(&query.Text, &dateMin, &dateMax, &builtAt, &query.Finished, &query.Messages)
 	if err != nil {
-		err = xerrors.Errorf("read query: %w", err)
+		err = fmt.Errorf("read query: %w", err)
 		return
 	}
 
@@ -331,7 +331,7 @@ func (q *QueryDB) Stream(queryId int, min, max *time.Time) (messages go_iterator
 func (q *QueryDB) List() (queries []Query, err error) {
 	rows, err := q.db.Query("SELECT queryId,text,dateMin,dateMax,builtAt,finished,messages FROM queries ORDER BY queryId desc")
 	if err != nil {
-		err = xerrors.Errorf("list query: %w", err)
+		err = fmt.Errorf("list query: %w", err)
 		return
 	}
 
@@ -340,7 +340,7 @@ func (q *QueryDB) List() (queries []Query, err error) {
 		query := Query{}
 		err = rows.Scan(&query.Id, &query.Text, &dateMin, &dateMax, &builtAt, &query.Finished, &query.Messages)
 		if err != nil {
-			err = xerrors.Errorf("read query: %w", err)
+			err = fmt.Errorf("read query: %w", err)
 			return
 		}
 

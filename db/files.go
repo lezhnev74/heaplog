@@ -3,12 +3,11 @@ package db
 import (
 	"database/sql"
 	"fmt"
-	"heaplog_2024/common"
 	"slices"
 	"strings"
 	"sync"
 
-	"golang.org/x/xerrors"
+	"heaplog_2024/common"
 )
 
 type FilesDb struct {
@@ -26,7 +25,7 @@ func (fdb *FilesDb) ReserveFileId() (fileId uint32, err error) {
 	r := fdb.db.QueryRow(`SELECT nextval('file_ids');`)
 	err = r.Scan(&fileId)
 	if err != nil {
-		err = xerrors.Errorf("unable to check in a query: %w", err)
+		err = fmt.Errorf("unable to check in a query: %w", err)
 	}
 	return
 }
@@ -61,14 +60,14 @@ func (fdb *FilesDb) CheckInFiles(actualFiles []string) (newFiles, obsoleteFiles 
 	// 2.1 Insert New
 	st, err := fdb.db.Prepare("INSERT INTO files(id,path) VALUES(nextval('file_ids'),?)")
 	if err != nil {
-		err = xerrors.Errorf("insert file: %w", err)
+		err = fmt.Errorf("insert file: %w", err)
 		return
 	}
 	defer st.Close()
 	for _, newFile := range newFiles {
 		_, err = st.Exec(newFile)
 		if err != nil {
-			err = xerrors.Errorf("insert file: %w", err)
+			err = fmt.Errorf("insert file: %w", err)
 			return
 		}
 	}
@@ -84,7 +83,7 @@ func (fdb *FilesDb) CheckInFiles(actualFiles []string) (newFiles, obsoleteFiles 
 		common.SliceToAny(obsoleteFiles)...,
 	)
 	if err != nil {
-		err = xerrors.Errorf("unable to delete obsolete files: %w", err)
+		err = fmt.Errorf("unable to delete obsolete files: %w", err)
 	}
 	return
 }

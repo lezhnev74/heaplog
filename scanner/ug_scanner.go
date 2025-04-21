@@ -11,14 +11,12 @@ import (
 	"strconv"
 	"unsafe"
 
-	"golang.org/x/xerrors"
-
 	"heaplog_2024/common"
 )
 
 var (
 	// NoMessageStartFound means the scanner failed to locate the start of a message in the stream
-	NoMessageStartFound = xerrors.Errorf("unable to find a message in the stream")
+	NoMessageStartFound = fmt.Errorf("unable to find a message in the stream")
 )
 
 type MessageLayout struct {
@@ -36,7 +34,7 @@ func UgScanLocations(file string, locations []common.Location, re string) (layou
 		if errors.Is(err, NoMessageStartFound) {
 			return layouts, nil
 		} else if err != nil {
-			return nil, xerrors.Errorf("ug scan locations: %w", err)
+			return nil, fmt.Errorf("ug scan locations: %w", err)
 		}
 		layouts = append(layouts, locLayouts...)
 	}
@@ -61,11 +59,11 @@ func UgScanLocation(file string, loc common.Location, re string) (layouts []Mess
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, xerrors.Errorf("scan ug connect out: %w", err)
+		return nil, fmt.Errorf("scan ug connect out: %w", err)
 	}
 	err = cmd.Start()
 	if err != nil {
-		return nil, xerrors.Errorf("scan ug start: %w", err)
+		return nil, fmt.Errorf("scan ug start: %w", err)
 	}
 
 	putLayout := func(l MessageLayout) bool {
@@ -82,7 +80,7 @@ func UgScanLocation(file string, loc common.Location, re string) (layouts []Mess
 		}
 		err = cmd.Cancel()
 		if err != nil {
-			err = xerrors.Errorf("ug finish: %w", err)
+			err = fmt.Errorf("ug finish: %w", err)
 		}
 		_ = cmd.Wait() // as we called Cancel above, so it returns non-nil error
 	}()
@@ -97,7 +95,7 @@ func UgScanLocation(file string, loc common.Location, re string) (layouts []Mess
 
 	fileSize, err := common.FileSize(file)
 	if err != nil {
-		return nil, xerrors.Errorf("scan ug: %w", err)
+		return nil, fmt.Errorf("scan ug: %w", err)
 	}
 
 	for {
@@ -133,17 +131,17 @@ func UgScan(file string, re string, locations []common.Location) (layouts []Mess
 	cmd := exec.CommandContext(ctx, "ug", "-P", `--format=%[0]b,%[1]b:%[1]d%~`, re, file)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, xerrors.Errorf("scan ug connect out: %w", err)
+		return nil, fmt.Errorf("scan ug connect out: %w", err)
 	}
 	err = cmd.Start()
 	if err != nil {
-		return nil, xerrors.Errorf("scan ug start: %w", err)
+		return nil, fmt.Errorf("scan ug start: %w", err)
 	}
 
 	defer func() {
 		err = cmd.Wait()
 		if err != nil {
-			err = xerrors.Errorf("ug finish: %w", err)
+			err = fmt.Errorf("ug finish: %w", err)
 		}
 	}()
 
@@ -168,7 +166,7 @@ func UgScan(file string, re string, locations []common.Location) (layouts []Mess
 
 	fileSize, err := common.FileSize(file)
 	if err != nil {
-		return nil, xerrors.Errorf("scan ug: %w", err)
+		return nil, fmt.Errorf("scan ug: %w", err)
 	}
 
 	for {
