@@ -33,8 +33,8 @@ var (
 	timeFormat          = "2006-01-02T15:04:05.000000-07:00"
 )
 
-func _TestSearch(t *testing.T) {
-	t0 := time.Now()
+func TestSearch(t *testing.T) {
+	//t0 := time.Now()
 	storageRoot := "/home/dmitry/Code/go/src/heaplog/heaplog_2024/_local/local_test/storage"
 
 	//go func() {
@@ -51,7 +51,7 @@ func _TestSearch(t *testing.T) {
 	//stop := traceRun(path.Join(storageRoot, "trace.out"))
 	//defer stop()
 
-	s, _, _, _, tok := buildDependencies(t, 5_000_000, storageRoot)
+	s, _, _, dbc, tok := buildDependencies(t, 5_000_000, storageRoot)
 
 	query := `error`
 	expr, err := query_language.ParseUserQuery(query)
@@ -61,19 +61,30 @@ func _TestSearch(t *testing.T) {
 	require.NoError(t, err)
 	log.Printf("Full_scan: %t\n", isFullScan)
 
-	c := 0
-	for range messagesIt {
+	q, err := dbc.CheckinQuery(context.Background(), query, nil, nil, messagesIt)
+	require.NoError(t, err)
 
-		require.NoError(t, err)
-		c++
-
-		if c == 1 || c == 100 {
-			log.Printf("%d results ready in %s\n", c, time.Since(t0).String())
-		}
+	for !q.Finished {
+		q, err = dbc.FindQuery(q.Id)
+		fmt.Printf("query results: %d\n", q.Messages)
+		time.Sleep(time.Second)
 	}
-	log.Printf("Found messages: %d\n", c)
-	debug.FreeOSMemory()
-	test_util.ProcStat()
+
+	dbc.QueryDB.Flush()
+
+	//c := 0
+	//for range messagesIt {
+	//
+	//	require.NoError(t, err)
+	//	c++
+	//
+	//	if c == 1 || c == 100 {
+	//		log.Printf("%d results ready in %s\n", c, time.Since(t0).String())
+	//	}
+	//}
+	//log.Printf("Found messages: %d\n", c)
+	//debug.FreeOSMemory()
+	//test_util.ProcStat()
 }
 
 func _TestIngest(t *testing.T) {
@@ -168,12 +179,15 @@ func buildDependencies(t *testing.T, segmentSize uint64, storageRoot string) (
 	require.NoError(t, err)
 	appender, err := duckdb.NewAppenderFromConn(conn, "", "file_segments_messages")
 	require.NoError(t, err)
+	resultsAppender, err := duckdb.NewAppenderFromConn(conn, "", "query_results")
+	require.NoError(t, err)
 
 	dbContainer := &db.DbContainer{
 		DB:         _db,
 		FilesDb:    db.NewFilesDb(_db),
 		SegmentsDb: db.NewSegmentsDb(_db),
 		MessagesDb: db.NewMessagesDb(_db, appender),
+		QueryDB:    db.NewQueryDb(_db, resultsAppender),
 	}
 
 	tok := func(in []byte) [][]byte {

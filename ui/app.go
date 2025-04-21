@@ -13,9 +13,10 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/lezhnev74/inverted_index_2"
 	"github.com/marcboeker/go-duckdb"
 	"golang.org/x/exp/mmap"
+
+	"github.com/lezhnev74/inverted_index_2"
 
 	"heaplog_2024/common"
 	"heaplog_2024/db"
