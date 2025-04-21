@@ -26,6 +26,7 @@ using your logs as "heapfiles" (hence the name).
 ## Features
 
 - Modest on disk space (uses [DuckDB](https://duckdb.org/) + [FST](https://blog.burntsushi.net/transducers/) for terms).
+- [Inverted index](https://github.com/lezhnev74/inverted_index_2)
 - Powerful query language (prefix match, regular expressions, AND-, OR-, NOT-operators).
 - Supports append-only files (logs and such).
 - Supports multi-line log messages.
