@@ -32,6 +32,8 @@ using your logs as "heapfiles" (hence the name).
 - Runs as a background service: exposes Web UI, runs indexing workers.
 - Deploys as docker container
 
+![](Heaplog_components.png)
+
 ## Query Language
 
 Query language supports prefix match, regular expressions, and AND-OR-NOT operators. Note that prefix match uses the
