@@ -100,13 +100,24 @@ func (ing *Ingest) Index(files []string) error {
 			if err != nil {
 				return fmt.Errorf("index file: %w", err)
 			}
-			msgIterator, err := ing.extractMessages(filePath, locations)
-			if err != nil {
-				return fmt.Errorf("index file: %w", err)
-			}
+
+			messagesCh := make(chan *ScannedTokenizedMessage, 1000)
+			go func() {
+				defer close(messagesCh)
+				msgIterator, err := ing.extractMessages(filePath, locations)
+				if err != nil {
+					messagesCh <- &ScannedTokenizedMessage{Err: fmt.Errorf("index file: %w", err)}
+					return
+				}
+
+				// allow concurrent reads and saves
+				for s := range msgIterator {
+					messagesCh <- s
+				}
+			}()
 
 			// 2. Save to the storage
-			_, err = ing.saveStream(file, msgIterator)
+			_, err = ing.saveStream(file, messagesCh)
 			if err != nil {
 				return fmt.Errorf("index file %s: %w", file.Path, err)
 			}
@@ -120,22 +131,22 @@ func (ing *Ingest) Index(files []string) error {
 func (ing *Ingest) extractMessages(filePath string, locations []common.Location) (iter.Seq[*ScannedTokenizedMessage], error) {
 
 	if len(locations) == 0 {
-		return nil, nil // nothing to index
+		return common.NopSeq[*ScannedTokenizedMessage](), nil // nothing to index
 	}
 
 	// file indexing goes over segments one-by-one
 	reader, err := os.Open(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("extract messages: %w", err)
+		return common.NopSeq[*ScannedTokenizedMessage](), fmt.Errorf("extract messages: %w", err)
 	}
 
 	// it is quicker to read all message locations at once that call it for every location
 	allMessageLayouts, err := ing.findMessages(filePath, locations)
 	if errors.Is(err, scanner.NoMessageStartFound) || len(allMessageLayouts) == 0 {
 		// no new messages found in the file
-		return nil, nil
+		return common.NopSeq[*ScannedTokenizedMessage](), nil
 	} else if err != nil {
-		return nil, fmt.Errorf("extract messages: %w", err)
+		return common.NopSeq[*ScannedTokenizedMessage](), fmt.Errorf("extract messages: %w", err)
 	}
 
 	iterator := func(yield func(message *ScannedTokenizedMessage) bool) {
@@ -160,7 +171,7 @@ func (ing *Ingest) extractMessages(filePath string, locations []common.Location)
 
 // saveStream analyzes incoming (ordered by file position) messages, batches them into segments,
 // saves the indexed values to the DB (as well as in II).
-func (ing *Ingest) saveStream(file db.File, messages iter.Seq[*ScannedTokenizedMessage]) (lastSegmentLoc common.Location, err error) {
+func (ing *Ingest) saveStream(file db.File, messages chan *ScannedTokenizedMessage) (lastSegmentLoc common.Location, err error) {
 
 	// As we iterate through incoming messages we pick a segment they should be appended to:
 	// - it could be an existing half-full segment

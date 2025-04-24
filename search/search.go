@@ -156,7 +156,7 @@ func (s *Search) Search(
 				matchedMessages := make([]db.Message, 0)
 				for ev := range matchedIt {
 					if ev.Err != nil {
-						log.Printf("unable to match message: %s", ev.Err)
+						common.Out("unable to match message: %s", ev.Err)
 						break
 					}
 					matchedMessages = append(matchedMessages, ev.Val)

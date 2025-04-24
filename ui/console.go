@@ -46,7 +46,6 @@ func overrideConfig(cfg Config, ctx *cli.Context) Config {
 	if ctx.Int("DuckdbMaxMemMb") != 0 {
 		cfg.DuckdbMaxMemMb = uint(ctx.Int("DuckdbMaxMemMb"))
 	}
-	cfg.EnableLogging = ctx.Bool("Verbose")
 
 	return cfg
 }
@@ -56,8 +55,6 @@ func PrepareConsoleApp() (app *cli.App) {
 	prepareCfg := func(ctx *cli.Context) (Config, error) {
 		cfg, _ := LoadConfig(true)
 		cfg = overrideConfig(cfg, ctx)
-
-		common.EnableLogging = cfg.EnableLogging
 
 		return cfg, cfg.Validate()
 	}
@@ -119,7 +116,7 @@ func PrepareConsoleApp() (app *cli.App) {
 				Flags:       flags,
 				Action: func(ctx *cli.Context) error {
 
-					log.Printf("Pid: %d", os.Getpid())
+					common.Out("Pid: %d", os.Getpid())
 
 					cfg, err := prepareCfg(ctx)
 					if err != nil {
@@ -139,7 +136,7 @@ func PrepareConsoleApp() (app *cli.App) {
 					go func() {
 						<-sigs
 						cancel() // stop the program
-						log.Printf("Stopping heaplog...")
+						common.Out("Stopping heaplog...")
 
 						t := time.Second * 3
 						time.Sleep(t)
@@ -155,7 +152,7 @@ func PrepareConsoleApp() (app *cli.App) {
 						log.Println(http.ListenAndServe(":6060", nil))
 					}()
 
-					log.Printf("Listening on port 8393")
+					common.Out("Listening on port 8393")
 					log.Fatal(httpApp.Listen(":8393"))
 					return nil
 				},
@@ -175,7 +172,7 @@ func PrepareConsoleApp() (app *cli.App) {
 					}
 
 					httpApp := makeHttpApp(happ, "")
-					log.Printf("Listening on port 8393")
+					common.Out("Listening on port 8393")
 					log.Fatal(httpApp.Listen(":8393"))
 					return nil
 				},

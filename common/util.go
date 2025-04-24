@@ -1,6 +1,7 @@
 package common
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
@@ -12,6 +13,8 @@ import (
 	"runtime/debug"
 	"runtime/pprof"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 var (
@@ -134,17 +137,12 @@ func PrintMem(db *sql.DB) (rss uint64) {
 	return m.Sys
 }
 
-var EnableLogging bool
-
 func Out(pattern string, args ...any) {
-	if EnableLogging {
-		log.Printf(pattern, args...)
-	}
+	zap.S().Logf(zap.InfoLevel, pattern, args...)
 }
+
 func OutS(s string) {
-	if EnableLogging {
-		log.Println(s)
-	}
+	zap.S().Logf(zap.InfoLevel, s)
 }
 
 func CleanMem() {
@@ -155,7 +153,7 @@ func CleanMem() {
 	ctx := context.Background()
 	cmd := exec.CommandContext(ctx, "bash", "-c", `echo 3 > /proc/sys/vm/drop_caches`)
 	out, err := cmd.CombinedOutput()
-	Out("cleanmem: %s", out)
+	Out("cleanmem: %s", bytes.Trim(out, "\n"))
 	if err != nil {
 		Out("cleanmem error: %s", err)
 		return
@@ -186,7 +184,7 @@ func ProfileCPU(fn func()) {
 
 	fn()
 
-	log.Printf("profiled in %s", time.Since(tt).String())
+	Out("profiled in %s", time.Since(tt).String())
 	pprof.StopCPUProfile()
 	defer func() { _ = f.Close() }()
 }

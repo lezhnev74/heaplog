@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"iter"
-	"log"
 	"math"
 	"time"
 
@@ -60,14 +59,14 @@ func NewQueryDb(_db *sql.DB, appender *duckdb.Appender) *QueryDB {
 			if mp.queryId == 0 {
 				err = qdb.appender.Flush()
 				if err != nil {
-					log.Printf("check in result error: %s", err)
+					common.Out("check in result error: %s", err)
 				}
 				continue
 			} else {
 				err = qdb.appender.AppendRow(mp.queryId, uint32(mp.fileId), mp.from, mp.len, uint64(mp.date.UnixMicro()))
 			}
 			if err != nil {
-				log.Printf("check in result error: %s", err)
+				common.Out("check in result error: %s", err)
 			}
 		}
 	}()
@@ -126,7 +125,7 @@ func (q *QueryDB) CheckinQuery(ctx context.Context, text string, min, max *time.
 	go func() {
 		defer func() {
 			if err != nil {
-				log.Printf("query %d: checkin query defer: %s", queryId, err)
+				common.Out("query %d: checkin query defer: %s", queryId, err)
 			}
 
 			q.appenderChan <- QueryMessagePacker{} // ask for flush
@@ -134,7 +133,7 @@ func (q *QueryDB) CheckinQuery(ctx context.Context, text string, min, max *time.
 			// mark as Finished
 			_, err = q.db.Exec("UPDATE queries SET finished=true WHERE queryId=?", queryId)
 			if err != nil {
-				log.Printf("query %d: checkin query defer: %s", queryId, err)
+				common.Out("query %d: checkin query defer: %s", queryId, err)
 			}
 		}()
 
@@ -150,7 +149,7 @@ func (q *QueryDB) CheckinQuery(ctx context.Context, text string, min, max *time.
 			}
 
 			if ev.Err != nil {
-				log.Printf("query %d: checkin query: %s", queryId, ev.Err)
+				common.Out("query %d: checkin query: %s", queryId, ev.Err)
 				return
 			}
 
@@ -164,7 +163,7 @@ func (q *QueryDB) CheckinQuery(ctx context.Context, text string, min, max *time.
 			// lastDate is null if there were no messages
 			_, err = q.db.Exec("UPDATE queries SET messages=? WHERE queryId=?", n, queryId)
 			if err != nil {
-				log.Printf("query %d: query finish: %s", queryId, err)
+				common.Out("query %d: query finish: %s", queryId, err)
 				return
 			}
 		}

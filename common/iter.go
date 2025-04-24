@@ -46,3 +46,15 @@ func SeqBatch[V any](s iter.Seq[V], size int) iter.Seq[[]V] {
 		}
 	}
 }
+
+// NopSeq is a convenience function
+// which returns an empty no-op Seq
+// that is safe to range over.
+func NopSeq[T any]() iter.Seq[T] {
+	return func(func(T) bool) {}
+}
+
+// NopSeq2 is the same as NopSeq, but for Seq2.
+func NopSeq2[K, V any]() iter.Seq2[K, V] {
+	return func(func(K, V) bool) {}
+}

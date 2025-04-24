@@ -2,7 +2,6 @@ package ingest
 
 import (
 	"fmt"
-	"log"
 	"path/filepath"
 
 	"heaplog_2024/common"
@@ -30,7 +29,7 @@ func (d *Discover) DiscoverFiles() (news, obsoletes []string, err error) {
 		for _, f := range files {
 			f, err = filepath.Abs(f)
 			if err != nil {
-				log.Printf("unable to get absolute path to the discovered file %s: %s", f, err)
+				common.Out("unable to get absolute path to the discovered file %s: %s", f, err)
 				continue
 			}
 			allCurrentFiles = append(allCurrentFiles, f)

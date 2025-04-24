@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"iter"
-	"log"
 	"slices"
 	"strings"
 	"time"
@@ -60,14 +59,14 @@ func NewMessagesDb(db *sql.DB, appender *duckdb.Appender) *MessagesDb {
 			if mp == flushPacket {
 				err = mdb.appender.Flush()
 				if err != nil {
-					log.Printf("check in message error: %s", err)
+					common.Out("check in message error: %s", err)
 				}
 				continue
 			}
 
 			err = mdb.appender.AppendRow(mp.segmentId, mp.from, mp.relDateFrom, mp.dateLen)
 			if err != nil {
-				log.Printf("check in message error: %s", err)
+				common.Out("check in message error: %s", err)
 			}
 		}
 	}()

@@ -2,7 +2,6 @@ package search
 
 import (
 	"errors"
-	"log"
 	"os"
 
 	"heaplog_2024/common"
@@ -24,7 +23,7 @@ func ReadMessages(mAddrs []MessageAddr) (messages [][]byte, err error) {
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
 				// well, the file has been removed, so do nothign here
-				log.Printf("unable to read messages for a removed file: %s", filePath)
+				common.Out("unable to read messages for a removed file: %s", filePath)
 				err = nil
 			}
 			return

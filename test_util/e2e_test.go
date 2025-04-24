@@ -33,7 +33,7 @@ var (
 	timeFormat          = "2006-01-02T15:04:05.000000-07:00"
 )
 
-func TestSearch(t *testing.T) {
+func _TestSearch(t *testing.T) {
 	//t0 := time.Now()
 	storageRoot := "/home/dmitry/Code/go/src/heaplog/heaplog_2024/_local/local_test/storage"
 
@@ -59,7 +59,7 @@ func TestSearch(t *testing.T) {
 
 	messagesIt, isFullScan, err := s.Search(expr, nil, nil, timeFormat, tok, runtime.NumCPU())
 	require.NoError(t, err)
-	log.Printf("Full_scan: %t\n", isFullScan)
+	common.Out("Full_scan: %t\n", isFullScan)
 
 	q, err := dbc.CheckinQuery(context.Background(), query, nil, nil, messagesIt)
 	require.NoError(t, err)
@@ -79,19 +79,20 @@ func TestSearch(t *testing.T) {
 	//	c++
 	//
 	//	if c == 1 || c == 100 {
-	//		log.Printf("%d results ready in %s\n", c, time.Since(t0).String())
+	//		common.Out("%d results ready in %s\n", c, time.Since(t0).String())
 	//	}
 	//}
-	//log.Printf("Found messages: %d\n", c)
+	//common.Out("Found messages: %d\n", c)
 	//debug.FreeOSMemory()
 	//test_util.ProcStat()
 }
 
 func _TestIngest(t *testing.T) {
-	storageRoot := "/home/dmitry/Code/go/src/heaplog_2024/_local/s4"
+	storageRoot := "/home/dmitry/Code/go/src/heaplog/heaplog_2024/_local/test_storage"
 
 	//stop := traceRun(path.Join(storageRoot, "trace.out"))
 	//defer stop()
+
 	go func() {
 		t := time.NewTicker(5 * time.Second)
 		for range t.C {
@@ -101,49 +102,22 @@ func _TestIngest(t *testing.T) {
 	}()
 
 	debug.SetGCPercent(10)
-	_, ing, ii, fdb, _ := buildDependencies(t, 5_000_000, storageRoot)
+	_, ing, _, fdb, _ := buildDependencies(t, 5_000_000, storageRoot)
 
 	files := []string{
-		"/home/dmitry/Code/go/src/heaplog_2024/_local/1kb.log",
-		"/home/dmitry/Code/go/src/heaplog_2024/_local/10kb.log",
-		"/home/dmitry/Code/go/src/heaplog_2024/_local/1gb.log",
-		"/home/dmitry/Code/go/src/heaplog_2024/_local/4gb_.log",
-		"/home/dmitry/Code/go/src/heaplog_2024/_local/sample.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-07-10.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-07-11.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-07-12.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-07-13.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-07-14.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-07-15.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-07-16.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-07-17.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-07-18.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-07-19.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-07-20.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-07-21.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-07-22.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-07-23.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-07-24.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-07-25.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-07-26.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-07-27.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-07-28.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-07-29.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-07-30.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-07-31.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-08-01.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-08-02.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-08-03.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-08-04.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-08-05.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-08-06.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-08-07.log",
-		//"/home/dmitry/Code/go/src/heaplog_2024/_local/logs/laravel-2024-08-08.log",
+		//"/home/dmitry/Code/go/src/heaplog_2024/_local/1kb.log",
+		//"/home/dmitry/Code/go/src/heaplog/heaplog_2024/_local/10kb.log",
+		"/home/dmitry/Code/go/src/heaplog/heaplog_2024/_local/100Mb.log",
+		//"/home/dmitry/Code/go/src/heaplog/heaplog_2024/_local/1gb.log",
+		//"/home/dmitry/Code/go/src/heaplog_2024/_local/4gb_.log",
+		//"/home/dmitry/Code/go/src/heaplog_2024/_local/sample.log",
+		//"/home/dmitry/Code/go/src/heaplog/heaplog_2024/_local/logs/laravel-2025-02-20.log",
+		//"/home/dmitry/Code/go/src/heaplog/heaplog_2024/_local/logs/laravel-2025-02-21.log",
 	}
 	_, _, err := fdb.CheckInFiles(files)
 	require.NoError(t, err)
 
-	log.Printf("Go ingest")
+	common.Out("Go ingest")
 
 	err = ing.Index(files)
 	require.NoError(t, err)
@@ -151,15 +125,15 @@ func _TestIngest(t *testing.T) {
 	test_util.ProcStat()
 
 	// MERGE II:
-	fmt.Printf("MERGE START\n")
-	//return
-	for {
-		mergedSegments, err := ii.Merge(30, 1000, runtime.NumCPU())
-		require.NoError(t, err)
-		if mergedSegments == 0 {
-			break
-		}
-	}
+	//fmt.Printf("MERGE START\n")
+	////return
+	//for {
+	//	mergedSegments, err := ii.Merge(30, 1000, runtime.NumCPU())
+	//	require.NoError(t, err)
+	//	if mergedSegments == 0 {
+	//		break
+	//	}
+	//}
 }
 
 func buildDependencies(t *testing.T, segmentSize uint64, storageRoot string) (
@@ -197,7 +171,8 @@ func buildDependencies(t *testing.T, segmentSize uint64, storageRoot string) (
 	require.NoError(t, err)
 
 	s := func(file string, locations []common.Location) ([]scanner.MessageLayout, error) {
-		layouts, err := scanner.UgScanLocations(file, locations, messageStartPattern)
+		//layouts, err := scanner.UgScanLocations(file, locations, messageStartPattern)
+		layouts, err := scanner.UgScan(file, messageStartPattern, locations)
 		require.NoError(t, err)
 		return layouts, nil
 	}

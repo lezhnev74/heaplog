@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 	"unsafe"
 
 	"github.com/lezhnev74/inverted_index_2"
@@ -20,6 +21,8 @@ type SegmentBuffer struct {
 	terms       map[string]struct{}
 	messagesCnt int
 	s           db.Segment
+	// measure one segments time to be indexed
+	startTime time.Time
 
 	// segmentSize specifies the maximum segment size in bytes.
 	segmentSize uint64
@@ -79,6 +82,7 @@ func (b *SegmentBuffer) Accept(m *ScannedTokenizedMessage) (err error, isNew boo
 		b.s.DateMax = m.DateTime
 		b.messagesCnt = 0
 		b.terms = make(map[string]struct{})
+		b.startTime = time.Now()
 	}
 
 	b.s.Loc.To = m.To
@@ -125,16 +129,19 @@ func (b *SegmentBuffer) flush() error {
 
 	// Report
 	common.Out(
-		"indexed %s[%d:%d]: %d messages, %d terms",
+		"indexed %s[%d:%d]: %d messages, %d terms in %s",
 		b.file.Path,
 		b.s.Loc.From,
 		b.s.Loc.To,
 		b.messagesCnt,
 		len(segmentTerms),
+		time.Now().Sub(b.startTime).String(),
 	)
 
 	// Cleanup
 	b.terms = make(map[string]struct{}) // reset for the next segment
+	b.messagesCnt = 0
+	b.startTime = time.Now()
 
 	return nil
 }

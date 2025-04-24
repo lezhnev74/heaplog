@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"iter"
-	"log"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -87,7 +86,7 @@ func (happ *HeaplogApp) Test() error {
 		return fmt.Errorf("unable to test the file at %s: parse date: %w", file, err)
 	}
 
-	log.Printf("Great! Found a message in %s\n", file)
+	common.Out("Great! Found a message in %s\n", file)
 	return nil
 }
 
@@ -220,7 +219,7 @@ func (happ *HeaplogApp) fetchMessages(queryId int, messages []db.Message) (rows 
 			if err != nil {
 				if errors.Is(err, sql.ErrNoRows) {
 					// this can happen if the target file was already removed, but cleanup was not performed yet
-					log.Printf("query %d page: looks like the file[%d] is removed", queryId, m.FileId)
+					common.Out("query %d page: looks like the file[%d] is removed", queryId, m.FileId)
 					continue
 				}
 				err = fmt.Errorf("page failed: find file: %w", err)
@@ -253,8 +252,6 @@ func (happ *HeaplogApp) fetchMessages(queryId int, messages []db.Message) (rows 
 }
 
 func NewHeaplog(ctx context.Context, cfg Config, startBackground bool) (*HeaplogApp, error) {
-
-	common.EnableLogging = cfg.EnableLogging
 
 	// 1. Init the database
 	connector, err := db.PrepareDuckDB(cfg.StoragePath, int(cfg.DuckdbMaxMemMb))
@@ -295,7 +292,7 @@ func NewHeaplog(ctx context.Context, cfg Config, startBackground bool) (*Heaplog
 	tok := func(in []byte) [][]byte {
 		return tokenizer.Tokenize(in, int(cfg.MinTermLen), int(cfg.MaxTermLen))
 	}
-	ii, err := inverted_index_2.NewInvertedIndex(cfg.StoragePath, cfg.EnableLogging)
+	ii, err := inverted_index_2.NewInvertedIndex(cfg.StoragePath, true)
 	if err != nil {
 		return nil, err
 	}
@@ -319,7 +316,7 @@ func NewHeaplog(ctx context.Context, cfg Config, startBackground bool) (*Heaplog
 			for range t {
 				queries, err := dbContainer.List()
 				if err != nil {
-					log.Printf("cleanup queries: %s", err.Error())
+					common.Out("cleanup queries: %s", err.Error())
 					return
 				}
 				ttl := time.Hour * 24
@@ -327,7 +324,7 @@ func NewHeaplog(ctx context.Context, cfg Config, startBackground bool) (*Heaplog
 					if time.Since(*q.BuiltAt) > ttl {
 						err = dbContainer.RemoveQuery(q.Id)
 						if err != nil {
-							log.Printf("cleanup queries: %s", err.Error())
+							common.Out("cleanup queries: %s", err.Error())
 							return
 						}
 					}
@@ -342,26 +339,26 @@ func NewHeaplog(ctx context.Context, cfg Config, startBackground bool) (*Heaplog
 			for range t {
 				_, obsoletes, err := _discover.DiscoverFiles()
 				if err != nil {
-					log.Printf("discovering files stopped: %s", err)
+					common.Out("discovering files stopped: %s", err)
 					return
 				}
 				if len(obsoletes) > 0 {
 					err = db.ClearUp(dbContainer, ii)
 					if err != nil {
-						log.Printf("cleaning up: %s", err)
+						common.Out("cleaning up: %s", err)
 						return
 					}
 				}
 
 				allFiles, err := dbContainer.AllFiles()
 				if err != nil {
-					log.Printf("unable to read files for ingesting: %s", err)
+					common.Out("unable to read files for ingesting: %s", err)
 					return
 				}
 
 				err = ingestor.Index(allFiles)
 				if err != nil {
-					log.Printf("ingest: %s", err)
+					common.Out("ingest: %s", err)
 					return
 				}
 
@@ -376,7 +373,7 @@ func NewHeaplog(ctx context.Context, cfg Config, startBackground bool) (*Heaplog
 				for {
 					merged, err := ii.Merge(30, 30, int(cfg.Concurrency))
 					if err != nil {
-						log.Printf("merging inverted index segments: %s", err)
+						common.Out("merging inverted index segments: %s", err)
 					}
 					if merged == 0 {
 						break

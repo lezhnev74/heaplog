@@ -182,12 +182,7 @@ func makeHttpApp(happ *HeaplogApp, viewsDirectory string) *fiber.App {
 
 	httpApp.Use("/debug/mem", func(c *fiber.Ctx) error {
 		common.CleanMem()
-
-		tmp := common.EnableLogging
-		common.EnableLogging = true
 		common.PrintMem(happ.db.DB)
-		common.EnableLogging = tmp
-
 		c.Response().AppendBodyString("printed.")
 		return nil
 	})

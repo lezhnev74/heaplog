@@ -1,10 +1,11 @@
 package query_language
 
 import (
-	"log"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"heaplog_2024/common"
 )
 
 func TestAntlrQueryParser(t *testing.T) {
@@ -50,8 +51,8 @@ func TestAntlrQueryParser(t *testing.T) {
 				require.ErrorContains(t, err, ti.expectedError.Error())
 			}
 			qe = qe.optimize()
-			log.Printf("exp: %s", ti.expected.String())
-			log.Printf("act: %s", qe.String())
+			common.Out("exp: %s", ti.expected.String())
+			common.Out("act: %s", qe.String())
 			require.Equal(t, ti.expected, qe)
 		})
 	}

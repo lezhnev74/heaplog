@@ -19,5 +19,5 @@ package ui
 //	for _, m := range ms {
 //		fmt.Println(len(m))
 //	}
-//	log.Printf("Found messages: %d\n", len(ms))
+//	common.Out("Found messages: %d\n", len(ms))
 //}

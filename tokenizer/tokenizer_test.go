@@ -3,11 +3,12 @@ package tokenizer
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"heaplog_2024/common"
 )
 
 func TestFilterShortTokensInPlaceCutLongTokens(t *testing.T) {
@@ -116,5 +117,5 @@ The purpose of a tool is to enable and facilitate thought; not to replace it.
 		tokens = xtokens
 	})
 
-	log.Printf("found %d tokens", len(tokens))
+	common.Out("found %d tokens", len(tokens))
 }
