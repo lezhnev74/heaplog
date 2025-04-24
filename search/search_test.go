@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"runtime"
 	"slices"
 	"testing"
 
@@ -239,6 +240,7 @@ multile
 	require.NoError(t, err)
 
 	_db.MessagesDb.Flush()
+	runtime.Gosched() // win time for the flush to finish
 
 	type test struct {
 		matcher          search.SearchMatcher

@@ -13,7 +13,7 @@ import (
 	"heaplog_2024/db"
 )
 
-// SegmentBuffer accomodates messages that are being indexed.
+// SegmentBuffer accommodates messages that are being indexed.
 // It is used to buffer messages before they are written to the database.
 // Automatically flushes segment messages and allocates a new segment as needed.
 type SegmentBuffer struct {
@@ -80,7 +80,6 @@ func (b *SegmentBuffer) Accept(m *ScannedTokenizedMessage) (err error, isNew boo
 		b.s.Loc = common.Location{From: m.From, To: m.To}
 		b.s.DateMin = m.DateTime
 		b.s.DateMax = m.DateTime
-		b.messagesCnt = 0
 		b.terms = make(map[string]struct{})
 		b.startTime = time.Now()
 	}
@@ -135,7 +134,7 @@ func (b *SegmentBuffer) flush() error {
 		b.s.Loc.To,
 		b.messagesCnt,
 		len(segmentTerms),
-		time.Now().Sub(b.startTime).String(),
+		time.Since(b.startTime).String(),
 	)
 
 	// Cleanup

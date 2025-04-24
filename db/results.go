@@ -123,6 +123,7 @@ func (q *QueryDB) CheckinQuery(ctx context.Context, text string, min, max *time.
 	// load all query Messages from the iterator in the background
 	// return query Id instantly to start listening for the first result.
 	go func() {
+		var err error // shadow
 		defer func() {
 			if err != nil {
 				common.Out("query %d: checkin query defer: %s", queryId, err)

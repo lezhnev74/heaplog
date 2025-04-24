@@ -92,7 +92,7 @@ func (ing *Ingest) Index(files []string) error {
 			if err != nil {
 				return fmt.Errorf("index file: %w", err)
 			}
-			file := db.File{filePath, fileId}
+			file := db.File{Path: filePath, Id: fileId}
 
 			// Indexing flow:
 			// 1. Extract unindexed messages
@@ -231,7 +231,7 @@ func (ing *Ingest) selectLocationsForIndexing(file db.File) ([]common.Location, 
 		return nil, err
 	}
 
-	unindexedLocations := common.ExcludeLocations(common.Location{0, fileSize}, indexedLocations...)
+	unindexedLocations := common.ExcludeLocations(common.Location{From: 0, To: fileSize}, indexedLocations...)
 	return unindexedLocations, nil
 }
 

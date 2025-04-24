@@ -66,6 +66,7 @@ func _TestSearch(t *testing.T) {
 
 	for !q.Finished {
 		q, err = dbc.FindQuery(q.Id)
+		require.NoError(t, err)
 		fmt.Printf("query results: %d\n", q.Messages)
 		time.Sleep(time.Second)
 	}
