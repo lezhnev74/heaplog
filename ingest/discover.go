@@ -17,6 +17,7 @@ type Discover struct {
 	storage *db.FilesDb
 }
 
+// DiscoverFiles scans the configured locations for evaporated and newly appeared files.
 func (d *Discover) DiscoverFiles() (news, obsoletes []string, err error) {
 	allCurrentFiles := make([]string, 0, 20)
 	for _, g := range d.globs {

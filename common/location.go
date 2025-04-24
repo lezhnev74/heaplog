@@ -81,3 +81,28 @@ func MergeLocations(src []Location) (ret []Location) {
 
 	return
 }
+
+// ExcludeLocations will remove excl locations from the src location,
+// returning what has left.
+func ExcludeLocations(src Location, excl ...Location) []Location {
+	cleanLocations := []Location{src}
+	for _, el := range excl {
+		nextPending := make([]Location, 0, len(cleanLocations))
+		for _, pendingLocation := range cleanLocations {
+			nextPending = append(nextPending, pendingLocation.Remove(el)...)
+		}
+		cleanLocations = nextPending
+	}
+	// Merge siblings to make contiguous locations
+	return MergeLocations(cleanLocations)
+}
+
+// PickNextLocation returns the next contiguous run within the locations that is at most maxLen long
+func PickNextLocation(locations []Location, minPos, maxLen uint64) (Location, bool) {
+	for _, l := range locations {
+		if l.Contains(minPos) {
+			return Location{From: minPos, To: min(minPos+maxLen, l.To)}, true
+		}
+	}
+	return Location{}, false
+}

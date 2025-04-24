@@ -16,7 +16,7 @@ type SegmentsDb struct {
 }
 
 type Segment struct {
-	Id               int
+	Id               uint32
 	FileId           int
 	Loc              common.Location
 	DateMin, DateMax time.Time
@@ -136,7 +136,7 @@ func (sdb *SegmentsDb) LastSegmentLocation(fileId int) (location common.Location
 		err = nil // return empty location
 		return
 	} else if err != nil {
-		err = fmt.Errorf("unable to read a segment: %w", err)
+		err = fmt.Errorf("unable to read the last segment: %w", err)
 	}
 	return
 }

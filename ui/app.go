@@ -359,7 +359,7 @@ func NewHeaplog(ctx context.Context, cfg Config, startBackground bool) (*Heaplog
 					return
 				}
 
-				err = ingestor.IndexConcurrent(allFiles, int(cfg.Concurrency))
+				err = ingestor.Index(allFiles)
 				if err != nil {
 					log.Printf("ingest: %s", err)
 					return

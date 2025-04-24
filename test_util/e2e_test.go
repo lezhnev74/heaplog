@@ -145,7 +145,7 @@ func _TestIngest(t *testing.T) {
 
 	log.Printf("Go ingest")
 
-	err = ing.IndexConcurrent(files, runtime.NumCPU())
+	err = ing.Index(files)
 	require.NoError(t, err)
 
 	test_util.ProcStat()
