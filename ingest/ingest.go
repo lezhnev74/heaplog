@@ -2,14 +2,13 @@ package ingest
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"os"
 	"slices"
 	"time"
-	"unsafe"
 
 	"github.com/lezhnev74/inverted_index_2"
 	"golang.org/x/sync/errgroup"
@@ -19,9 +18,12 @@ import (
 	"heaplog_2024/scanner"
 )
 
+// Ingest finds unindexed file runs and performs the indexing procedure, updating the database.
 type Ingest struct {
-	db *db.DbContainer
-	ii *inverted_index_2.InvertedIndex
+	fdb *db.FilesDb
+	mdb *db.MessagesDb
+	sdb *db.SegmentsDb
+	ii  *inverted_index_2.InvertedIndex
 
 	// findMessages extracts message layouts (boundaries) from the file
 	findMessages func(file string, locations []common.Location) ([]scanner.MessageLayout, error)
@@ -56,14 +58,18 @@ func NewIngest(
 	concurrency int,
 ) *Ingest {
 	ing := Ingest{
+		sdb: db.SegmentsDb,
+		fdb: db.FilesDb,
+		mdb: db.MessagesDb,
+		ii:  ii,
+
 		findMessages: scan,
 		parseTime:    parseTime,
 		tokenize:     tokenize,
-		db:           db,
-		ii:           ii,
-		segmentSize:  segmentSize,
-		concurrency:  concurrency,
-		ctx:          ctx,
+
+		segmentSize: segmentSize,
+		concurrency: concurrency,
+		ctx:         ctx,
 	}
 	return &ing
 }
@@ -71,23 +77,38 @@ func NewIngest(
 // Index concurrently indexes new areas in the given files
 func (ing *Ingest) Index(files []string) error {
 
-	// for cold startup when many files are to be indexed, we can index each file concurrently.
-	// otherwise under normal load, indexing a file can be done in one thread with no problems.
+	// for cold startup when many files are to be indexed,
+	// indexing happens concurrently to speed up warming the index.
 
 	wg := errgroup.Group{}
 	wg.SetLimit(ing.concurrency)
 
 	// Each file goes in a separate go-routine, so if it fails (a file has been deleted or other reasons),
 	// the rest of indexing is unaffected.
-	for _, file := range files {
+	for _, filePath := range files {
 		wg.Go(func() (err error) {
-			unindexedLocations, err := ing.selectLocationsForIndexing(file)
+
+			fileId, err := ing.fdb.GetFileId(filePath)
 			if err != nil {
 				return fmt.Errorf("index file: %w", err)
 			}
-			err = ing.indexFile(file, unindexedLocations)
+			file := db.File{filePath, fileId}
+
+			// Indexing flow:
+			// 1. Extract unindexed messages
+			locations, err := ing.selectLocationsForIndexing(file)
 			if err != nil {
 				return fmt.Errorf("index file: %w", err)
+			}
+			msgIterator, err := ing.extractMessages(filePath, locations)
+			if err != nil {
+				return fmt.Errorf("index file: %w", err)
+			}
+
+			// 2. Save to the storage
+			_, err = ing.saveStream(file, msgIterator)
+			if err != nil {
+				return fmt.Errorf("index file %s: %w", file.Path, err)
 			}
 			return
 		})
@@ -96,75 +117,50 @@ func (ing *Ingest) Index(files []string) error {
 }
 
 // indexFile indexes the given areas in the file
-func (ing *Ingest) indexFile(file string, locations []common.Location) error {
+func (ing *Ingest) extractMessages(filePath string, locations []common.Location) (iter.Seq[*ScannedTokenizedMessage], error) {
 
 	if len(locations) == 0 {
-		return nil // nothing to index
-	}
-
-	fileId, err := ing.db.GetFileId(file)
-	if err != nil {
-		return fmt.Errorf("index file: %w", err)
+		return nil, nil // nothing to index
 	}
 
 	// file indexing goes over segments one-by-one
-	reader, err := os.Open(file)
+	reader, err := os.Open(filePath)
 	if err != nil {
-		return fmt.Errorf("index file: %w", err)
+		return nil, fmt.Errorf("extract messages: %w", err)
 	}
-	defer func() { _ = reader.Close() }()
 
 	// it is quicker to read all message locations at once that call it for every location
-	allMessageLayouts, err := ing.findMessages(file, locations)
+	allMessageLayouts, err := ing.findMessages(filePath, locations)
 	if errors.Is(err, scanner.NoMessageStartFound) || len(allMessageLayouts) == 0 {
 		// no new messages found in the file
-		return nil
+		return nil, nil
 	} else if err != nil {
-		return fmt.Errorf("message layouts scan failed: %w", err)
+		return nil, fmt.Errorf("extract messages: %w", err)
 	}
 
-	lastSegmentLoc, err := ing.db.LastSegmentLocation(fileId)
-	if err != nil {
-		err = fmt.Errorf("index file: %w", err)
-		return err
-	}
+	iterator := func(yield func(message *ScannedTokenizedMessage) bool) {
+		defer func() { _ = reader.Close() }()
 
-	for {
-		loc, ok := common.PickNextLocation(locations, lastSegmentLoc.To, ing.segmentSize)
-		if !ok {
-			// no more available areas to index
-			break
-		}
+		for _, location := range locations {
+			locMessageLayouts := selectLocationLayouts(location, allMessageLayouts)
+			if len(locMessageLayouts) == 0 {
+				continue
+			}
 
-		locMessageLayouts := selectLocationLayouts(loc, allMessageLayouts)
-		if len(locMessageLayouts) == 0 {
-			// here is the workaround for files where messages begin not from the beginning
-			// in which case a location may have no messages at all.
-			lastSegmentLoc.To++
-			continue
-		}
-
-		tokenizedMessages := ing.readMessagesInStream(file, reader, locMessageLayouts)
-		lastSegmentLoc, err = ing.saveBatch(file, tokenizedMessages)
-		if err != nil {
-			return fmt.Errorf("save segment failed: %w", err)
+			for s := range ing.readMessagesInStream(filePath, reader, locMessageLayouts) {
+				if !yield(s) {
+					return
+				}
+			}
 		}
 	}
 
-	ing.db.MessagesDb.Flush()
-
-	return nil
+	return iterator, nil
 }
 
-// saveBatch analyzes incoming messages and saves them as a segment to the DB (as well as in II).
-func (ing *Ingest) saveBatch(file string, messages <-chan *ScannedTokenizedMessage) (lastSegmentLoc common.Location, err error) {
-	t0 := time.Now()
-
-	fileId, err := ing.db.GetFileId(file)
-	if err != nil {
-		err = fmt.Errorf("file is missing: %w", err)
-		return
-	}
+// saveStream analyzes incoming (ordered by file position) messages, batches them into segments,
+// saves the indexed values to the DB (as well as in II).
+func (ing *Ingest) saveStream(file db.File, messages iter.Seq[*ScannedTokenizedMessage]) (lastSegmentLoc common.Location, err error) {
 
 	// As we iterate through incoming messages we pick a segment they should be appended to:
 	// - it could be an existing half-full segment
@@ -172,156 +168,54 @@ func (ing *Ingest) saveBatch(file string, messages <-chan *ScannedTokenizedMessa
 	// Each message will extend the segment's boundary (min/max time, start/end pos),
 	// This calculation is done at the end of one segment's ingestion.
 
-	curSegment := db.Segment{}
-	curSegmentTermsMap := map[string]struct{}{} // for deduplication
-	curSegmentMessages := 0
-
-	// As we iterate through messages, we accumulate segment terms.
-	// This function flushes terms to II and updates cur segment's boundaries
-	flush := func() error {
-
-		// Here it has to save data with respect to accidental interruptions.
-		// The reserved segment id is used in both messages and II. But in case the interruption happens
-		// during the flush, those will point to a non-existing segment.
-		// In some cases that can lead to disk space wasted.
-		// Saving the segment as the last step gives more guarantees that no empty segments will appear.
-
-		// Before proceeding, we need to make sure the messages are flushed (though this is a non-blocking operation)
-		ing.db.MessagesDb.Flush()
-
-		// update II
-		segmentTerms := make([][]byte, 0, len(curSegmentTermsMap))
-		for i := range curSegmentTermsMap {
-			b := unsafe.Slice(unsafe.StringData(i), len(i))
-			segmentTerms = append(segmentTerms, b)
+	segBuf := NewSegmentBuffer(file, ing.segmentSize, ing.sdb, ing.ii)
+	defer func() {
+		err2 := segBuf.flush()
+		if err == nil {
+			err = err2
 		}
-		iiErr := ing.ii.Put(segmentTerms, uint32(curSegment.Id))
-		if iiErr != nil {
-			return fmt.Errorf("save segment: ii: %w", iiErr)
-		}
+	}()
 
-		// as the last step, persist the segment
-		syncErr := ing.db.CheckinSegmentWithId(
-			uint32(curSegment.Id),
-			fileId,
-			curSegment.Loc,
-			curSegment.DateMin,
-			curSegment.DateMax,
-		)
-		if syncErr != nil {
-			return fmt.Errorf("sync segment: %w", syncErr)
-		}
-
-		// Report
-		if curSegmentMessages > 0 {
-			common.Out("indexed %s[%d:%d]: %d messages, %d terms in %s", file, curSegment.Loc.From, curSegment.Loc.To, curSegmentMessages, len(segmentTerms), time.Since(t0).String())
-		}
-
-		// Cleanup
-		curSegmentTermsMap = make(map[string]struct{}) // reset for the next segment
-
-		t0 = time.Now()
-		return nil
-	}
-
+	var isNew bool
 	for message := range messages {
 		if message.Err != nil {
 			err = fmt.Errorf("message scan failed: %w", message.Err)
 			return
 		}
 
-		curSegment, isNew, serr = ing.selectSegment(fileId, curSegment, message)
-		if serr != nil {
-			err = fmt.Errorf("segment selection failed: %w", serr)
+		err, isNew = segBuf.Accept(message)
+		if err != nil {
+			err = fmt.Errorf("segment selection failed: %w", err)
 			return
 		}
-		// flush previous segment data
 		if isNew {
-			err = flush()
-			if err != nil {
-				return
-			}
+			ing.mdb.Flush()
 		}
 
 		relDateFrom := uint8(message.DateFrom - message.From)
 		dateLen := uint8(message.DateTo - message.DateFrom)
 
-		checkInErr := ing.db.CheckinMessage(segmentId, message.From, relDateFrom, dateLen)
+		checkInErr := ing.mdb.CheckinMessage(segBuf.s.Id, message.From, relDateFrom, dateLen)
 		if checkInErr != nil {
 			err = fmt.Errorf("checking messages failed: %w", checkInErr)
 			return
 		}
-
-		for i := range message.Terms {
-			t := unsafe.String(unsafe.SliceData(message.Terms[i]), len(message.Terms[i]))
-			curSegmentTermsMap[t] = struct{}{}
-		}
 	}
 
-	err = flush()
-	lastSegmentLoc = curSegment.Loc
+	lastSegmentLoc = segBuf.s.Loc
 	return
-}
-
-// selectSegment decides if the curSegment is OK for the given message.
-// If the picks a segment which is half-full and adjoins this message,
-// otherwise it starts a new segment.
-// If indexing happens more often then messages appear in the file, then segments can be very small (and pollute II).
-// To solve that it must stream found messages to the existing segment (that adjoins this message)
-// until it is full, in which case it should allocate a new one.
-func (ing *Ingest) selectSegment(fileId int, curSegment db.Segment, m *ScannedTokenizedMessage) (db.Segment, bool, error) {
-	var (
-		err          error
-		isNewSegment bool
-	)
-
-	if curSegment.Id == 0 {
-		// this is the first time the selection is invoked, so we try to use an existing segment
-		// that adjoins this message. It can return 0 if none found, though.
-		// "no suitable segment" is an expected case.
-		curSegment, err = ing.db.SelectSegmentThatAdjoins(fileId, m.From)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return curSegment, isNewSegment, err
-		}
-	}
-
-	// make a new segment if the current is absent or too big already.
-	if curSegment.Id == 0 || uint64(curSegment.Loc.Len()) > ing.segmentSize {
-		// start a new segment
-		isNewSegment = true
-		curSegment = db.Segment{}
-		newId, _ := ing.db.ReserveSegmentId()
-		curSegment.Id = int(newId)
-		curSegment.FileId = fileId
-		curSegment.Loc = common.Location{From: m.From, To: m.To}
-		curSegment.DateMin = m.DateTime
-		curSegment.DateMax = m.DateTime
-		curSegmentMessages = 0
-	}
-
-	curSegment.Loc.To = m.To
-	curSegment.DateMax = m.DateTime
-	curSegmentMessages++
-
-	return curSegment, isNewSegment, nil
 }
 
 // selectLocationsForIndexing returns contiguous file runs that were never indexed.
 // Excludes segments that were previously checked in.
-func (ing *Ingest) selectLocationsForIndexing(file string) ([]common.Location, error) {
+func (ing *Ingest) selectLocationsForIndexing(file db.File) ([]common.Location, error) {
 
-	fileSize, err := common.FileSize(file)
+	fileSize, err := common.FileSize(file.Path)
 	if err != nil {
-		return nil, fmt.Errorf("filesize failed for %s: %w", file, err)
+		return nil, fmt.Errorf("filesize failed for %s: %w", file.Path, err)
 	}
 
-	fileId, err := ing.db.GetFileId(file)
-	if err != nil {
-		err = fmt.Errorf("get file id failed: %w", err)
-		return nil, err
-	}
-
-	indexedLocations, err := ing.db.ReadIndexedLocations(fileId)
+	indexedLocations, err := ing.sdb.ReadIndexedLocations(file.Id)
 	if err != nil {
 		return nil, err
 	}
@@ -330,16 +224,15 @@ func (ing *Ingest) selectLocationsForIndexing(file string) ([]common.Location, e
 	return unindexedLocations, nil
 }
 
-func (ing *Ingest) readMessagesInStream(name string, stream io.ReaderAt, messageLayouts []scanner.MessageLayout) <-chan *ScannedTokenizedMessage {
-	r := make(chan *ScannedTokenizedMessage)
+// readMessagesInStream reads messages from the file stream at the given positions (see layouts),
+// each message is tokenized.
+func (ing *Ingest) readMessagesInStream(name string, stream io.ReaderAt, messageLayouts []scanner.MessageLayout) iter.Seq[*ScannedTokenizedMessage] {
 
 	// Big messages lead to an exponential memory consumption spike,
 	// so to be predictable in terms of memory, we limit the size of indexable area.
 	maxIndexableSize := uint64(10_000_000) // bytes
 
-	go func() {
-		defer close(r)
-
+	iterator := func(yield func(message *ScannedTokenizedMessage) bool) {
 		buf := make([]byte, 0)
 		var err error
 	loop:
@@ -365,14 +258,18 @@ func (ing *Ingest) readMessagesInStream(name string, stream io.ReaderAt, message
 				_, err := stream.ReadAt(buf[:halfSize], int64(layout.From))
 				if err != nil {
 					err = fmt.Errorf("file read: %w", err)
-					r <- &ScannedTokenizedMessage{Err: err}
+					if !yield(&ScannedTokenizedMessage{Err: err}) {
+						break
+					}
 				}
 
 				// Read the end of the message
 				_, err = stream.ReadAt(buf[halfSize:], int64(layout.To-halfSize))
 				if err != nil {
 					err = fmt.Errorf("file read: %w", err)
-					r <- &ScannedTokenizedMessage{Err: err}
+					if !yield(&ScannedTokenizedMessage{Err: err}) {
+						break
+					}
 				}
 
 			} else {
@@ -386,12 +283,14 @@ func (ing *Ingest) readMessagesInStream(name string, stream io.ReaderAt, message
 				_, err := stream.ReadAt(buf, int64(layout.From))
 				if err != nil {
 					err = fmt.Errorf("file read: %w", err)
-					r <- &ScannedTokenizedMessage{Err: err}
+					if !yield(&ScannedTokenizedMessage{Err: err}) {
+						break
+					}
 				}
 			}
 
 			dateFrom, dateTo := layout.DateFrom-layout.From, layout.DateTo-layout.From
-			terms := ing.tokenize(buf[:dateFrom])
+			terms := ing.tokenize(buf[:dateFrom]) // slow
 			terms = append(terms, ing.tokenize(buf[dateTo:])...)
 
 			tm := &ScannedTokenizedMessage{
@@ -402,14 +301,18 @@ func (ing *Ingest) readMessagesInStream(name string, stream io.ReaderAt, message
 			tm.DateTime, err = ing.parseTime(buf[dateFrom:dateTo])
 			if err != nil {
 				err = fmt.Errorf("date parse: %w", err)
-				r <- &ScannedTokenizedMessage{Err: err}
+				if !yield(&ScannedTokenizedMessage{Err: err}) {
+					break
+				}
 			}
 
-			r <- tm
+			if !yield(tm) {
+				break
+			}
 		}
-	}()
+	}
 
-	return r
+	return iterator
 }
 
 // From the list of all layouts select suitable for the given location.

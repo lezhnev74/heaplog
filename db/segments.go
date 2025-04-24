@@ -16,7 +16,7 @@ type SegmentsDb struct {
 }
 
 type Segment struct {
-	Id               int
+	Id               uint32
 	FileId           int
 	Loc              common.Location
 	DateMin, DateMax time.Time

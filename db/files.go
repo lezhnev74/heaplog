@@ -15,6 +15,11 @@ type FilesDb struct {
 	m  sync.Mutex
 }
 
+type File struct {
+	Path string
+	Id   int
+}
+
 func NewFilesDb(db *sql.DB) *FilesDb {
 	return &FilesDb{
 		db: db,
