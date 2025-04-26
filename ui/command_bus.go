@@ -3,6 +3,7 @@ package ui
 import (
 	"bytes"
 	"fmt"
+	"iter"
 	"math"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/template/html/v2"
 
+	"heaplog_2024/common"
 	"heaplog_2024/db"
 )
 
@@ -97,7 +99,7 @@ func (bus *CommandBus) Page(c *fiber.Ctx) error {
 	}
 
 	// 3. Fetch page messages
-	messages, err := bus.happ.Page(queryId, from, to, page, pageSize, pageSkip)
+	messages, _, err := bus.happ.Page(queryId, from, to, page, pageSize, pageSkip)
 	if err != nil {
 		return &fiber.Error{Code: fiber.StatusOK, Message: err.Error()}
 	}
@@ -105,11 +107,13 @@ func (bus *CommandBus) Page(c *fiber.Ctx) error {
 	// 4. Build view models
 	viewModel := fiber.Map{}
 	// 4.1 Messages View model
-	shouldPoll := !query.Finished && len(messages) < (pageSize-pageSkip) // is the page full now?
-	pollDelay := fmt.Sprintf("%dms", 500*polls)                          // increase timeouts through time
+	messagesBytes := waitMessages(messages, 500*time.Millisecond, 1_000_000)
+	shouldPoll := !query.Finished && len(messagesBytes) < (pageSize-pageSkip) // is the page full now?
+	pollDelay := fmt.Sprintf("%dms", 100*polls)                               // increase timeouts through time
+
 	viewModel["Messages"] = fiber.Map{
 		"QueryId":    queryId,
-		"Messages":   messages,
+		"Messages":   messagesBytes,
 		"ShouldPoll": shouldPoll,
 		"Page":       page,
 		"PollDelay":  pollDelay,
@@ -128,6 +132,24 @@ func (bus *CommandBus) Page(c *fiber.Ctx) error {
 	_, err = c.Write(htmlBuf.Bytes())
 
 	return err
+}
+
+// waitMessages will iterate through the iterator and stop whenever time limit is reached or maxSize is accumulated
+func waitMessages(messages iter.Seq[common.MessageBytes], duration time.Duration, maxSizeBytes int) (ret [][]byte) {
+	var (
+		size = 0
+		t0   = time.Now()
+	)
+
+	for mb := range messages {
+		size += len(mb.Val)
+		ret = append(ret, mb.Val)
+
+		if size >= maxSizeBytes || time.Now().Sub(t0).Abs() >= duration {
+			break
+		}
+	}
+	return ret
 }
 
 // Pagination polls for pagination updates and re-renders.
@@ -215,18 +237,19 @@ func (bus *CommandBus) Messages(c *fiber.Ctx) error {
 	}
 
 	// 3. Fetch page messages
-	messages, err := bus.happ.Page(queryId, from, to, page, pageSize, pageSkip)
+	messages, _, err := bus.happ.Page(queryId, from, to, page, pageSize, pageSkip)
 	if err != nil {
 		return &fiber.Error{Code: fiber.StatusOK, Message: err.Error()}
 	}
 
 	// 4. Build view models
-	shouldPoll := !query.Finished && len(messages) < (pageSize-pageSkip) // is the page full now?
-	pollDelay := fmt.Sprintf("%dms", 5000*polls)                         // increase timeouts through time
+	messagesBytes := waitMessages(messages, 500*time.Millisecond, 1_000_000)
+	shouldPoll := !query.Finished && len(messagesBytes) < (pageSize-pageSkip) // is the page full now?
+	pollDelay := fmt.Sprintf("%dms", 5000*polls)                              // increase timeouts through time
 
 	viewModel := fiber.Map{
 		"QueryId":    queryId,
-		"Messages":   messages,
+		"Messages":   messagesBytes,
 		"ShouldPoll": shouldPoll,
 		"Page":       page,
 		"PollDelay":  pollDelay,

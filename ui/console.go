@@ -215,7 +215,12 @@ func PrepareConsoleApp() (app *cli.App) {
 							return err
 						}
 
-						_, err = outStream.Write([]byte(ev.Val + "\n"))
+						_, err = outStream.Write(ev.Val)
+						if err != nil {
+							return err
+						}
+
+						_, err = outStream.Write([]byte("\n"))
 						if err != nil {
 							return err
 						}

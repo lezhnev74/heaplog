@@ -1,19 +1,17 @@
 package common
 
 import (
-	"bytes"
-	"context"
 	"database/sql"
 	"fmt"
 	"hash/crc32"
 	"log"
 	"os"
-	"os/exec"
 	"runtime"
 	"runtime/debug"
 	"runtime/pprof"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"go.uber.org/zap"
 )
 
@@ -148,16 +146,6 @@ func OutS(s string) {
 func CleanMem() {
 	runtime.GC()
 	debug.FreeOSMemory()
-
-	// since the main runtime for the app is Docker, clearing caches allows the app to stay below the max mem limit.
-	ctx := context.Background()
-	cmd := exec.CommandContext(ctx, "bash", "-c", `echo 3 > /proc/sys/vm/drop_caches`)
-	out, err := cmd.CombinedOutput()
-	Out("cleanmem: %s", bytes.Trim(out, "\n"))
-	if err != nil {
-		Out("cleanmem error: %s", err)
-		return
-	}
 }
 
 func DumpMemoryIn(d time.Duration) {
@@ -194,6 +182,21 @@ func ProfileCPU(fn func()) {
 type ErrVal[V any] struct {
 	Val V
 	Err error
+}
+
+type MessageBytes ErrVal[[]byte]
+
+func (mb MessageBytes) String() string { return string(mb.Val) }
+
+func (ev ErrVal[V]) String() string {
+	switch v := any(ev.Val).(type) {
+	case string:
+		return v
+	case fmt.Stringer:
+		return v.String()
+	default:
+		return spew.Sprintf("%v", v)
+	}
 }
 
 func ExpandValues[V any](v []ErrVal[V]) []V {

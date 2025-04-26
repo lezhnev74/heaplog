@@ -148,7 +148,11 @@ func (happ *HeaplogApp) NewQuery(text string, min *time.Time, max *time.Time) (n
 	return
 }
 
-func (happ *HeaplogApp) Page(queryId int, from, to *time.Time, page, pageSize, pageSkip int) (rows []string, err error) {
+func (happ *HeaplogApp) Page(queryId int, from, to *time.Time, page, pageSize, pageSkip int) (
+	rows iter.Seq[common.MessageBytes],
+	messageCount int,
+	err error,
+) {
 	messages, err := happ.db.QueryDB.Page(queryId, from, to, page, pageSize)
 	if err != nil {
 		err = fmt.Errorf("page failed: %w", err)
@@ -158,28 +162,24 @@ func (happ *HeaplogApp) Page(queryId int, from, to *time.Time, page, pageSize, p
 	// Apply skip-offset:
 	messages = messages[min(len(messages), pageSkip):]
 
-	return happ.fetchMessages(queryId, messages)
+	return happ.fetchMessages(queryId, messages), len(messages), nil
 }
 
-func (happ *HeaplogApp) All(queryId int, from, to *time.Time) (rows iter.Seq[common.ErrVal[string]]) {
+func (happ *HeaplogApp) All(queryId int, from, to *time.Time) (rows iter.Seq[common.MessageBytes]) {
 	messagesIt := happ.db.QueryDB.Stream(queryId, from, to)
 	messageBatchesIt := common.SeqBatch(messagesIt, 1000)
-	return func(yield func(val common.ErrVal[string]) bool) {
+	return func(yield func(common.MessageBytes) bool) {
 		for batch := range messageBatchesIt {
 			for _, ev := range batch {
 				if ev.Err != nil {
-					yield(common.ErrVal[string]{Err: ev.Err})
+					yield(common.MessageBytes{Err: ev.Err})
 					return
 				}
 			}
 
-			rows, err := happ.fetchMessages(queryId, common.ExpandValues(batch))
-			if err != nil {
-				yield(common.ErrVal[string]{Err: err})
-				return
-			}
-			for _, r := range rows {
-				if !yield(common.ErrVal[string]{Val: r}) {
+			rows := happ.fetchMessages(queryId, common.ExpandValues(batch))
+			for r := range rows {
+				if !yield(r) {
 					return
 				}
 			}
@@ -203,52 +203,63 @@ func (happ *HeaplogApp) Query(queryId int, from, to *time.Time) (query db.Query,
 	return
 }
 
-func (happ *HeaplogApp) fetchMessages(queryId int, messages []db.Message) (rows []string, err error) {
-	// Read actual messages from the source files
+// fetchMessages extract actual message bytes from the heap files
+func (happ *HeaplogApp) fetchMessages(queryId int, messages []db.Message) iter.Seq[common.MessageBytes] {
 	var (
-		file           string
 		lastFileId     int
 		lastFileReader *mmap.ReaderAt
 	)
-	for _, m := range messages {
-		if lastFileId != m.FileId {
-			lastFileId = m.FileId
 
-			// Open a new file stream:
-			file, err = happ.db.GetFile(m.FileId)
-			if err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					// this can happen if the target file was already removed, but cleanup was not performed yet
-					common.Out("query %d page: looks like the file[%d] is removed", queryId, m.FileId)
-					continue
-				}
-				err = fmt.Errorf("page failed: find file: %w", err)
-				return
-			}
-
+	return func(yield func(common.MessageBytes) bool) {
+		defer func() {
 			if lastFileReader != nil {
 				_ = lastFileReader.Close()
 			}
-			lastFileReader, err = mmap.Open(file)
+		}()
+
+		for _, m := range messages {
+			if lastFileId != m.FileId {
+				lastFileId = m.FileId
+
+				// Open a new file stream:
+				file, err := happ.db.GetFile(m.FileId)
+				if err != nil {
+					if errors.Is(err, sql.ErrNoRows) {
+						// this can happen if the target file was already removed, but cleanup was not performed yet
+						common.Out("query %d page: looks like the file[%d] is removed", queryId, m.FileId)
+						continue
+					}
+					err = fmt.Errorf("page failed: find file: %w", err)
+					yield(common.MessageBytes{Err: err})
+					return
+				}
+
+				// free the reader on new file
+				if lastFileReader != nil {
+					_ = lastFileReader.Close()
+				}
+
+				lastFileReader, err = mmap.Open(file)
+				if err != nil {
+					err = fmt.Errorf("page failed: mmap file: %w", err)
+					yield(common.MessageBytes{Err: err})
+					return
+				}
+			}
+
+			b := make([]byte, m.Loc.To)
+			_, err := lastFileReader.ReadAt(b, int64(m.Loc.From))
 			if err != nil {
-				err = fmt.Errorf("page failed: mmap file: %w", err)
+				err = fmt.Errorf("page failed: mmap read: %w", err)
+				yield(common.MessageBytes{Err: err})
+				return
+			}
+
+			if !yield(common.MessageBytes{Val: bytes.TrimRight(b, "\n")}) {
 				return
 			}
 		}
-
-		b := make([]byte, m.Loc.To)
-		_, err = lastFileReader.ReadAt(b, int64(m.Loc.From))
-		if err != nil {
-			err = fmt.Errorf("page failed: mmap read: %w", err)
-			return
-		}
-		rows = append(rows, string(bytes.TrimRight(b, "\n")))
 	}
-	if lastFileReader != nil {
-		_ = lastFileReader.Close()
-	}
-
-	return
 }
 
 func NewHeaplog(ctx context.Context, cfg Config, startBackground bool) (*HeaplogApp, error) {

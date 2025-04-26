@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"bytes"
 	"embed"
 	"fmt"
 	"io/fs"
@@ -59,8 +60,11 @@ func makeHttpApp(happ *HeaplogApp, viewsDirectory string) *fiber.App {
 		},
 		// count \n for messages
 		"lines": func(m any) (int, error) {
-			s := m.(string)
-			return strings.Count(s, "\n"), nil
+			s := m.([]byte)
+			return bytes.Count(s, []byte("\n")), nil
+		},
+		"bytes": func(m []byte) (string, error) {
+			return string(m), nil
 		},
 		"shortNumber": func(m any) (string, error) {
 			c := m.(int)
@@ -108,10 +112,7 @@ func makeHttpApp(happ *HeaplogApp, viewsDirectory string) *fiber.App {
 	c := cors.ConfigDefault
 	c.ExposeHeaders = "*"
 	httpApp.Use(cors.New(c))
-	httpApp.Use(compress.New())
-	// httpApp.Use(cache.New(cache.Config{
-	// 	Expiration: 30 * time.Minute,
-	// }))
+	httpApp.Use(compress.New(compress.Config{Level: compress.LevelBestCompression}))
 
 	// HTTP ROUTES:
 	httpApp.Use("/static", filesystem.New(filesystem.Config{
