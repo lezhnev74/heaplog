@@ -145,7 +145,7 @@ func waitMessages(messages iter.Seq[common.MessageBytes], duration time.Duration
 		size += len(mb.Val)
 		ret = append(ret, mb.Val)
 
-		if size >= maxSizeBytes || time.Now().Sub(t0).Abs() >= duration {
+		if size >= maxSizeBytes || time.Since(t0).Abs() >= duration {
 			break
 		}
 	}
