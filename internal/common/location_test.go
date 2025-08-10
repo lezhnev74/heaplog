@@ -393,3 +393,51 @@ func TestPickNextLocation(t *testing.T) {
 		})
 	}
 }
+
+func TestNewLocation(t *testing.T) {
+	tests := []struct {
+		from    int
+		to      int
+		want    Location
+		wantErr bool
+	}{
+		{ // valid location
+			0,
+			100,
+			Location{0, 100},
+			false,
+		},
+		{ // zero length location
+			50,
+			50,
+			Location{50, 50},
+			false,
+		},
+		{ // single unit location
+			75,
+			76,
+			Location{75, 76},
+			false,
+		},
+		{ // invalid location (negative length)
+			100,
+			99,
+			Location{},
+			true,
+		},
+	}
+	for i, tt := range tests {
+		t.Run(fmt.Sprintf("Test %d", i), func(t *testing.T) {
+			if tt.wantErr {
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("NewLocation() should have panicked")
+					}
+				}()
+			}
+			if got := NewLocation(tt.from, tt.to); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("NewLocation() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

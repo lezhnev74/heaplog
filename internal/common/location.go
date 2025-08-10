@@ -1,7 +1,7 @@
 package common
 
 import (
-	"log"
+	"fmt"
 	"slices"
 )
 
@@ -10,9 +10,19 @@ type Location struct {
 	From, To int
 }
 
-func (s Location) Intersects(s2 Location) bool {
-	return s.From <= s2.To && s.To >= s2.From
+func NewLocation(from, to int) Location {
+	l := Location{from, to}
+	if l.Len() < 0 {
+		panic(fmt.Sprintf("negative location length: [%d,%d)", l.From, l.To))
+	}
+	return l
 }
+
+func (s Location) Len() int64 { return int64(s.To - s.From) }
+
+func (s Location) Contains(i int) bool { return i >= s.From && i < s.To }
+
+func (s Location) Intersects(s2 Location) bool { return s.From <= s2.To && s.To >= s2.From }
 
 // Split slices a segment into chunks of at most maxLen bytes
 func (s Location) Split(maxLen int) (ret []Location) {
@@ -27,21 +37,11 @@ func (s Location) Split(maxLen int) (ret []Location) {
 	}
 }
 
-func (s Location) Len() int64 { return int64(s.To - s.From) }
-
-func (s Location) Contains(i int) bool { return i >= s.From && i < s.To }
-
 // Remove returns a list of locations that remain after removing s2 from s.
 // If there is no intersection, returns the original location.
 // If there is partial overlap, returns one or two locations that remain.
 // If s2 fully contains s, returns the empty list.
 func (s Location) Remove(s2 Location) (ret []Location) {
-
-	// valid locations
-	if s.Len() < 0 || s2.Len() < 0 {
-		log.Panicf("Invalid ranges: %v or %v", s, s2)
-	}
-
 	intersection := Location{max(s.From, s2.From), min(s.To, s2.To)}
 
 	// If the intersection is empty, then the difference is the union of the two ranges.
