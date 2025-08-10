@@ -13,15 +13,17 @@ func TestDiscoverAt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	defer os.RemoveAll(tempDir)
 
 	// Create test files
 	files := map[string][]byte{
 		filepath.Join(tempDir, "file1.txt"):          []byte("content1"),
-		filepath.Join(tempDir, "file2.txt"):          []byte("content2"),
+		filepath.Join(tempDir, "file2.txt"):          []byte(""), // empty
 		filepath.Join(tempDir, "test.log"):           []byte("log content"),
 		filepath.Join(tempDir, "subdir/file3.txt"):   []byte("content3"),
 		filepath.Join(tempDir, "subdir/test.config"): []byte("config"),
+		filepath.Join(tempDir, "wrong/inaccessible"): []byte("config"),
 	}
 
 	for path, content := range files {
@@ -83,19 +85,23 @@ func TestDiscoverAt(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			discovered, err := DiscoverAt(tc.patterns)
+			discovered, err := discoverFilesAt(tc.patterns)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if len(discovered) != len(tc.expected) {
-				t.Errorf("DiscoverAt() found %d files, want %d", len(discovered), len(tc.expected))
+				t.Errorf("discoverFilesAt() found %d files, want %d", len(discovered), len(tc.expected))
 			}
-			for path, size := range discovered {
+			for path, errVal := range discovered {
 				if !slices.Contains(tc.expected, path) {
 					t.Errorf("File %s is unexpected", path)
 				}
-				if size != len(files[path]) {
-					t.Errorf("File %s has size %d, want %d", path, size, len(files[path]))
+				if errVal.Err != nil {
+					t.Errorf("File %s has error: %v", path, errVal.Err)
+					continue
+				}
+				if errVal.Val != len(files[path]) {
+					t.Errorf("File %s has size %d, want %d", path, errVal.Val, len(files[path]))
 				}
 			}
 		})
