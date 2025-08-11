@@ -4,22 +4,23 @@ import (
 	"testing"
 
 	"heaplog_2024/internal/common"
+	"heaplog_2024/internal/ingest/scanner"
 )
 
-func Test_alignByLayouts(t *testing.T) {
+func TestSegmentLayoutsByLocations(t *testing.T) {
 	tests := []struct {
 		name        string
 		segmentSize int
 		locs        []common.Location
-		layouts     []common.Location
-		want        [][]common.Location
+		layouts     []scanner.MessageLayout
+		want        [][]scanner.MessageLayout
 	}{
 		{
 			name:        "empty inputs",
 			segmentSize: 10,
 			locs:        []common.Location{},
-			layouts:     []common.Location{},
-			want:        [][]common.Location{},
+			layouts:     []scanner.MessageLayout{},
+			want:        [][]scanner.MessageLayout{},
 		},
 		{
 			name:        "overlapping layouts",
@@ -27,13 +28,13 @@ func Test_alignByLayouts(t *testing.T) {
 			locs: []common.Location{
 				{From: 0, To: 100},
 			},
-			layouts: []common.Location{
-				{From: 0, To: 60},
-				{From: 50, To: 80},
+			layouts: []scanner.MessageLayout{
+				{Location: common.Location{From: 0, To: 60}},
+				{Location: common.Location{From: 50, To: 80}},
 			},
-			want: [][]common.Location{
-				{{From: 0, To: 60}},
-				{{From: 50, To: 80}},
+			want: [][]scanner.MessageLayout{
+				{{Location: common.Location{From: 0, To: 60}}},
+				{{Location: common.Location{From: 50, To: 80}}},
 			},
 		},
 		{
@@ -42,13 +43,13 @@ func Test_alignByLayouts(t *testing.T) {
 			locs: []common.Location{
 				{From: 0, To: 100},
 			},
-			layouts: []common.Location{
-				{From: 10, To: 10},
-				{From: 20, To: 20},
+			layouts: []scanner.MessageLayout{
+				{Location: common.Location{From: 10, To: 10}},
+				{Location: common.Location{From: 20, To: 20}},
 			},
-			want: [][]common.Location{
-				{{From: 10, To: 10}},
-				{{From: 20, To: 20}},
+			want: [][]scanner.MessageLayout{
+				{{Location: common.Location{From: 10, To: 10}}},
+				{{Location: common.Location{From: 20, To: 20}}},
 			},
 		},
 		{
@@ -57,13 +58,13 @@ func Test_alignByLayouts(t *testing.T) {
 			locs: []common.Location{
 				{From: 0, To: 100},
 			},
-			layouts: []common.Location{
-				{From: 0, To: 50},
-				{From: 50, To: 100},
+			layouts: []scanner.MessageLayout{
+				{Location: common.Location{From: 0, To: 50}},
+				{Location: common.Location{From: 50, To: 100}},
 			},
-			want: [][]common.Location{
-				{{From: 0, To: 50}},
-				{{From: 50, To: 100}},
+			want: [][]scanner.MessageLayout{
+				{{Location: common.Location{From: 0, To: 50}}},
+				{{Location: common.Location{From: 50, To: 100}}},
 			},
 		},
 		{
@@ -72,11 +73,11 @@ func Test_alignByLayouts(t *testing.T) {
 			locs: []common.Location{
 				{From: 0, To: 50},
 			},
-			layouts: []common.Location{
-				{From: 60, To: 80},
-				{From: 90, To: 100},
+			layouts: []scanner.MessageLayout{
+				{Location: common.Location{From: 60, To: 80}},
+				{Location: common.Location{From: 90, To: 100}},
 			},
-			want: [][]common.Location{},
+			want: [][]scanner.MessageLayout{},
 		},
 		{
 			name:        "single layout spanning multiple segments",
@@ -84,11 +85,11 @@ func Test_alignByLayouts(t *testing.T) {
 			locs: []common.Location{
 				{From: 0, To: 100},
 			},
-			layouts: []common.Location{
-				{From: 0, To: 90},
+			layouts: []scanner.MessageLayout{
+				{Location: common.Location{From: 0, To: 90}},
 			},
-			want: [][]common.Location{
-				{{From: 0, To: 90}},
+			want: [][]scanner.MessageLayout{
+				{{Location: common.Location{From: 0, To: 90}}},
 			},
 		},
 		{
@@ -98,11 +99,11 @@ func Test_alignByLayouts(t *testing.T) {
 				{From: 0, To: 50},
 				{From: 60, To: 100},
 			},
-			layouts: []common.Location{
-				{From: 30, To: 80},
+			layouts: []scanner.MessageLayout{
+				{Location: common.Location{From: 30, To: 80}},
 			},
-			want: [][]common.Location{
-				{{From: 30, To: 80}},
+			want: [][]scanner.MessageLayout{
+				{{Location: common.Location{From: 30, To: 80}}},
 			},
 		},
 		{
@@ -111,14 +112,14 @@ func Test_alignByLayouts(t *testing.T) {
 			locs: []common.Location{
 				{From: 0, To: 50},
 			},
-			layouts: []common.Location{
-				{From: 0, To: 40},
-				{From: 40, To: 50},
+			layouts: []scanner.MessageLayout{
+				{Location: common.Location{From: 0, To: 40}},
+				{Location: common.Location{From: 40, To: 50}},
 			},
-			want: [][]common.Location{
+			want: [][]scanner.MessageLayout{
 				{
-					{From: 0, To: 40},
-					{From: 40, To: 50},
+					{Location: common.Location{From: 0, To: 40}},
+					{Location: common.Location{From: 40, To: 50}},
 				},
 			},
 		},
@@ -128,18 +129,18 @@ func Test_alignByLayouts(t *testing.T) {
 			locs: []common.Location{
 				{From: 0, To: 100},
 			},
-			layouts: []common.Location{
-				{From: 0, To: 30},
-				{From: 30, To: 60},
-				{From: 60, To: 90},
+			layouts: []scanner.MessageLayout{
+				{Location: common.Location{From: 0, To: 30}},
+				{Location: common.Location{From: 30, To: 60}},
+				{Location: common.Location{From: 60, To: 90}},
 			},
-			want: [][]common.Location{
+			want: [][]scanner.MessageLayout{
 				{
-					{From: 0, To: 30},
-					{From: 30, To: 60},
+					{Location: common.Location{From: 0, To: 30}},
+					{Location: common.Location{From: 30, To: 60}},
 				},
 				{
-					{From: 60, To: 90},
+					{Location: common.Location{From: 60, To: 90}},
 				},
 			},
 		},
@@ -149,13 +150,13 @@ func Test_alignByLayouts(t *testing.T) {
 			locs: []common.Location{
 				{From: 50, To: 150},
 			},
-			layouts: []common.Location{
-				{From: 0, To: 40},
-				{From: 60, To: 100},
+			layouts: []scanner.MessageLayout{
+				{Location: common.Location{From: 0, To: 40}},
+				{Location: common.Location{From: 60, To: 100}},
 			},
-			want: [][]common.Location{
+			want: [][]scanner.MessageLayout{
 				{
-					{From: 60, To: 100},
+					{Location: common.Location{From: 60, To: 100}},
 				},
 			},
 		},
@@ -165,17 +166,85 @@ func Test_alignByLayouts(t *testing.T) {
 			locs: []common.Location{
 				{From: 0, To: 150},
 			},
-			layouts: []common.Location{
-				{From: 0, To: 40},
-				{From: 60, To: 100},
+			layouts: []scanner.MessageLayout{
+				{Location: common.Location{From: 0, To: 40}},
+				{Location: common.Location{From: 60, To: 100}},
 			},
-			want: [][]common.Location{
+			want: [][]scanner.MessageLayout{
 				{
-					{From: 0, To: 40},
+					{Location: common.Location{From: 0, To: 40}},
 				},
 				{
-					{From: 60, To: 100},
+					{Location: common.Location{From: 60, To: 100}},
 				},
+			},
+		},
+		{
+			name:        "non overlapping layouts not abutting",
+			segmentSize: 100,
+			locs: []common.Location{
+				{From: 40, To: 50},
+				{From: 60, To: 70},
+			},
+			layouts: []scanner.MessageLayout{
+				{Location: common.Location{From: 30, To: 45}},
+				{Location: common.Location{From: 55, To: 65}},
+			},
+			want: [][]scanner.MessageLayout{
+				{
+					{Location: common.Location{From: 30, To: 45}},
+				},
+				{
+					{Location: common.Location{From: 55, To: 65}},
+				},
+			},
+		},
+		{
+			name:        "left from the locs",
+			segmentSize: 100,
+			locs: []common.Location{
+				{From: 10, To: 20},
+			},
+			layouts: []scanner.MessageLayout{
+				{Location: common.Location{From: 0, To: 5}},
+			},
+			want: [][]scanner.MessageLayout{},
+		},
+		{
+			name:        "right from the locs",
+			segmentSize: 100,
+			locs: []common.Location{
+				{From: 10, To: 20},
+			},
+			layouts: []scanner.MessageLayout{
+				{Location: common.Location{From: 30, To: 35}},
+			},
+			want: [][]scanner.MessageLayout{},
+		},
+		{
+			name:        "partial overlap left",
+			segmentSize: 100,
+			locs: []common.Location{
+				{From: 10, To: 20},
+			},
+			layouts: []scanner.MessageLayout{
+				{Location: common.Location{From: 0, To: 11}},
+			},
+			want: [][]scanner.MessageLayout{
+				{{Location: common.Location{From: 0, To: 11}}},
+			},
+		},
+		{
+			name:        "partial overlap right",
+			segmentSize: 100,
+			locs: []common.Location{
+				{From: 10, To: 20},
+			},
+			layouts: []scanner.MessageLayout{
+				{Location: common.Location{From: 16, To: 30}},
+			},
+			want: [][]scanner.MessageLayout{
+				{{Location: common.Location{From: 16, To: 30}}},
 			},
 		},
 	}
@@ -183,7 +252,7 @@ func Test_alignByLayouts(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				got := alignByLayouts(tt.segmentSize, tt.locs, tt.layouts)
+				got := segmentLayoutsByLocations(tt.segmentSize, tt.locs, tt.layouts)
 				if len(got) != len(tt.want) {
 					t.Errorf("alignByLayouts() got = %v, want %v", got, tt.want)
 				}

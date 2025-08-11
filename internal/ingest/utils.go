@@ -5,23 +5,22 @@ import (
 	"slices"
 
 	"heaplog_2024/internal/common"
+	"heaplog_2024/internal/ingest/scanner"
 )
 
-// alignByLayouts groups layouts into contiguous segments based on the given segmentSize.
-// Note: The final segment may be smaller than segmentSize if there are not enough layouts
-// to fill it.
-// Note: both locs and layouts must be clustered by their From field.
-func alignByLayouts(
+// segmentLayoutsByLocations groups message layouts into segments within locations.
+// It ensures that layouts within each segment are contiguous (abutting) and the total size.
+func segmentLayoutsByLocations(
 	segmentSize int,
 	locs []common.Location,
-	layouts []common.Location,
-) [][]common.Location {
-	result := make([][]common.Location, 0)
+	layouts []scanner.MessageLayout,
+) [][]scanner.MessageLayout {
+	result := make([][]scanner.MessageLayout, 0)
 	if len(layouts) == 0 || len(locs) == 0 {
 		return result
 	}
 
-	currentSegment := make([]common.Location, 0)
+	currentSegment := make([]scanner.MessageLayout, 0)
 	currentSize := 0
 	latestLayoutIndex := 0
 
@@ -29,7 +28,12 @@ func alignByLayouts(
 		li, found := slices.BinarySearchFunc(
 			layouts[latestLayoutIndex:],
 			loc,
-			func(loc common.Location, layout common.Location) int { return cmp.Compare(loc.From, layout.From) },
+			func(a scanner.MessageLayout, b common.Location) int {
+				if a.Intersects(b) {
+					return 0
+				}
+				return cmp.Compare(a.From, b.From)
+			},
 		)
 		li += latestLayoutIndex // correct the index
 		if !found && li == len(layouts) {
@@ -37,7 +41,7 @@ func alignByLayouts(
 		}
 
 		latestLayoutIndex = li
-		for latestLayoutIndex < len(layouts) && loc.Intersects(layouts[latestLayoutIndex]) {
+		for latestLayoutIndex < len(layouts) && loc.Intersects(layouts[latestLayoutIndex].Location) {
 			layout := layouts[latestLayoutIndex]
 			// Check if layout abuts with previous layout in segment
 			if len(currentSegment) > 0 && currentSegment[len(currentSegment)-1].To != layout.From {
@@ -45,7 +49,7 @@ func alignByLayouts(
 				if len(currentSegment) > 0 {
 					result = append(result, currentSegment)
 				}
-				currentSegment = make([]common.Location, 0)
+				currentSegment = make([]scanner.MessageLayout, 0)
 				currentSize = 0
 			}
 
@@ -56,7 +60,7 @@ func alignByLayouts(
 			// Segment full → flush
 			if currentSize >= segmentSize {
 				result = append(result, currentSegment)
-				currentSegment = make([]common.Location, 0)
+				currentSegment = make([]scanner.MessageLayout, 0)
 				currentSize = 0
 			}
 
