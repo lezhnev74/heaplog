@@ -19,7 +19,7 @@ var (
 )
 
 type MessageLayout struct {
-	From, To         int  // body in the stream
+	common.Location       // body in the stream
 	DateFrom, DateTo int  // [from,to) in the body
 	IsTail           bool // if message ended with EOF
 }
@@ -34,11 +34,11 @@ func Scan(file string, fileSize int, re string, locations []common.Location) (la
 	cmd := exec.CommandContext(ctx, "ug", "-P", `--format=%[0]b,%[1]b:%[1]d%~`, re, file)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, fmt.Errorf("scan ug connect out: %w", err)
+		return nil, fmt.Errorf("ug stdout err: %w", err)
 	}
 	err = cmd.Start()
 	if err != nil {
-		return nil, fmt.Errorf("scan ug start: %w", err)
+		return nil, fmt.Errorf("ug exec: %w", err)
 	}
 
 	defer func() {
@@ -68,7 +68,7 @@ func Scan(file string, fileSize int, re string, locations []common.Location) (la
 	m, d, dl := parseLine(lastLine)
 
 	if err != nil {
-		return nil, fmt.Errorf("scan ug: %w", err)
+		return nil, fmt.Errorf("parse line: %w", err)
 	}
 
 	for {

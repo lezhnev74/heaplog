@@ -53,7 +53,7 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			},
 		},
 		{
-			name:        "layouts matching segment size",
+			name:        "layouts matching layouts size",
 			segmentSize: 50,
 			locs: []common.Location{
 				{From: 0, To: 100},
@@ -107,7 +107,7 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			},
 		},
 		{
-			name:        "single segment",
+			name:        "single layouts",
 			segmentSize: 100,
 			locs: []common.Location{
 				{From: 0, To: 50},
@@ -258,7 +258,7 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 				}
 				for i := range got {
 					if len(got[i]) != len(tt.want[i]) {
-						t.Errorf("alignByLayouts() segment %d got = %v, want %v", i, got[i], tt.want[i])
+						t.Errorf("alignByLayouts() layouts %d got = %v, want %v", i, got[i], tt.want[i])
 					}
 					for j := range got[i] {
 						if got[i][j] != tt.want[i][j] {

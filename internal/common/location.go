@@ -18,7 +18,7 @@ func NewLocation(from, to int) Location {
 	return l
 }
 
-func (s Location) Len() int64 { return int64(s.To - s.From) }
+func (s Location) Len() int { return s.To - s.From }
 
 func (s Location) Contains(i int) bool { return i >= s.From && i < s.To }
 
@@ -57,6 +57,19 @@ func (s Location) Remove(s2 Location) (ret []Location) {
 	result = Location{From: intersection.To, To: s.To}
 	if result.Len() > 0 {
 		ret = append(ret, result)
+	}
+	return
+}
+
+// RemoveAll removes all locations from the original location.
+func (s Location) RemoveAll(ss []Location) (ret []Location) {
+	ret = []Location{s}
+	for _, s2 := range ss {
+		next := make([]Location, 0)
+		for _, r := range ret {
+			next = append(next, r.Remove(s2)...)
+		}
+		ret = next
 	}
 	return
 }

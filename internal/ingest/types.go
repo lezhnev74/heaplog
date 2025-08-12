@@ -7,10 +7,10 @@ import (
 )
 
 type Segment struct {
-	Loc common.Location
+	common.Location
 }
 
 type Message struct {
-	Loc  common.Location
+	common.Location
 	Date time.Time
 }

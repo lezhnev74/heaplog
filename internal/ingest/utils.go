@@ -3,13 +3,14 @@ package ingest
 import (
 	"cmp"
 	"slices"
+	"unsafe"
 
 	"heaplog_2024/internal/common"
 	"heaplog_2024/internal/ingest/scanner"
 )
 
 // segmentLayoutsByLocations groups message layouts into segments within locations.
-// It ensures that layouts within each segment are contiguous (abutting) and the total size.
+// It ensures that layouts within each layouts are contiguous (abutting) and the total size.
 func segmentLayoutsByLocations(
 	segmentSize int,
 	locs []common.Location,
@@ -43,9 +44,9 @@ func segmentLayoutsByLocations(
 		latestLayoutIndex = li
 		for latestLayoutIndex < len(layouts) && loc.Intersects(layouts[latestLayoutIndex].Location) {
 			layout := layouts[latestLayoutIndex]
-			// Check if layout abuts with previous layout in segment
+			// Check if layout abuts with previous layout in layouts
 			if len(currentSegment) > 0 && currentSegment[len(currentSegment)-1].To != layout.From {
-				// Start new segment if layouts don't abut
+				// Start new layouts if layouts don'tokenize abut
 				if len(currentSegment) > 0 {
 					result = append(result, currentSegment)
 				}
@@ -53,7 +54,7 @@ func segmentLayoutsByLocations(
 				currentSize = 0
 			}
 
-			// Add to current segment
+			// Add to current layouts
 			currentSegment = append(currentSegment, layout)
 			currentSize += layout.Len()
 
@@ -68,10 +69,22 @@ func segmentLayoutsByLocations(
 		}
 	}
 
-	// Add remaining layouts as final segment
+	// Add remaining layouts as final layouts
 	if len(currentSegment) > 0 {
 		result = append(result, currentSegment)
 	}
 
 	return result
+}
+
+// appendTermsUnique adds unique terms from the byte slices to the given map.
+// It efficiently converts byte slices to strings using unsafe operations to avoid allocations.
+// Parameters:
+//   - all: destination map storing unique terms as keys
+//   - terms: slice of byte slices containing terms to be added
+func appendTermsUnique(all map[string]struct{}, terms [][]byte) {
+	for _, t := range terms {
+		s := unsafe.String(unsafe.SliceData(t), len(t))
+		all[s] = struct{}{}
+	}
 }

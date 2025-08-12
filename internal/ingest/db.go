@@ -6,8 +6,14 @@ import "heaplog_2024/internal/common"
 type filesIndex interface {
 	// getSegments returns indexed segments (sorted by position) per file
 	getSegments() (map[string][]common.Location, error)
+	// putSegment adds a segment to the index
 	// terms are data for the inverted index
-	putSegment(file string, segment Segment, terms []string, messages []Message) error
-	// wipeFile removes all data for a file from the index
+	// must keep invariant that segments are non-overlapping
+	putSegment(file string, terms [][]byte, messages []Message) error
+	// wipeSegments resets the index for the single segment
+	wipeSegment(file string, segment common.Location) error
+	// wipeSegments resets the index for the file
+	wipeSegments(file string) error
+	// wipeFile deletes the index for the file
 	wipeFile(file string) error
 }

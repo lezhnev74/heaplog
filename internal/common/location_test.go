@@ -44,11 +44,13 @@ func TestExcludeLocations(t *testing.T) {
 		},
 	}
 	for i, tt := range tests {
-		t.Run(fmt.Sprintf("Test %d", i), func(t *testing.T) {
-			if got := ExcludeLocations(tt.src, tt.excl...); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("ExcludeLocations() = %v, want %v", got, tt.want)
-			}
-		})
+		t.Run(
+			fmt.Sprintf("Test %d", i), func(t *testing.T) {
+				if got := ExcludeLocations(tt.src, tt.excl...); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("ExcludeLocations() = %v, want %v", got, tt.want)
+				}
+			},
+		)
 	}
 }
 
@@ -95,11 +97,13 @@ func TestLocation_Intersects(t *testing.T) {
 		},
 	}
 	for i, tt := range tests {
-		t.Run(fmt.Sprintf("Test %d", i), func(t *testing.T) {
-			if got := tt.loc1.Intersects(tt.loc2); got != tt.want {
-				t.Errorf("Location.Intersects() = %v, want %v", got, tt.want)
-			}
-		})
+		t.Run(
+			fmt.Sprintf("Test %d", i), func(t *testing.T) {
+				if got := tt.loc1.Intersects(tt.loc2); got != tt.want {
+					t.Errorf("Location.Intersects() = %v, want %v", got, tt.want)
+				}
+			},
+		)
 	}
 }
 
@@ -136,11 +140,13 @@ func TestLocation_Split(t *testing.T) {
 		},
 	}
 	for i, tt := range tests {
-		t.Run(fmt.Sprintf("Test %d", i), func(t *testing.T) {
-			if got := tt.loc.Split(tt.maxLen); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Location.Split() = %v, want %v", got, tt.want)
-			}
-		})
+		t.Run(
+			fmt.Sprintf("Test %d", i), func(t *testing.T) {
+				if got := tt.loc.Split(tt.maxLen); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("Location.Split() = %v, want %v", got, tt.want)
+				}
+			},
+		)
 	}
 }
 
@@ -182,11 +188,13 @@ func TestLocation_Contains(t *testing.T) {
 		},
 	}
 	for i, tt := range tests {
-		t.Run(fmt.Sprintf("Test %d", i), func(t *testing.T) {
-			if got := tt.loc.Contains(tt.pos); got != tt.want {
-				t.Errorf("Location.Contains() = %v, want %v", got, tt.want)
-			}
-		})
+		t.Run(
+			fmt.Sprintf("Test %d", i), func(t *testing.T) {
+				if got := tt.loc.Contains(tt.pos); got != tt.want {
+					t.Errorf("Location.Contains() = %v, want %v", got, tt.want)
+				}
+			},
+		)
 	}
 }
 
@@ -238,11 +246,13 @@ func TestLocation_Remove(t *testing.T) {
 		},
 	}
 	for i, tt := range tests {
-		t.Run(fmt.Sprintf("Test %d", i), func(t *testing.T) {
-			if got := tt.loc1.Remove(tt.loc2); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Location.Remove() = %v, want %v", got, tt.want)
-			}
-		})
+		t.Run(
+			fmt.Sprintf("Test %d", i), func(t *testing.T) {
+				if got := tt.loc1.Remove(tt.loc2); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("Location.Remove() = %v, want %v", got, tt.want)
+				}
+			},
+		)
 	}
 }
 
@@ -281,11 +291,13 @@ func TestMergeLocations(t *testing.T) {
 		},
 	}
 	for i, tt := range tests {
-		t.Run(fmt.Sprintf("Test %d", i), func(t *testing.T) {
-			if got := MergeLocations(tt.locations); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("MergeLocations() = %v, want %v", got, tt.want)
-			}
-		})
+		t.Run(
+			fmt.Sprintf("Test %d", i), func(t *testing.T) {
+				if got := MergeLocations(tt.locations); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("MergeLocations() = %v, want %v", got, tt.want)
+				}
+			},
+		)
 	}
 }
 
@@ -327,11 +339,13 @@ func TestExcludeLocations1(t *testing.T) {
 		},
 	}
 	for i, tt := range tests {
-		t.Run(fmt.Sprintf("Test %d", i), func(t *testing.T) {
-			if got := ExcludeLocations(tt.src, tt.excl...); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("ExcludeLocations() = %v, want %v", got, tt.want)
-			}
-		})
+		t.Run(
+			fmt.Sprintf("Test %d", i), func(t *testing.T) {
+				if got := ExcludeLocations(tt.src, tt.excl...); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("ExcludeLocations() = %v, want %v", got, tt.want)
+				}
+			},
+		)
 	}
 }
 
@@ -386,11 +400,13 @@ func TestPickNextLocation(t *testing.T) {
 		},
 	}
 	for i, tt := range tests {
-		t.Run(fmt.Sprintf("Test %d", i), func(t *testing.T) {
-			if got := PickNextLocation(tt.locations, tt.minPos, tt.maxLen); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("PickNextLocation() = %v, want %v", got, tt.want)
-			}
-		})
+		t.Run(
+			fmt.Sprintf("Test %d", i), func(t *testing.T) {
+				if got := PickNextLocation(tt.locations, tt.minPos, tt.maxLen); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("PickNextLocation() = %v, want %v", got, tt.want)
+				}
+			},
+		)
 	}
 }
 
@@ -427,17 +443,67 @@ func TestNewLocation(t *testing.T) {
 		},
 	}
 	for i, tt := range tests {
-		t.Run(fmt.Sprintf("Test %d", i), func(t *testing.T) {
-			if tt.wantErr {
-				defer func() {
-					if r := recover(); r == nil {
-						t.Errorf("NewLocation() should have panicked")
-					}
-				}()
-			}
-			if got := NewLocation(tt.from, tt.to); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NewLocation() = %v, want %v", got, tt.want)
-			}
-		})
+		t.Run(
+			fmt.Sprintf("Test %d", i), func(t *testing.T) {
+				if tt.wantErr {
+					defer func() {
+						if r := recover(); r == nil {
+							t.Errorf("NewLocation() should have panicked")
+						}
+					}()
+				}
+				if got := NewLocation(tt.from, tt.to); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("NewLocation() = %v, want %v", got, tt.want)
+				}
+			},
+		)
+	}
+}
+
+func TestLocation_RemoveAll(t *testing.T) {
+	tests := []struct {
+		loc  Location
+		excl []Location
+		want []Location
+	}{
+		{ // empty exclusion list
+			Location{0, 100},
+			[]Location{},
+			[]Location{{0, 100}},
+		},
+		{ // single exclusion in the middle
+			Location{0, 100},
+			[]Location{{40, 60}},
+			[]Location{{0, 40}, {60, 100}},
+		},
+		{ // multiple non-overlapping exclusions
+			Location{0, 100},
+			[]Location{{10, 20}, {40, 50}, {70, 80}},
+			[]Location{{0, 10}, {20, 40}, {50, 70}, {80, 100}},
+		},
+		{ // overlapping exclusions
+			Location{0, 100},
+			[]Location{{10, 30}, {20, 40}, {35, 45}},
+			[]Location{{0, 10}, {45, 100}},
+		},
+		{ // complete coverage
+			Location{0, 100},
+			[]Location{{0, 50}, {50, 100}},
+			[]Location{},
+		},
+		{ // no intersection
+			Location{0, 100},
+			[]Location{{150, 200}, {250, 300}},
+			[]Location{{0, 100}},
+		},
+	}
+	for i, tt := range tests {
+		t.Run(
+			fmt.Sprintf("Test %d", i), func(t *testing.T) {
+				if got := tt.loc.RemoveAll(tt.excl); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("Location.RemoveAll() = %v, want %v", got, tt.want)
+				}
+			},
+		)
 	}
 }
