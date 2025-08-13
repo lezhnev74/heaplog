@@ -83,12 +83,12 @@ func (ix *indexer) consumeTasksViaWorkerPool(in <-chan task) <-chan taskResult {
 					for _, m := range t.layouts {
 
 						// correct positions for the buffer
-						pos := func(pos int) int { return pos - t.layouts[0].From }
+						pos := func(pos int) int { return pos - t.layouts[0].Loc.From }
 						// skip date tokens
-						appendTermsUnique(termsMap, ix.tokenize(t.segmentBuf[pos(m.From):pos(m.DateFrom)]))
-						appendTermsUnique(termsMap, ix.tokenize(t.segmentBuf[pos(m.DateTo):pos(m.To)]))
+						appendTermsUnique(termsMap, ix.tokenize(t.segmentBuf[pos(m.Loc.From):pos(m.DateLoc.From)]))
+						appendTermsUnique(termsMap, ix.tokenize(t.segmentBuf[pos(m.DateLoc.To):pos(m.Loc.To)]))
 
-						dateBuf := t.segmentBuf[pos(m.DateFrom):pos(m.DateTo)]
+						dateBuf := t.segmentBuf[pos(m.DateLoc.From):pos(m.DateLoc.To)]
 						date, err := ix.parseDate(dateBuf)
 						if err != nil {
 							ix.logger.Error(
@@ -101,7 +101,7 @@ func (ix *indexer) consumeTasksViaWorkerPool(in <-chan task) <-chan taskResult {
 							continue TaskLoop
 						}
 
-						messages = append(messages, Message{m.Location, date})
+						messages = append(messages, Message{m.Loc, date})
 					}
 
 					// Collect unique terms from the messages
@@ -140,7 +140,7 @@ func (ix *indexer) produceTasks(pendingSegments map[string][][]scanner.MessageLa
 				defer fd.Close()
 
 				for _, segment := range segments {
-					segmentLoc := common.Location{segment[0].From, segment[len(segment)-1].To}
+					segmentLoc := common.Location{segment[0].Loc.From, segment[len(segment)-1].Loc.To}
 					bytes := ix.bufPool.Get(segmentLoc.Len())[:segmentLoc.Len()]
 					_, err = fd.ReadAt(bytes, int64(segmentLoc.From))
 					if err != nil {

@@ -72,23 +72,17 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 			},
 			expectedLayouts: []scanner.MessageLayout{
 				{
-					From:     1,
-					To:       125,
-					DateFrom: 2,
-					DateTo:   34,
+					Loc:     common.Location{From: 1, To: 125},
+					DateLoc: common.Location{From: 2, To: 34},
 				},
 				{
-					From:     125,
-					To:       620,
-					DateFrom: 126,
-					DateTo:   158,
+					Loc:     common.Location{From: 125, To: 620},
+					DateLoc: common.Location{From: 126, To: 158},
 				},
 				{
-					From:     620,
-					To:       885,
-					DateFrom: 621,
-					DateTo:   653,
-					IsTail:   true,
+					Loc:     common.Location{From: 620, To: 885},
+					DateLoc: common.Location{From: 621, To: 653},
+					IsTail:  true,
 				},
 			},
 		},
@@ -98,10 +92,8 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 			},
 			expectedLayouts: []scanner.MessageLayout{
 				{
-					From:     1,
-					To:       125,
-					DateFrom: 2,
-					DateTo:   34,
+					Loc:     common.Location{From: 1, To: 125},
+					DateLoc: common.Location{From: 2, To: 34},
 				},
 			},
 		},
@@ -111,10 +103,8 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 			},
 			expectedLayouts: []scanner.MessageLayout{
 				{
-					From:     1,
-					To:       125, // right boundary is the next message or the eof
-					DateFrom: 2,
-					DateTo:   34,
+					Loc:     common.Location{From: 1, To: 125}, // right boundary is the next message or the eof
+					DateLoc: common.Location{From: 2, To: 34},
 				},
 			},
 		},
@@ -125,28 +115,26 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 			},
 			expectedLayouts: []scanner.MessageLayout{
 				{
-					From:     1,
-					To:       125,
-					DateFrom: 2,
-					DateTo:   34,
+					Loc:     common.Location{From: 1, To: 125},
+					DateLoc: common.Location{From: 2, To: 34},
 				},
 				{
-					From:     620,
-					To:       885,
-					DateFrom: 621,
-					DateTo:   653,
-					IsTail:   true,
+					Loc:     common.Location{From: 620, To: 885},
+					DateLoc: common.Location{From: 621, To: 653},
+					IsTail:  true,
 				},
 			},
 		},
 	}
 
 	for i, tt := range tests {
-		t.Run(fmt.Sprintf("Test %d", i), func(t *testing.T) {
-			layouts, err := scanner.Scan(filePath, len(fileMap[filePath]), MsgStartRe, tt.locations)
-			require.NoError(t, err)
-			require.Equal(t, tt.expectedLayouts, layouts)
-		})
+		t.Run(
+			fmt.Sprintf("Test %d", i), func(t *testing.T) {
+				layouts, err := scanner.Scan(filePath, len(fileMap[filePath]), MsgStartRe, tt.locations)
+				require.NoError(t, err)
+				require.Equal(t, tt.expectedLayouts, layouts)
+			},
+		)
 	}
 }
 
@@ -185,7 +173,12 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 	}
 	require.NoError(t, common.PopulateFiles(fileMap))
 
-	messages, err := scanner.Scan(filePath, len(fileMap[filePath]), MsgStartRe, []common.Location{{From: 0, To: 1_000_000}})
+	messages, err := scanner.Scan(
+		filePath,
+		len(fileMap[filePath]),
+		MsgStartRe,
+		[]common.Location{{From: 0, To: 1_000_000}},
+	)
 	require.NoError(t, err)
 	require.Len(t, messages, 3000)
 }

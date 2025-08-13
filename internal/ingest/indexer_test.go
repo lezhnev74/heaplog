@@ -15,8 +15,6 @@ import (
 	"heaplog_2024/internal/ingest/tokenizer"
 )
 
-const MessageStartPattern = `(?m)^\[(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}\.?(\d{6}([+-]\d\d:\d\d)?)?)]`
-const TimeFormat = "2006-01-02T15:04:05.000000-07:00"
 const fileContents = `
 [2024-07-30T00:00:04.769958+00:00] message first
 [2024-07-30T00:00:12.285087+00:00] message second
@@ -48,7 +46,7 @@ func TestIndexer(t *testing.T) {
 		logger:   logger,
 		tokenize: func(i []byte) [][]byte { return tokenizer.Tokenize(i, 4, 8) },
 		parseDate: func(b []byte) (time.Time, error) {
-			return time.Parse(TimeFormat, string(b))
+			return time.Parse(common.TimeFormat, string(b))
 		},
 	}
 
@@ -57,7 +55,7 @@ func TestIndexer(t *testing.T) {
 	layouts, err := scanner.Scan(
 		testFile,
 		len(fileBytes),
-		MessageStartPattern,
+		common.MessageStartPattern,
 		[]common.Location{common.Location{0, len(fileBytes)}},
 	)
 	require.NoError(t, err)

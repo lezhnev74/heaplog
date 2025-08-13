@@ -19,9 +19,9 @@ var (
 )
 
 type MessageLayout struct {
-	common.Location       // body in the stream
-	DateFrom, DateTo int  // [from,to) in the body
-	IsTail           bool // if message ended with EOF
+	Loc     common.Location // body in the stream
+	DateLoc common.Location // date in the stream
+	IsTail  bool            // if message ended with EOF
 }
 
 // Scan execs "ug" on the entire file and returns all message offsets within the given locations.
@@ -52,7 +52,7 @@ func Scan(file string, fileSize int, re string, locations []common.Location) (la
 	// here we decide if it within the given locations.
 	putLayout := func(l MessageLayout) {
 		for _, rloc := range locations {
-			if rloc.Contains(l.From) {
+			if rloc.Contains(l.Loc.From) {
 				layouts = append(layouts, l) // yes, keep the layout
 				return
 			}
@@ -73,13 +73,13 @@ func Scan(file string, fileSize int, re string, locations []common.Location) (la
 
 	for {
 		l := MessageLayout{}
-		l.From = m
-		l.DateFrom = d
-		l.DateTo = d + dl
+		l.Loc.From = m
+		l.DateLoc.From = d
+		l.DateLoc.To = d + dl
 
 		if !scanner.Scan() {
 			// reached EOF
-			l.To = fileSize // the last message
+			l.Loc.To = fileSize // the last message
 			l.IsTail = true
 			putLayout(l)
 			break
@@ -87,7 +87,7 @@ func Scan(file string, fileSize int, re string, locations []common.Location) (la
 
 		lastLine = scanner.Text()
 		m, d, dl = parseLine(lastLine)
-		l.To = m
+		l.Loc.To = m
 		putLayout(l)
 	}
 
