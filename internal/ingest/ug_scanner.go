@@ -1,4 +1,4 @@
-package scanner
+package ingest
 
 import (
 	"bufio"
@@ -21,15 +21,15 @@ var (
 type MessageLayout struct {
 	Loc     common.Location // body in the stream
 	DateLoc common.Location // date in the stream
-	IsTail  bool            // if message ended with EOF
+	IsTail  bool            // if the message is at the end of the stream
 }
 
-// Scan execs "ug" on the entire file and returns all message offsets within the given locations.
+// scan execs "ug" on the entire file and returns all message offsets within the given locations.
 // The "ug" command is based on https://github.com/Genivia/ugrep by Robert A. van Engelen.
 // It uses a custom format to extract message boundaries and date ranges.
 // Returns NoMessageStartFound error if no messages are found in the stream.
 // Returns error if there are issues executing ug or accessing the file.
-func Scan(file string, fileSize int, re string, locations []common.Location) (layouts []MessageLayout, err error) {
+func scan(file string, fileSize int, re string, locations []common.Location) (layouts []MessageLayout, err error) {
 	ctx := context.Background()
 	cmd := exec.CommandContext(ctx, "ug", "-P", `--format=%[0]b,%[1]b:%[1]d%~`, re, file)
 	stdout, err := cmd.StdoutPipe()

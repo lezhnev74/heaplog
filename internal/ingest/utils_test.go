@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"heaplog_2024/internal/common"
-	"heaplog_2024/internal/ingest/scanner"
 )
 
 func TestSegmentLayoutsByLocations(t *testing.T) {
@@ -12,15 +11,15 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 		name        string
 		segmentSize int
 		locs        []common.Location
-		layouts     []scanner.MessageLayout
-		want        [][]scanner.MessageLayout
+		layouts     []MessageLayout
+		want        [][]MessageLayout
 	}{
 		{
 			name:        "empty inputs",
 			segmentSize: 10,
 			locs:        []common.Location{},
-			layouts:     []scanner.MessageLayout{},
-			want:        [][]scanner.MessageLayout{},
+			layouts:     []MessageLayout{},
+			want:        [][]MessageLayout{},
 		},
 		{
 			name:        "overlapping layouts",
@@ -28,13 +27,13 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			locs: []common.Location{
 				{From: 0, To: 100},
 			},
-			layouts: []scanner.MessageLayout{
-				{Location: common.Location{From: 0, To: 60}},
-				{Location: common.Location{From: 50, To: 80}},
+			layouts: []MessageLayout{
+				{Loc: common.Location{From: 0, To: 60}},
+				{Loc: common.Location{From: 50, To: 80}},
 			},
-			want: [][]scanner.MessageLayout{
-				{{Location: common.Location{From: 0, To: 60}}},
-				{{Location: common.Location{From: 50, To: 80}}},
+			want: [][]MessageLayout{
+				{{Loc: common.Location{From: 0, To: 60}}},
+				{{Loc: common.Location{From: 50, To: 80}}},
 			},
 		},
 		{
@@ -43,13 +42,13 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			locs: []common.Location{
 				{From: 0, To: 100},
 			},
-			layouts: []scanner.MessageLayout{
-				{Location: common.Location{From: 10, To: 10}},
-				{Location: common.Location{From: 20, To: 20}},
+			layouts: []MessageLayout{
+				{Loc: common.Location{From: 10, To: 10}},
+				{Loc: common.Location{From: 20, To: 20}},
 			},
-			want: [][]scanner.MessageLayout{
-				{{Location: common.Location{From: 10, To: 10}}},
-				{{Location: common.Location{From: 20, To: 20}}},
+			want: [][]MessageLayout{
+				{{Loc: common.Location{From: 10, To: 10}}},
+				{{Loc: common.Location{From: 20, To: 20}}},
 			},
 		},
 		{
@@ -58,13 +57,13 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			locs: []common.Location{
 				{From: 0, To: 100},
 			},
-			layouts: []scanner.MessageLayout{
-				{Location: common.Location{From: 0, To: 50}},
-				{Location: common.Location{From: 50, To: 100}},
+			layouts: []MessageLayout{
+				{Loc: common.Location{From: 0, To: 50}},
+				{Loc: common.Location{From: 50, To: 100}},
 			},
-			want: [][]scanner.MessageLayout{
-				{{Location: common.Location{From: 0, To: 50}}},
-				{{Location: common.Location{From: 50, To: 100}}},
+			want: [][]MessageLayout{
+				{{Loc: common.Location{From: 0, To: 50}}},
+				{{Loc: common.Location{From: 50, To: 100}}},
 			},
 		},
 		{
@@ -73,11 +72,11 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			locs: []common.Location{
 				{From: 0, To: 50},
 			},
-			layouts: []scanner.MessageLayout{
-				{Location: common.Location{From: 60, To: 80}},
-				{Location: common.Location{From: 90, To: 100}},
+			layouts: []MessageLayout{
+				{Loc: common.Location{From: 60, To: 80}},
+				{Loc: common.Location{From: 90, To: 100}},
 			},
-			want: [][]scanner.MessageLayout{},
+			want: [][]MessageLayout{},
 		},
 		{
 			name:        "single layout spanning multiple segments",
@@ -85,11 +84,11 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			locs: []common.Location{
 				{From: 0, To: 100},
 			},
-			layouts: []scanner.MessageLayout{
-				{Location: common.Location{From: 0, To: 90}},
+			layouts: []MessageLayout{
+				{Loc: common.Location{From: 0, To: 90}},
 			},
-			want: [][]scanner.MessageLayout{
-				{{Location: common.Location{From: 0, To: 90}}},
+			want: [][]MessageLayout{
+				{{Loc: common.Location{From: 0, To: 90}}},
 			},
 		},
 		{
@@ -99,11 +98,11 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 				{From: 0, To: 50},
 				{From: 60, To: 100},
 			},
-			layouts: []scanner.MessageLayout{
-				{Location: common.Location{From: 30, To: 80}},
+			layouts: []MessageLayout{
+				{Loc: common.Location{From: 30, To: 80}},
 			},
-			want: [][]scanner.MessageLayout{
-				{{Location: common.Location{From: 30, To: 80}}},
+			want: [][]MessageLayout{
+				{{Loc: common.Location{From: 30, To: 80}}},
 			},
 		},
 		{
@@ -112,14 +111,14 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			locs: []common.Location{
 				{From: 0, To: 50},
 			},
-			layouts: []scanner.MessageLayout{
-				{Location: common.Location{From: 0, To: 40}},
-				{Location: common.Location{From: 40, To: 50}},
+			layouts: []MessageLayout{
+				{Loc: common.Location{From: 0, To: 40}},
+				{Loc: common.Location{From: 40, To: 50}},
 			},
-			want: [][]scanner.MessageLayout{
+			want: [][]MessageLayout{
 				{
-					{Location: common.Location{From: 0, To: 40}},
-					{Location: common.Location{From: 40, To: 50}},
+					{Loc: common.Location{From: 0, To: 40}},
+					{Loc: common.Location{From: 40, To: 50}},
 				},
 			},
 		},
@@ -129,18 +128,18 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			locs: []common.Location{
 				{From: 0, To: 100},
 			},
-			layouts: []scanner.MessageLayout{
-				{Location: common.Location{From: 0, To: 30}},
-				{Location: common.Location{From: 30, To: 60}},
-				{Location: common.Location{From: 60, To: 90}},
+			layouts: []MessageLayout{
+				{Loc: common.Location{From: 0, To: 30}},
+				{Loc: common.Location{From: 30, To: 60}},
+				{Loc: common.Location{From: 60, To: 90}},
 			},
-			want: [][]scanner.MessageLayout{
+			want: [][]MessageLayout{
 				{
-					{Location: common.Location{From: 0, To: 30}},
-					{Location: common.Location{From: 30, To: 60}},
+					{Loc: common.Location{From: 0, To: 30}},
+					{Loc: common.Location{From: 30, To: 60}},
 				},
 				{
-					{Location: common.Location{From: 60, To: 90}},
+					{Loc: common.Location{From: 60, To: 90}},
 				},
 			},
 		},
@@ -150,13 +149,13 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			locs: []common.Location{
 				{From: 50, To: 150},
 			},
-			layouts: []scanner.MessageLayout{
-				{Location: common.Location{From: 0, To: 40}},
-				{Location: common.Location{From: 60, To: 100}},
+			layouts: []MessageLayout{
+				{Loc: common.Location{From: 0, To: 40}},
+				{Loc: common.Location{From: 60, To: 100}},
 			},
-			want: [][]scanner.MessageLayout{
+			want: [][]MessageLayout{
 				{
-					{Location: common.Location{From: 60, To: 100}},
+					{Loc: common.Location{From: 60, To: 100}},
 				},
 			},
 		},
@@ -166,16 +165,16 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			locs: []common.Location{
 				{From: 0, To: 150},
 			},
-			layouts: []scanner.MessageLayout{
-				{Location: common.Location{From: 0, To: 40}},
-				{Location: common.Location{From: 60, To: 100}},
+			layouts: []MessageLayout{
+				{Loc: common.Location{From: 0, To: 40}},
+				{Loc: common.Location{From: 60, To: 100}},
 			},
-			want: [][]scanner.MessageLayout{
+			want: [][]MessageLayout{
 				{
-					{Location: common.Location{From: 0, To: 40}},
+					{Loc: common.Location{From: 0, To: 40}},
 				},
 				{
-					{Location: common.Location{From: 60, To: 100}},
+					{Loc: common.Location{From: 60, To: 100}},
 				},
 			},
 		},
@@ -186,16 +185,16 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 				{From: 40, To: 50},
 				{From: 60, To: 70},
 			},
-			layouts: []scanner.MessageLayout{
-				{Location: common.Location{From: 30, To: 45}},
-				{Location: common.Location{From: 55, To: 65}},
+			layouts: []MessageLayout{
+				{Loc: common.Location{From: 30, To: 45}},
+				{Loc: common.Location{From: 55, To: 65}},
 			},
-			want: [][]scanner.MessageLayout{
+			want: [][]MessageLayout{
 				{
-					{Location: common.Location{From: 30, To: 45}},
+					{Loc: common.Location{From: 30, To: 45}},
 				},
 				{
-					{Location: common.Location{From: 55, To: 65}},
+					{Loc: common.Location{From: 55, To: 65}},
 				},
 			},
 		},
@@ -205,10 +204,10 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			locs: []common.Location{
 				{From: 10, To: 20},
 			},
-			layouts: []scanner.MessageLayout{
-				{Location: common.Location{From: 0, To: 5}},
+			layouts: []MessageLayout{
+				{Loc: common.Location{From: 0, To: 5}},
 			},
-			want: [][]scanner.MessageLayout{},
+			want: [][]MessageLayout{},
 		},
 		{
 			name:        "right from the locs",
@@ -216,10 +215,10 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			locs: []common.Location{
 				{From: 10, To: 20},
 			},
-			layouts: []scanner.MessageLayout{
-				{Location: common.Location{From: 30, To: 35}},
+			layouts: []MessageLayout{
+				{Loc: common.Location{From: 30, To: 35}},
 			},
-			want: [][]scanner.MessageLayout{},
+			want: [][]MessageLayout{},
 		},
 		{
 			name:        "partial overlap left",
@@ -227,11 +226,11 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			locs: []common.Location{
 				{From: 10, To: 20},
 			},
-			layouts: []scanner.MessageLayout{
-				{Location: common.Location{From: 0, To: 11}},
+			layouts: []MessageLayout{
+				{Loc: common.Location{From: 0, To: 11}},
 			},
-			want: [][]scanner.MessageLayout{
-				{{Location: common.Location{From: 0, To: 11}}},
+			want: [][]MessageLayout{
+				{{Loc: common.Location{From: 0, To: 11}}},
 			},
 		},
 		{
@@ -240,11 +239,11 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			locs: []common.Location{
 				{From: 10, To: 20},
 			},
-			layouts: []scanner.MessageLayout{
-				{Location: common.Location{From: 16, To: 30}},
+			layouts: []MessageLayout{
+				{Loc: common.Location{From: 16, To: 30}},
 			},
-			want: [][]scanner.MessageLayout{
-				{{Location: common.Location{From: 16, To: 30}}},
+			want: [][]MessageLayout{
+				{{Loc: common.Location{From: 16, To: 30}}},
 			},
 		},
 	}

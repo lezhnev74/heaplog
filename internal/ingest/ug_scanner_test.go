@@ -1,4 +1,4 @@
-package scanner_test
+package ingest
 
 import (
 	"fmt"
@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"heaplog_2024/internal/common"
-	"heaplog_2024/internal/ingest/scanner"
 )
 
 const MsgStartRe = `^\[([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}[+-][0-9]{2}:[0-9]{2})]`
@@ -47,7 +46,7 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 
 	type Test struct {
 		locations       []common.Location
-		expectedLayouts []scanner.MessageLayout
+		expectedLayouts []MessageLayout
 	}
 	tests := []Test{
 		{ // empty
@@ -70,7 +69,7 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 			locations: []common.Location{
 				{From: 0, To: 10000},
 			},
-			expectedLayouts: []scanner.MessageLayout{
+			expectedLayouts: []MessageLayout{
 				{
 					Loc:     common.Location{From: 1, To: 125},
 					DateLoc: common.Location{From: 2, To: 34},
@@ -90,7 +89,7 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 			locations: []common.Location{
 				{From: 0, To: 20},
 			},
-			expectedLayouts: []scanner.MessageLayout{
+			expectedLayouts: []MessageLayout{
 				{
 					Loc:     common.Location{From: 1, To: 125},
 					DateLoc: common.Location{From: 2, To: 34},
@@ -101,7 +100,7 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 			locations: []common.Location{
 				{From: 0, To: 50},
 			},
-			expectedLayouts: []scanner.MessageLayout{
+			expectedLayouts: []MessageLayout{
 				{
 					Loc:     common.Location{From: 1, To: 125}, // right boundary is the next message or the eof
 					DateLoc: common.Location{From: 2, To: 34},
@@ -113,7 +112,7 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 				{From: 0, To: 50},
 				{From: 610, To: 700},
 			},
-			expectedLayouts: []scanner.MessageLayout{
+			expectedLayouts: []MessageLayout{
 				{
 					Loc:     common.Location{From: 1, To: 125},
 					DateLoc: common.Location{From: 2, To: 34},
@@ -130,7 +129,7 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 	for i, tt := range tests {
 		t.Run(
 			fmt.Sprintf("Test %d", i), func(t *testing.T) {
-				layouts, err := scanner.Scan(filePath, len(fileMap[filePath]), MsgStartRe, tt.locations)
+				layouts, err := scan(filePath, len(fileMap[filePath]), MsgStartRe, tt.locations)
 				require.NoError(t, err)
 				require.Equal(t, tt.expectedLayouts, layouts)
 			},
@@ -173,7 +172,7 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 	}
 	require.NoError(t, common.PopulateFiles(fileMap))
 
-	messages, err := scanner.Scan(
+	messages, err := scan(
 		filePath,
 		len(fileMap[filePath]),
 		MsgStartRe,

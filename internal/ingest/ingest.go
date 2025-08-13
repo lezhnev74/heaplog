@@ -13,7 +13,6 @@ import (
 	"go.uber.org/zap"
 
 	"heaplog_2024/internal/common"
-	"heaplog_2024/internal/ingest/scanner"
 )
 
 // Ingestor handles file discovery, scanning and indexing operations.
@@ -101,7 +100,7 @@ func (i *Ingestor) Run() error {
 // If the file has no messages found or any layouts boundaries don'tokenize align with message boundaries, the file is wiped from the index.
 func (i *Ingestor) validateOrWipe(
 	indexedSegments map[string][]common.Location,
-	foundFilesLayouts map[string][]scanner.MessageLayout,
+	foundFilesLayouts map[string][]MessageLayout,
 ) error {
 	var err error
 indexFileLoop:
@@ -117,10 +116,10 @@ indexFileLoop:
 			// todo: apply binary search
 
 			for _, m := range foundFilesLayouts[file] {
-				if s.From == m.From {
+				if s.From == m.Loc.From {
 					leftMatched = true
 				}
-				if s.To == m.To {
+				if s.To == m.Loc.To {
 					rightMatched = true
 				}
 			}
@@ -150,12 +149,12 @@ indexFileLoop:
 //   - accessibleFiles: map of file paths to their sizes
 //
 // Returns map of file paths to their message layouts and error if scanning fails.
-func (i *Ingestor) buildFilesLayouts(accessibleFiles map[string]int) (map[string][]scanner.MessageLayout, error) {
+func (i *Ingestor) buildFilesLayouts(accessibleFiles map[string]int) (map[string][]MessageLayout, error) {
 
 	// split files per workers
 	files := slices.Collect(maps.Keys(accessibleFiles))
 	filesPerWorker := common.ChunksN(files, i.workers)
-	layoutsPerFile := make([][]scanner.MessageLayout, len(files))
+	layoutsPerFile := make([][]MessageLayout, len(files))
 
 	wg := sync.WaitGroup{}
 	wg.Add(i.workers)
@@ -164,7 +163,7 @@ func (i *Ingestor) buildFilesLayouts(accessibleFiles map[string]int) (map[string
 			defer wg.Done()
 			for _, f := range filesPerWorker[j] {
 				fileSize := accessibleFiles[f]
-				layouts, err := scanner.Scan(f, fileSize, i.messageRE.String(), nil)
+				layouts, err := scan(f, fileSize, i.messageRE.String(), nil)
 				if err != nil {
 					i.logger.Error("scan file", zap.String("file", f), zap.Error(err))
 					continue
@@ -176,7 +175,7 @@ func (i *Ingestor) buildFilesLayouts(accessibleFiles map[string]int) (map[string
 	wg.Wait()
 
 	// merge layouts per file to a map
-	foundFilesLayouts := make(map[string][]scanner.MessageLayout)
+	foundFilesLayouts := make(map[string][]MessageLayout)
 	for j, layouts := range layoutsPerFile {
 		foundFilesLayouts[files[j]] = layouts
 	}
@@ -287,13 +286,13 @@ func (i *Ingestor) validateLastSegments(
 // For each file return a list of segments that need to be indexed.
 func (i *Ingestor) planIndexing(
 	indexedSegments map[string][]common.Location,
-	existingFilesLayouts map[string][]scanner.MessageLayout,
-) map[string][][]scanner.MessageLayout {
+	existingFilesLayouts map[string][]MessageLayout,
+) map[string][][]MessageLayout {
 
-	plan := make(map[string][][]scanner.MessageLayout)
+	plan := make(map[string][][]MessageLayout)
 
 	for file, layouts := range existingFilesLayouts {
-		filesize := layouts[len(layouts)-1].To
+		filesize := layouts[len(layouts)-1].Loc.To
 		fl := common.Location{0, filesize}
 		unindexedLocations := fl.RemoveAll(indexedSegments[file])
 		segments := segmentLayoutsByLocations(i.segmentLen, unindexedLocations, layouts)

@@ -6,7 +6,6 @@ import (
 	"unsafe"
 
 	"heaplog_2024/internal/common"
-	"heaplog_2024/internal/ingest/scanner"
 )
 
 // segmentLayoutsByLocations groups message layouts into segments within locations.
@@ -14,14 +13,14 @@ import (
 func segmentLayoutsByLocations(
 	segmentSize int,
 	locs []common.Location,
-	layouts []scanner.MessageLayout,
-) [][]scanner.MessageLayout {
-	result := make([][]scanner.MessageLayout, 0)
+	layouts []MessageLayout,
+) [][]MessageLayout {
+	result := make([][]MessageLayout, 0)
 	if len(layouts) == 0 || len(locs) == 0 {
 		return result
 	}
 
-	currentSegment := make([]scanner.MessageLayout, 0)
+	currentSegment := make([]MessageLayout, 0)
 	currentSize := 0
 	latestLayoutIndex := 0
 
@@ -29,11 +28,11 @@ func segmentLayoutsByLocations(
 		li, found := slices.BinarySearchFunc(
 			layouts[latestLayoutIndex:],
 			loc,
-			func(a scanner.MessageLayout, b common.Location) int {
-				if a.Intersects(b) {
+			func(a MessageLayout, b common.Location) int {
+				if a.Loc.Intersects(b) {
 					return 0
 				}
-				return cmp.Compare(a.From, b.From)
+				return cmp.Compare(a.Loc.From, b.From)
 			},
 		)
 		li += latestLayoutIndex // correct the index
@@ -42,26 +41,26 @@ func segmentLayoutsByLocations(
 		}
 
 		latestLayoutIndex = li
-		for latestLayoutIndex < len(layouts) && loc.Intersects(layouts[latestLayoutIndex].Location) {
+		for latestLayoutIndex < len(layouts) && loc.Intersects(layouts[latestLayoutIndex].Loc) {
 			layout := layouts[latestLayoutIndex]
 			// Check if layout abuts with previous layout in layouts
-			if len(currentSegment) > 0 && currentSegment[len(currentSegment)-1].To != layout.From {
+			if len(currentSegment) > 0 && currentSegment[len(currentSegment)-1].Loc.To != layout.Loc.From {
 				// Start new layouts if layouts don'tokenize abut
 				if len(currentSegment) > 0 {
 					result = append(result, currentSegment)
 				}
-				currentSegment = make([]scanner.MessageLayout, 0)
+				currentSegment = make([]MessageLayout, 0)
 				currentSize = 0
 			}
 
 			// Add to current layouts
 			currentSegment = append(currentSegment, layout)
-			currentSize += layout.Len()
+			currentSize += layout.Loc.Len()
 
 			// Segment full → flush
 			if currentSize >= segmentSize {
 				result = append(result, currentSegment)
-				currentSegment = make([]scanner.MessageLayout, 0)
+				currentSegment = make([]MessageLayout, 0)
 				currentSize = 0
 			}
 

@@ -11,8 +11,6 @@ import (
 	"go.uber.org/zap"
 
 	"heaplog_2024/internal/common"
-	"heaplog_2024/internal/ingest/scanner"
-	"heaplog_2024/internal/ingest/tokenizer"
 )
 
 const fileContents = `
@@ -44,7 +42,7 @@ func TestIndexer(t *testing.T) {
 		workers:  1, // predictable results
 		bufPool:  bufPool,
 		logger:   logger,
-		tokenize: func(i []byte) [][]byte { return tokenizer.Tokenize(i, 4, 8) },
+		tokenize: func(i []byte) [][]byte { return common.Tokenize(i, 4, 8) },
 		parseDate: func(b []byte) (time.Time, error) {
 			return time.Parse(common.TimeFormat, string(b))
 		},
@@ -52,15 +50,15 @@ func TestIndexer(t *testing.T) {
 
 	// Prepare test data
 	fileBytes := []byte(fileContents)
-	layouts, err := scanner.Scan(
+	layouts, err := scan(
 		testFile,
 		len(fileBytes),
 		common.MessageStartPattern,
-		[]common.Location{common.Location{0, len(fileBytes)}},
+		[]common.Location{{0, len(fileBytes)}},
 	)
 	require.NoError(t, err)
 
-	segments := map[string][][]scanner.MessageLayout{
+	segments := map[string][][]MessageLayout{
 		testFile: {layouts[:1], layouts[1:]},
 	}
 
