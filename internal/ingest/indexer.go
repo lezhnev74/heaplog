@@ -57,6 +57,7 @@ func (ix *Indexer) indexSegments(pendingSegments map[string][][]MessageLayout) i
 	return func(yield func(taskResult) bool) {
 		for r := range tasksResults {
 			ix.bufPool.Put(r.task.segmentBuf)
+			r.task.segmentBuf = nil
 			if !yield(r) {
 				break
 			}
@@ -91,13 +92,13 @@ func (ix *Indexer) consumeTasksViaWorkerPool(in <-chan task) <-chan taskResult {
 						continue // skip faulty files
 					}
 
+					// calculate effective position in the buffer by offsetting absolute position
+					pos := func(pos int) int { return pos - t.layouts[0].Loc.From }
+
 					// Tokenize each message in the layouts
 					messages := make([]common.Message, 0, len(t.layouts))
 					termsMap := make(map[string]struct{})
 					for _, m := range t.layouts {
-
-						// correct positions for the buffer
-						pos := func(pos int) int { return pos - t.layouts[0].Loc.From }
 						// skip date tokens
 						appendTermsUnique(termsMap, ix.tokenize(t.segmentBuf[pos(m.Loc.From):pos(m.DateLoc.From)]))
 						appendTermsUnique(termsMap, ix.tokenize(t.segmentBuf[pos(m.DateLoc.To):pos(m.Loc.To)]))

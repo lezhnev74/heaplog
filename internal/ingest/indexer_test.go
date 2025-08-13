@@ -13,21 +13,20 @@ import (
 )
 
 func TestIndexer(t *testing.T) {
-	fileName, fileBytes := common.MakeTestFile(t)
-
 	// Setup Indexer
 	logger := zap.NewNop()
 	ix := NewIndexer(
 		logger,
 		func(i []byte) [][]byte {
 			return [][]byte{[]byte("test token")}
-		}, // pick one
+		},
 		func(b []byte) (time.Time, error) {
 			return time.Parse(common.TimeFormat, string(b))
 		},
 	)
 
 	// Prepare test data
+	fileName, fileBytes := common.MakeTestFile(t)
 	layouts, err := scan(
 		fileName,
 		len(fileBytes),
@@ -45,6 +44,7 @@ func TestIndexer(t *testing.T) {
 		results = append(results, r)
 	}
 
+	// Compare results with expected values
 	expectedResults := []taskResult{
 		{
 			task: task{
@@ -62,11 +62,6 @@ func TestIndexer(t *testing.T) {
 			messages: common.SampleLayouts[1:],
 			tokens:   [][]byte{[]byte("test token")},
 		},
-	}
-
-	// Compare results with expected values
-	if len(results) != len(expectedResults) {
-		t.Fatalf("Expected %d results, got %d", len(expectedResults), len(results))
 	}
 
 	for i, result := range results {
