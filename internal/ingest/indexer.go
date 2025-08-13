@@ -19,12 +19,12 @@ type task struct {
 type taskResult struct {
 	task     task
 	tokens   [][]byte
-	messages []Message
+	messages []common.Message
 }
 
-// indexer processes log file segments in parallel, tokenizing content and parsing dates
+// Indexer processes log file segments in parallel, tokenizing content and parsing dates
 // using a configurable number of workers
-type indexer struct {
+type Indexer struct {
 	blacklist sync.Map
 	workers   int
 	tokenize  func([]byte) [][]byte
@@ -33,8 +33,23 @@ type indexer struct {
 	logger    *zap.Logger
 }
 
+func NewIndexer(
+	logger *zap.Logger,
+	tokenize func(i []byte) [][]byte,
+	parseDate func(b []byte) (time.Time, error),
+) *Indexer {
+	bufPool := common.NewBufferPool([]int{1024})
+	return &Indexer{
+		workers:   1, // predictable results
+		bufPool:   bufPool,
+		logger:    logger,
+		tokenize:  tokenize,
+		parseDate: parseDate,
+	}
+}
+
 // indexSegments processes pending segments from multiple files in parallel and returns an iterator of task results.
-func (ix *indexer) indexSegments(pendingSegments map[string][][]MessageLayout) iter.Seq[taskResult] {
+func (ix *Indexer) indexSegments(pendingSegments map[string][][]MessageLayout) iter.Seq[taskResult] {
 
 	tasks := ix.produceTasks(pendingSegments)
 	tasksResults := ix.consumeTasksViaWorkerPool(tasks)
@@ -53,7 +68,7 @@ func (ix *indexer) indexSegments(pendingSegments map[string][][]MessageLayout) i
 // It spawns the configured number of worker goroutines that process tasks in parallel.
 // Each worker tokenizes messages, extracts and validates dates, and collects unique terms.
 // If date parsing fails for any message in a file, the file is blacklisted and its remaining segments are skipped.
-func (ix *indexer) consumeTasksViaWorkerPool(in <-chan task) <-chan taskResult {
+func (ix *Indexer) consumeTasksViaWorkerPool(in <-chan task) <-chan taskResult {
 	results := make(chan taskResult)
 
 	// launch workers in a separate goroutine
@@ -77,7 +92,7 @@ func (ix *indexer) consumeTasksViaWorkerPool(in <-chan task) <-chan taskResult {
 					}
 
 					// Tokenize each message in the layouts
-					messages := make([]Message, 0, len(t.layouts))
+					messages := make([]common.Message, 0, len(t.layouts))
 					termsMap := make(map[string]struct{})
 					for _, m := range t.layouts {
 
@@ -100,7 +115,7 @@ func (ix *indexer) consumeTasksViaWorkerPool(in <-chan task) <-chan taskResult {
 							continue TaskLoop
 						}
 
-						messages = append(messages, Message{m.Loc, date})
+						messages = append(messages, common.Message{m.Loc, date})
 					}
 
 					// Collect unique terms from the messages
@@ -122,7 +137,7 @@ func (ix *indexer) consumeTasksViaWorkerPool(in <-chan task) <-chan taskResult {
 // For each segment, it reads the corresponding bytes from the file using a buffer from the pool.
 // Returns a channel of tasks containing file path, segment bytes, and message layouts.
 // If file operations fail, the file is blacklisted and skipped.
-func (ix *indexer) produceTasks(pendingSegments map[string][][]MessageLayout) <-chan task {
+func (ix *Indexer) produceTasks(pendingSegments map[string][][]MessageLayout) <-chan task {
 	tasks := make(chan task)
 
 	// produce tasks in a separate goroutine

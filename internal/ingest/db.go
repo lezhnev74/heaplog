@@ -9,7 +9,7 @@ type filesIndex interface {
 	// putSegment adds a segment to the index
 	// terms are data for the inverted index
 	// must keep invariant that segments are non-overlapping
-	putSegment(file string, terms [][]byte, messages []Message) error
+	putSegment(file string, terms [][]byte, messages []common.Message) error
 	// wipeSegments resets the index for the single segment
 	wipeSegment(file string, segment common.Location) error
 	// wipeSegments resets the index for the file

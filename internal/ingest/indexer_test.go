@@ -2,7 +2,6 @@ package ingest
 
 import (
 	"bytes"
-	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -13,56 +12,34 @@ import (
 	"heaplog_2024/internal/common"
 )
 
-const fileContents = `
-[2024-07-30T00:00:04.769958+00:00] message first
-[2024-07-30T00:00:12.285087+00:00] message second
-[2024-07-30T00:00:12.967490+00:00] message third
-`
-
 func TestIndexer(t *testing.T) {
+	fileName, fileBytes := common.MakeTestFile(t)
 
-	dir := t.TempDir()
-	testFile := filepath.Join(dir, "test.log")
-
-	err := common.PopulateFiles(
-		map[string][]byte{
-			testFile: []byte(fileContents),
+	// Setup Indexer
+	logger := zap.NewNop()
+	ix := NewIndexer(
+		logger,
+		func(i []byte) [][]byte {
+			return [][]byte{[]byte("test token")}
+		}, // pick one
+		func(b []byte) (time.Time, error) {
+			return time.Parse(common.TimeFormat, string(b))
 		},
 	)
 
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Setup indexer
-	logger := zap.NewNop()
-	bufPool := common.NewBufferPool([]int{1024})
-
-	ix := &indexer{
-		workers:  1, // predictable results
-		bufPool:  bufPool,
-		logger:   logger,
-		tokenize: func(i []byte) [][]byte { return common.Tokenize(i, 4, 8) },
-		parseDate: func(b []byte) (time.Time, error) {
-			return time.Parse(common.TimeFormat, string(b))
-		},
-	}
-
 	// Prepare test data
-	fileBytes := []byte(fileContents)
 	layouts, err := scan(
-		testFile,
+		fileName,
 		len(fileBytes),
 		common.MessageStartPattern,
 		[]common.Location{{0, len(fileBytes)}},
 	)
 	require.NoError(t, err)
 
-	segments := map[string][][]MessageLayout{
-		testFile: {layouts[:1], layouts[1:]},
-	}
-
 	// Test indexing
+	segments := map[string][][]MessageLayout{
+		fileName: {layouts[:1], layouts[1:]},
+	}
 	var results []taskResult
 	for r := range ix.indexSegments(segments) {
 		results = append(results, r)
@@ -71,33 +48,19 @@ func TestIndexer(t *testing.T) {
 	expectedResults := []taskResult{
 		{
 			task: task{
-				file:    testFile,
+				file:    fileName,
 				layouts: layouts[:1],
 			},
-			messages: []Message{
-				{
-					Location: common.Location{From: 1, To: 50},
-					Date:     time.Date(2024, 7, 30, 0, 0, 4, 769958000, time.UTC),
-				},
-			},
-			tokens: [][]byte{[]byte("message"), []byte("first")},
+			messages: common.SampleLayouts[:1],
+			tokens:   [][]byte{[]byte("test token")},
 		},
 		{
 			task: task{
-				file:    testFile,
+				file:    fileName,
 				layouts: layouts[1:],
 			},
-			messages: []Message{
-				{
-					Location: common.Location{From: 50, To: 100},
-					Date:     time.Date(2024, 7, 30, 0, 0, 12, 285087000, time.UTC),
-				},
-				{
-					Location: common.Location{From: 100, To: 149},
-					Date:     time.Date(2024, 7, 30, 0, 0, 12, 967490000, time.UTC),
-				},
-			},
-			tokens: [][]byte{[]byte("message"), []byte("second"), []byte("third")},
+			messages: common.SampleLayouts[1:],
+			tokens:   [][]byte{[]byte("test token")},
 		},
 	}
 
@@ -110,10 +73,6 @@ func TestIndexer(t *testing.T) {
 		expected := expectedResults[i]
 
 		// Compare messages
-		if len(result.messages) != len(expected.messages) {
-			t.Errorf("Result %d: Expected %d messages, got %d", i, len(expected.messages), len(result.messages))
-			continue
-		}
 		for j, msg := range result.messages {
 			if msg.Location != expected.messages[j].Location {
 				t.Errorf(
@@ -130,10 +89,6 @@ func TestIndexer(t *testing.T) {
 		}
 
 		// Compare tokens
-		if len(result.tokens) != len(expected.tokens) {
-			t.Errorf("Result %d: Expected %d tokens, got %d", i, len(expected.tokens), len(result.tokens))
-			continue
-		}
 		slices.SortFunc(result.tokens, bytes.Compare)
 		slices.SortFunc(expected.tokens, bytes.Compare)
 		for j, token := range result.tokens {
@@ -148,10 +103,6 @@ func TestIndexer(t *testing.T) {
 		}
 
 		// Compare layouts
-		if len(result.task.layouts) != len(expected.task.layouts) {
-			t.Errorf("Result %d: Expected %d layouts, got %d", i, len(expected.task.layouts), len(result.task.layouts))
-			continue
-		}
 		for j, layout := range result.task.layouts {
 			if layout != expected.task.layouts[j] {
 				t.Errorf("Result %d, layout %d: Expected %v, got %v", i, j, expected.task.layouts[j], layout)

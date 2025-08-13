@@ -30,7 +30,7 @@ type Ingestor struct {
 
 	db      filesIndex
 	logger  *zap.Logger
-	indexer *indexer
+	indexer *Indexer
 }
 
 // Run performs the main ingestion workflow
