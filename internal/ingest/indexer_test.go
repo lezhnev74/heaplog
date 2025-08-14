@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"slices"
 	"testing"
@@ -17,6 +18,7 @@ func TestIndexer(t *testing.T) {
 	// Setup Indexer
 	logger := zap.NewNop()
 	ix := NewIndexer(
+		context.Background(),
 		logger,
 		func(i []byte) [][]byte {
 			return [][]byte{[]byte("test token")}
@@ -112,6 +114,7 @@ func TestBlacklistedFileNotIndexed(t *testing.T) {
 	// Setup Indexer with a date parser that will fail
 	logger := zap.NewNop()
 	ix := NewIndexer(
+		context.Background(),
 		logger,
 		func(i []byte) [][]byte {
 			return [][]byte{[]byte("test token")}
@@ -145,4 +148,47 @@ func TestBlacklistedFileNotIndexed(t *testing.T) {
 	for range ix.indexSegments(segments) {
 		t.Error("Expected no results for blacklisted file on second attempt")
 	}
+}
+
+func TestIndexerContextCancellation(t *testing.T) {
+	// Setup context with cancellation
+	ctx, cancel := context.WithCancel(context.Background())
+	logger := zap.NewNop()
+
+	// Create indexer with slow date parser
+	ix := NewIndexer(
+		ctx,
+		logger,
+		func(i []byte) [][]byte {
+			return [][]byte{[]byte("test token")}
+		},
+		func(b []byte) (time.Time, error) {
+			time.Sleep(1000 * time.Millisecond) // Simulate slow processing
+			return time.Parse(common.TimeFormat, string(b))
+		},
+	)
+
+	// Prepare test data
+	fileName, fileBytes := common.MakeTestFile(t)
+	layouts, err := scan(
+		fileName,
+		len(fileBytes),
+		common.MessageStartPattern,
+		[]common.Location{{0, len(fileBytes)}},
+	)
+	require.NoError(t, err)
+
+	segments := map[string][][]MessageLayout{
+		fileName: {layouts},
+	}
+
+	// Cancel context quickly, before any tasks are started
+	go func() { cancel() }()
+
+	// Verify no results are produced
+	results := 0
+	for range ix.indexSegments(segments) {
+		results++
+	}
+	require.Equal(t, 0, results, "Expected no results after context cancellation")
 }

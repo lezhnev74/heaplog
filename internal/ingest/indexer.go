@@ -1,6 +1,7 @@
 package ingest
 
 import (
+	"context"
 	"iter"
 	"os"
 	"sync"
@@ -25,6 +26,7 @@ type taskResult struct {
 // Indexer processes log file segments in parallel, tokenizing content and parsing dates
 // using a configurable number of workers
 type Indexer struct {
+	ctx       context.Context
 	blacklist sync.Map
 	workers   int
 	tokenize  func([]byte) [][]byte
@@ -34,12 +36,14 @@ type Indexer struct {
 }
 
 func NewIndexer(
+	ctx context.Context,
 	logger *zap.Logger,
 	tokenize func(i []byte) [][]byte,
 	parseDate func(b []byte) (time.Time, error),
 ) *Indexer {
 	bufPool := common.NewBufferPool([]int{1024})
 	return &Indexer{
+		ctx:       ctx,
 		workers:   1, // predictable results
 		bufPool:   bufPool,
 		logger:    logger,
@@ -155,6 +159,14 @@ func (ix *Indexer) produceTasks(pendingSegments map[string][][]MessageLayout) <-
 				defer fd.Close()
 
 				for _, segment := range segments {
+
+					// Expect hang-up:
+					select {
+					case <-ix.ctx.Done():
+						return
+					default:
+					}
+
 					segmentLoc := common.Location{segment[0].Loc.From, segment[len(segment)-1].Loc.To}
 					bytes := ix.bufPool.Get(segmentLoc.Len())[:segmentLoc.Len()]
 					_, err = fd.ReadAt(bytes, int64(segmentLoc.From))
