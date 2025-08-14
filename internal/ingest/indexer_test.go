@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"bytes"
+	"fmt"
 	"slices"
 	"testing"
 	"time"
@@ -105,4 +106,43 @@ func TestIndexer(t *testing.T) {
 		}
 	}
 
+}
+
+func TestBlacklistedFileNotIndexed(t *testing.T) {
+	// Setup Indexer with a date parser that will fail
+	logger := zap.NewNop()
+	ix := NewIndexer(
+		logger,
+		func(i []byte) [][]byte {
+			return [][]byte{[]byte("test token")}
+		},
+		func(b []byte) (time.Time, error) {
+			return time.Time{}, fmt.Errorf("unexpected date format")
+		},
+	)
+
+	// Prepare test data
+	fileName, fileBytes := common.MakeTestFile(t)
+	layouts, err := scan(
+		fileName,
+		len(fileBytes),
+		common.MessageStartPattern,
+		[]common.Location{{0, len(fileBytes)}},
+	)
+	require.NoError(t, err)
+
+	// First indexing attempt should fail and blacklist the file
+	segments := map[string][][]MessageLayout{
+		fileName: {layouts},
+	}
+	results := 0
+	for range ix.indexSegments(segments) {
+		results++
+	}
+	require.Equal(t, 0, results, "Expected no results for blacklisted file")
+
+	// Second attempt should be skipped due to blacklisting
+	for range ix.indexSegments(segments) {
+		t.Error("Expected no results for blacklisted file on second attempt")
+	}
 }
