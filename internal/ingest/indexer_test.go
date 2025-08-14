@@ -18,6 +18,7 @@ func TestIndexer(t *testing.T) {
 	// Setup Indexer
 	logger := zap.NewNop()
 	ix := NewIndexer(
+		context.Background(),
 		logger,
 		func(i []byte) [][]byte {
 			return [][]byte{[]byte("test token")}
@@ -42,7 +43,7 @@ func TestIndexer(t *testing.T) {
 		fileName: {layouts[:1], layouts[1:]},
 	}
 	var results []taskResult
-	for r := range ix.indexSegments(context.Background(), segments) {
+	for r := range ix.indexSegments(segments) {
 		results = append(results, r)
 	}
 
@@ -113,6 +114,7 @@ func TestBlacklistedFileNotIndexed(t *testing.T) {
 	// Setup Indexer with a date parser that will fail
 	logger := zap.NewNop()
 	ix := NewIndexer(
+		context.Background(),
 		logger,
 		func(i []byte) [][]byte {
 			return [][]byte{[]byte("test token")}
@@ -137,13 +139,13 @@ func TestBlacklistedFileNotIndexed(t *testing.T) {
 		fileName: {layouts},
 	}
 	results := 0
-	for range ix.indexSegments(context.Background(), segments) {
+	for range ix.indexSegments(segments) {
 		results++
 	}
 	require.Equal(t, 0, results, "Expected no results for blacklisted file")
 
 	// Second attempt should be skipped due to blacklisting
-	for range ix.indexSegments(context.Background(), segments) {
+	for range ix.indexSegments(segments) {
 		t.Error("Expected no results for blacklisted file on second attempt")
 	}
 }
@@ -155,6 +157,7 @@ func TestIndexerContextCancellation(t *testing.T) {
 
 	// Create indexer with slow date parser
 	ix := NewIndexer(
+		ctx,
 		logger,
 		func(i []byte) [][]byte {
 			return [][]byte{[]byte("test token")}
@@ -184,7 +187,7 @@ func TestIndexerContextCancellation(t *testing.T) {
 
 	// Verify no results are produced
 	results := 0
-	for range ix.indexSegments(ctx, segments) {
+	for range ix.indexSegments(segments) {
 		results++
 	}
 	require.Equal(t, 0, results, "Expected no results after context cancellation")

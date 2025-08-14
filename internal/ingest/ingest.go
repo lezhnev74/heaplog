@@ -85,7 +85,7 @@ func (i *Ingestor) Run(ctx context.Context) error {
 	pendingSegments := i.planIndexing(indexedSegments, filesLayouts)
 
 	// 9. Perform indexing
-	for r := range i.indexer.indexSegments(ctx, pendingSegments) {
+	for r := range i.indexer.indexSegments(pendingSegments) {
 		err = i.db.putSegment(r.task.file, r.tokens, r.messages)
 		if err != nil {
 			i.logger.Error("save indexed segment", zap.String("file", r.task.file), zap.Error(err))

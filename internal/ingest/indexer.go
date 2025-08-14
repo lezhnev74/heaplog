@@ -26,6 +26,7 @@ type taskResult struct {
 // Indexer processes log file segments in parallel, tokenizing content and parsing dates
 // using a configurable number of workers
 type Indexer struct {
+	ctx       context.Context
 	blacklist sync.Map
 	workers   int
 	tokenize  func([]byte) [][]byte
@@ -35,12 +36,14 @@ type Indexer struct {
 }
 
 func NewIndexer(
+	ctx context.Context,
 	logger *zap.Logger,
 	tokenize func(i []byte) [][]byte,
 	parseDate func(b []byte) (time.Time, error),
 ) *Indexer {
 	bufPool := common.NewBufferPool([]int{1024})
 	return &Indexer{
+		ctx:       ctx,
 		workers:   1, // predictable results
 		bufPool:   bufPool,
 		logger:    logger,
@@ -51,11 +54,11 @@ func NewIndexer(
 
 // indexSegments processes pending segments from multiple files in parallel and returns an iterator of task results.
 func (ix *Indexer) indexSegments(
-	ctx context.Context,
+	// pendingSegments is a map of file paths to groups (called segments) of message layouts to be indexed
 	pendingSegments map[string][][]MessageLayout,
 ) iter.Seq[taskResult] {
 
-	tasks := ix.produceTasks(ctx, pendingSegments)
+	tasks := ix.produceTasks(pendingSegments)
 	tasksResults := ix.consumeTasksViaWorkerPool(tasks)
 
 	return func(yield func(taskResult) bool) {
@@ -142,12 +145,18 @@ func (ix *Indexer) consumeTasksViaWorkerPool(in <-chan task) <-chan taskResult {
 // For each segment, it reads the corresponding bytes from the file using a buffer from the pool.
 // Returns a channel of tasks containing file path, segment bytes, and message layouts.
 // If file operations fail, the file is blacklisted and skipped.
-func (ix *Indexer) produceTasks(ctx context.Context, pendingSegments map[string][][]MessageLayout) <-chan task {
+func (ix *Indexer) produceTasks(pendingSegments map[string][][]MessageLayout) <-chan task {
 	tasks := make(chan task)
 
 	// produce tasks in a separate goroutine
 	go func() {
+		defer close(tasks)
 		for file, segments := range pendingSegments {
+			// Expect hang-up:
+			if ix.ctx.Err() != nil {
+				return
+			}
+
 			fd, err := os.Open(file)
 			if err != nil {
 				ix.logger.Warn("open file", zap.String("file", file), zap.Error(err))
@@ -161,17 +170,15 @@ func (ix *Indexer) produceTasks(ctx context.Context, pendingSegments map[string]
 				for _, segment := range segments {
 
 					// Expect hang-up:
-					select {
-					case <-ctx.Done():
+					if ix.ctx.Err() != nil {
 						return
-					default:
 					}
 
 					segmentLoc := common.Location{segment[0].Loc.From, segment[len(segment)-1].Loc.To}
 					bytes := ix.bufPool.Get(segmentLoc.Len())[:segmentLoc.Len()]
 					_, err = fd.ReadAt(bytes, int64(segmentLoc.From))
 					if err != nil {
-						ix.logger.Error("read layouts", zap.String("file", file), zap.Error(err))
+						ix.logger.Error("read file", zap.String("file", file), zap.Error(err))
 						ix.blacklist.Store(file, nil)
 						continue
 					}
@@ -179,7 +186,6 @@ func (ix *Indexer) produceTasks(ctx context.Context, pendingSegments map[string]
 				}
 			}()
 		}
-		close(tasks)
 	}()
 
 	return tasks
