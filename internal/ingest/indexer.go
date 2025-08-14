@@ -26,7 +26,6 @@ type taskResult struct {
 // Indexer processes log file segments in parallel, tokenizing content and parsing dates
 // using a configurable number of workers
 type Indexer struct {
-	ctx       context.Context
 	blacklist sync.Map
 	workers   int
 	tokenize  func([]byte) [][]byte
@@ -36,14 +35,12 @@ type Indexer struct {
 }
 
 func NewIndexer(
-	ctx context.Context,
 	logger *zap.Logger,
 	tokenize func(i []byte) [][]byte,
 	parseDate func(b []byte) (time.Time, error),
 ) *Indexer {
 	bufPool := common.NewBufferPool([]int{1024})
 	return &Indexer{
-		ctx:       ctx,
 		workers:   1, // predictable results
 		bufPool:   bufPool,
 		logger:    logger,
@@ -53,9 +50,12 @@ func NewIndexer(
 }
 
 // indexSegments processes pending segments from multiple files in parallel and returns an iterator of task results.
-func (ix *Indexer) indexSegments(pendingSegments map[string][][]MessageLayout) iter.Seq[taskResult] {
+func (ix *Indexer) indexSegments(
+	ctx context.Context,
+	pendingSegments map[string][][]MessageLayout,
+) iter.Seq[taskResult] {
 
-	tasks := ix.produceTasks(pendingSegments)
+	tasks := ix.produceTasks(ctx, pendingSegments)
 	tasksResults := ix.consumeTasksViaWorkerPool(tasks)
 
 	return func(yield func(taskResult) bool) {
@@ -142,7 +142,7 @@ func (ix *Indexer) consumeTasksViaWorkerPool(in <-chan task) <-chan taskResult {
 // For each segment, it reads the corresponding bytes from the file using a buffer from the pool.
 // Returns a channel of tasks containing file path, segment bytes, and message layouts.
 // If file operations fail, the file is blacklisted and skipped.
-func (ix *Indexer) produceTasks(pendingSegments map[string][][]MessageLayout) <-chan task {
+func (ix *Indexer) produceTasks(ctx context.Context, pendingSegments map[string][][]MessageLayout) <-chan task {
 	tasks := make(chan task)
 
 	// produce tasks in a separate goroutine
@@ -162,7 +162,7 @@ func (ix *Indexer) produceTasks(pendingSegments map[string][][]MessageLayout) <-
 
 					// Expect hang-up:
 					select {
-					case <-ix.ctx.Done():
+					case <-ctx.Done():
 						return
 					default:
 					}
