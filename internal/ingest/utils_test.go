@@ -1,10 +1,199 @@
 package ingest
 
 import (
+	"slices"
 	"testing"
 
 	"heaplog_2024/internal/common"
 )
+
+func TestFilesWithIncompleteTrailingSegments(t *testing.T) {
+	tests := []struct {
+		name            string
+		segmentLen      int
+		indexedSegments map[string][]common.Location
+		accessibleFiles map[string]int
+		want            []string
+	}{
+		{
+			name:            "empty inputs",
+			segmentLen:      100,
+			indexedSegments: map[string][]common.Location{},
+			accessibleFiles: map[string]int{},
+			want:            []string{},
+		},
+		{
+			name:       "complete segment",
+			segmentLen: 100,
+			indexedSegments: map[string][]common.Location{
+				"file1": {{From: 0, To: 100}},
+			},
+			accessibleFiles: map[string]int{
+				"file1": 100,
+			},
+			want: []string{},
+		},
+		{
+			name:       "incomplete trailing segment at file end",
+			segmentLen: 100,
+			indexedSegments: map[string][]common.Location{
+				"file1": {{From: 0, To: 80}},
+			},
+			accessibleFiles: map[string]int{
+				"file1": 80,
+			},
+			want: []string{},
+		},
+		{
+			name:       "incomplete trailing segment not at file end",
+			segmentLen: 100,
+			indexedSegments: map[string][]common.Location{
+				"file1": {{From: 0, To: 80}},
+			},
+			accessibleFiles: map[string]int{
+				"file1": 120,
+			},
+			want: []string{"file1"},
+		},
+		{
+			name:       "full trailing segment not at file end",
+			segmentLen: 80,
+			indexedSegments: map[string][]common.Location{
+				"file1": {{From: 0, To: 80}},
+			},
+			accessibleFiles: map[string]int{
+				"file1": 120,
+			},
+			want: []string{},
+		},
+		{
+			name:       "multiple files one incomplete",
+			segmentLen: 100,
+			indexedSegments: map[string][]common.Location{
+				"file1": {{From: 0, To: 100}},
+				"file2": {{From: 0, To: 80}},
+			},
+			accessibleFiles: map[string]int{
+				"file1": 100,
+				"file2": 120,
+			},
+			want: []string{"file2"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				var got []string
+				for v := range filesWithIncompleteTrailingSegments(
+					tt.segmentLen,
+					tt.indexedSegments,
+					tt.accessibleFiles,
+				) {
+					got = append(got, v)
+				}
+				if !slices.Equal(got, tt.want) {
+					t.Errorf("filesWithIncompleteTrailingSegments() = %v, want %v", got, tt.want)
+				}
+			},
+		)
+	}
+}
+
+func TestFindMisalignedSegments(t *testing.T) {
+	tests := []struct {
+		name              string
+		indexedSegments   map[string][]common.Location
+		foundFilesLayouts map[string][]MessageLayout
+		want              []string
+	}{
+		{
+			name:              "empty inputs",
+			indexedSegments:   map[string][]common.Location{},
+			foundFilesLayouts: map[string][]MessageLayout{},
+			want:              []string{},
+		},
+		{
+			name: "aligned segments",
+			indexedSegments: map[string][]common.Location{
+				"file1": {{From: 0, To: 10}},
+			},
+			foundFilesLayouts: map[string][]MessageLayout{
+				"file1": {{Loc: common.Location{From: 0, To: 10}}},
+			},
+			want: []string{},
+		},
+		{
+			name: "misaligned start",
+			indexedSegments: map[string][]common.Location{
+				"file1": {{From: 0, To: 10}},
+			},
+			foundFilesLayouts: map[string][]MessageLayout{
+				"file1": {{Loc: common.Location{From: 5, To: 10}}},
+			},
+			want: []string{"file1"},
+		},
+		{
+			name: "misaligned end",
+			indexedSegments: map[string][]common.Location{
+				"file1": {{From: 0, To: 10}},
+			},
+			foundFilesLayouts: map[string][]MessageLayout{
+				"file1": {{Loc: common.Location{From: 0, To: 15}}},
+			},
+			want: []string{"file1"},
+		},
+		{
+			name: "incomplete index",
+			indexedSegments: map[string][]common.Location{
+				"file1": {{From: 0, To: 10}},
+			},
+			foundFilesLayouts: map[string][]MessageLayout{
+				"file1": {
+					{Loc: common.Location{From: 0, To: 5}},
+					{Loc: common.Location{From: 5, To: 9}},
+				},
+			},
+			want: []string{"file1"},
+		},
+		{
+			name: "unindexed",
+			indexedSegments: map[string][]common.Location{
+				"file1": {{From: 0, To: 10}},
+			},
+			foundFilesLayouts: map[string][]MessageLayout{
+				"file1": {},
+			},
+			want: []string{"file1"},
+		},
+		{
+			name: "multiple files one misaligned",
+			indexedSegments: map[string][]common.Location{
+				"file1": {{From: 0, To: 10}},
+				"file2": {{From: 0, To: 10}},
+			},
+			foundFilesLayouts: map[string][]MessageLayout{
+				"file1": {{Loc: common.Location{From: 0, To: 10}}},
+				"file2": {{Loc: common.Location{From: 5, To: 15}}},
+			},
+			want: []string{"file2"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				var got []string
+				for v := range findMisalignedSegments(tt.indexedSegments, tt.foundFilesLayouts) {
+					got = append(got, v)
+				}
+				if !slices.Equal(got, tt.want) {
+					t.Errorf("findMisalignedSegments() = %v, want %v", got, tt.want)
+				}
+			},
+		)
+	}
+}
 
 func TestSegmentLayoutsByLocations(t *testing.T) {
 	tests := []struct {
@@ -251,7 +440,7 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				got := segmentLayoutsByLocations(tt.segmentSize, tt.locs, tt.layouts)
+				got := alignSegmentsByMessageBoundaries(tt.segmentSize, tt.locs, tt.layouts)
 				if len(got) != len(tt.want) {
 					t.Errorf("alignByLayouts() got = %v, want %v", got, tt.want)
 				}

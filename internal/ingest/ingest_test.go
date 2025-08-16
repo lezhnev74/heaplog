@@ -1,0 +1,5 @@
+package ingest
+
+func testValidateAlignment() {
+
+}

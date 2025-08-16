@@ -4,7 +4,6 @@
 package ingest
 
 import (
-	"context"
 	"fmt"
 	"maps"
 	"regexp"
@@ -34,13 +33,34 @@ type Ingestor struct {
 	indexer *Indexer
 }
 
-// Run performs the main ingestion workflow
-func (i *Ingestor) Run(ctx context.Context) error {
+func NewIngestor(
+	globs []string,
+	messageRE *regexp.Regexp,
+	segmentLen int,
+	workers int,
+	db filesIndex,
+	logger *zap.Logger,
+	indexer *Indexer,
+) *Ingestor {
+	return &Ingestor{
+		globs:      globs,
+		messageRE:  messageRE,
+		segmentLen: segmentLen,
+		workers:    workers,
+		db:         db,
+		logger:     logger,
+		indexer:    indexer,
+	}
+}
 
-	i.logger.Debug("starting ingestion")
+// Run performs the main ingestion workflow
+func (i *Ingestor) Run() error {
+
+	i.logger.Debug("ingestion launched")
+	defer i.logger.Debug("ingestion completed")
 
 	// 1. discover current files
-	accessibleFiles, err := i.discoverAccessibleFiles()
+	files, err := i.discoverAccessibleFiles()
 	if err != nil {
 		return fmt.Errorf("discover accessible files: %w", err)
 	}
@@ -52,124 +72,97 @@ func (i *Ingestor) Run(ctx context.Context) error {
 	}
 
 	// 3. Reconcile missing files (present in index but not on disk)
-	err = i.reconcileMissingFiles(indexedSegments, accessibleFiles)
-	if err != nil {
-		return fmt.Errorf("reconcile missing files: %w", err)
+	for file := range indexedSegments {
+		if _, ok := files[file]; !ok {
+			i.logger.Info("wipe file index", zap.String("file", file))
+			err = i.db.wipeFile(file)
+			if err != nil {
+				return fmt.Errorf("wipe file index: %w", err)
+			}
+			delete(indexedSegments, file)
+		}
 	}
 
 	// 4. Skip files that are already entirely indexed
-	accessibleFiles = i.skipEntirelyIndexed(accessibleFiles, indexedSegments)
+	for file, size := range files {
+		if len(indexedSegments[file]) == 0 {
+			continue
+		}
+		loc := common.Location{From: 0, To: size}
+		unindexed := loc.RemoveAll(indexedSegments[file])
+		if len(unindexed) == 0 {
+			delete(files, file)
+		}
+	}
 
-	// 5. Build message layouts for all found files
-	filesLayouts, err := i.buildFilesLayouts(accessibleFiles)
+	// 5. Build messages' layouts for each file
+	layouts, err := i.scanFiles(files)
 	if err != nil {
 		return fmt.Errorf("build file layouts: %w", err)
 	}
 
-	// 6. Validate alignment; wipe segments if misaligned
-	// as the result it re-indexes files that somehow changed already indexed data.
-	err = i.validateOrWipe(indexedSegments, filesLayouts)
-	if err != nil {
-		return fmt.Errorf("validate misaligned: %w", err)
+	// 6. Validate index alignment; wipe segments if misaligned
+	// as a result it re-indexes files that somehow changed already indexed data.
+	for file := range findMisalignedSegments(indexedSegments, layouts) {
+		i.logger.Warn("indexed misalignment: re-index required", zap.String("file", file))
+		err = i.db.wipeSegments(file)
+		if err != nil {
+			return fmt.Errorf("wipe segments for %s: %w", file, err)
+		}
+		delete(indexedSegments, file)
 	}
 
 	// 7. Validate last file segments.
 	// If the last layout is not full and does not end at the end of the file,
 	// it is considered to be incomplete and needs to be re-indexed.
-	err = i.validateLastSegments(indexedSegments, accessibleFiles)
-	if err != nil {
-		return fmt.Errorf("validate last segments: %w", err)
+	for file := range filesWithIncompleteTrailingSegments(i.segmentLen, indexedSegments, files) {
+		i.logger.Debug("re-index trailing segment", zap.String("file", file))
+		indexedSegments[file] = indexedSegments[file][:len(indexedSegments[file])-1]
 	}
 
-	// 8. Plan segment for indexing
-	pendingSegments := i.planIndexing(indexedSegments, filesLayouts)
+	// 8. Plan segments for indexing
+	plan := make(map[string][][]MessageLayout)
+	for file := range layouts {
+		filesize := layouts[file][len(layouts[file])-1].Loc.To
+		loc := common.Location{0, filesize}
+		unindexedLocations := loc.RemoveAll(indexedSegments[file])
+		segments := alignSegmentsByMessageBoundaries(i.segmentLen, unindexedLocations, layouts[file])
+		plan[file] = segments
+	}
 
 	// 9. Perform indexing
-	for r := range i.indexer.indexSegments(pendingSegments) {
+	for r := range i.indexer.indexSegments(plan) {
 		err = i.db.putSegment(r.task.file, r.tokens, r.messages)
 		if err != nil {
-			i.logger.Error("save indexed segment", zap.String("file", r.task.file), zap.Error(err))
-			panic(err)
+			return fmt.Errorf("put segment for %s: %w", r.task.file, err)
 		}
 	}
 
 	return nil
 }
 
-// validateOrWipe checks alignment of indexed segments with actual file contents and wipes misaligned files from index.
-// It compares each indexed layouts's boundaries with message layouts found in files to ensure they exactly match message boundaries.
-// If the file has no messages found or any layouts boundaries don'tokenize align with message boundaries, the file is wiped from the index.
-func (i *Ingestor) validateOrWipe(
-	indexedSegments map[string][]common.Location,
-	foundFilesLayouts map[string][]MessageLayout,
-) error {
-	var err error
-indexFileLoop:
-	for file, indexedLocs := range indexedSegments {
-		if len(indexedLocs) == 0 {
-			continue // no point in comparing, no indexed data available
-		}
-
-		// map indexedLocs to actual messages in the file
-		for _, s := range indexedLocs {
-			leftMatched, rightMatched := false, false
-
-			// todo: apply binary search
-
-			for _, m := range foundFilesLayouts[file] {
-				if s.From == m.Loc.From {
-					leftMatched = true
-				}
-				if s.To == m.Loc.To {
-					rightMatched = true
-				}
-			}
-			if leftMatched && rightMatched {
-				continue
-			}
-
-			// the indexed layouts is not aligned to messages in the file
-			i.logger.Warn(
-				"indexed layouts misalignment: re-index required",
-				zap.String("file", file),
-				zap.Any("layouts", s),
-			)
-			err = i.db.wipeSegments(file)
-			if err != nil {
-				return fmt.Errorf("reindex file: %w", err)
-			}
-			delete(indexedSegments, file)
-			continue indexFileLoop
-		}
-	}
-	return nil
-}
-
-// buildFilesLayouts scans accessible files to build message layouts.
-// Parameters:
-//   - accessibleFiles: map of file paths to their sizes
-//
-// Returns map of file paths to their message layouts and error if scanning fails.
-func (i *Ingestor) buildFilesLayouts(accessibleFiles map[string]int) (map[string][]MessageLayout, error) {
+// scanFiles scans accessible files to build message layouts.
+// Returns a map of file paths to their message layouts and error if scanning fails.
+func (i *Ingestor) scanFiles(files map[string]int) (map[string][]MessageLayout, error) {
 
 	// split files per workers
-	files := slices.Collect(maps.Keys(accessibleFiles))
-	filesPerWorker := common.ChunksN(files, i.workers)
-	layoutsPerFile := make([][]MessageLayout, len(files))
+	filePaths := slices.Collect(maps.Keys(files))
+	filesPerWorker := common.ChunksN(filePaths, i.workers)
+	fileLayouts := make([][]MessageLayout, len(filePaths))
 
+	// scanning is cpu intensive (RE-parsing), so run in parallel
 	wg := sync.WaitGroup{}
 	wg.Add(i.workers)
 	for j := range filesPerWorker {
 		go func() {
 			defer wg.Done()
 			for _, f := range filesPerWorker[j] {
-				fileSize := accessibleFiles[f]
-				layouts, err := scan(f, fileSize, i.messageRE.String(), nil)
+				layouts, err := scan(f, files[f], i.messageRE.String(), nil)
 				if err != nil {
 					i.logger.Error("scan file", zap.String("file", f), zap.Error(err))
 					continue
 				}
-				layoutsPerFile[slices.Index(files, f)] = layouts
+				fileLayouts[slices.Index(filePaths, f)] = layouts
 			}
 		}()
 	}
@@ -177,33 +170,10 @@ func (i *Ingestor) buildFilesLayouts(accessibleFiles map[string]int) (map[string
 
 	// merge layouts per file to a map
 	foundFilesLayouts := make(map[string][]MessageLayout)
-	for j, layouts := range layoutsPerFile {
-		foundFilesLayouts[files[j]] = layouts
+	for j, layouts := range fileLayouts {
+		foundFilesLayouts[filePaths[j]] = layouts
 	}
 	return foundFilesLayouts, nil
-}
-
-// reconcileMissingFiles removes indexed files that are no longer accessible from the indexedSegments map and database.
-// Parameters:
-//   - indexedSegments: map of file paths to their indexed locations
-//   - accessibleFiles: map of currently accessible file paths to their sizes
-//
-// Returns error if database operation fails.
-func (i *Ingestor) reconcileMissingFiles(
-	indexedSegments map[string][]common.Location,
-	accessibleFiles map[string]int,
-) error {
-	for file := range indexedSegments {
-		if _, ok := accessibleFiles[file]; !ok {
-			i.logger.Info("removing file from index", zap.String("file", file))
-			err := i.db.wipeFile(file)
-			if err != nil {
-				return fmt.Errorf("wipe indexed file: %w", err)
-			}
-			delete(indexedSegments, file)
-		}
-	}
-	return nil
 }
 
 // discoverAccessibleFiles discovers and validates files matching the configured glob patterns.
@@ -220,80 +190,4 @@ func (i *Ingestor) discoverAccessibleFiles() (map[string]int, error) {
 		foundFiles[fs.path] = fs.size
 	}
 	return foundFiles, nil
-}
-
-// skipEntirelyIndexed removes files that are already entirely indexed from the accessibleFiles map.
-// A file is considered entirely indexed if all its content is covered by indexed segments.
-func (i *Ingestor) skipEntirelyIndexed(
-	accessibleFiles map[string]int,
-	indexedSegments map[string][]common.Location,
-) map[string]int {
-	result := maps.Clone(accessibleFiles)
-	for file, size := range accessibleFiles {
-		segments := indexedSegments[file]
-		if len(segments) == 0 {
-			continue
-		}
-
-		fileLocation := common.Location{From: 0, To: size}
-		unindexed := fileLocation.RemoveAll(segments)
-		if len(unindexed) == 0 {
-			i.logger.Debug("skipping entirely indexed file", zap.String("file", file))
-			delete(result, file)
-		}
-	}
-	return result
-}
-
-// validateLastSegments ensures that the last indexed layouts of each file is either complete
-// (has full layouts length) or ends at the end of the file. Incomplete segments that don'tokenize
-// meet these criteria are removed from both the in-memory map and the database.
-func (i *Ingestor) validateLastSegments(
-	indexedSegments map[string][]common.Location,
-	accessibleFiles map[string]int,
-) error {
-	for file, segments := range indexedSegments {
-		if len(segments) == 0 {
-			continue
-		}
-
-		lastSegment := segments[len(segments)-1]
-		fileSize := accessibleFiles[file]
-
-		// If the last layouts is not full and doesn'tokenize end at the file end
-		if lastSegment.To-lastSegment.From < i.segmentLen && lastSegment.To < fileSize {
-			i.logger.Debug(
-				"removing incomplete last layouts",
-				zap.String("file", file),
-				zap.Any("layouts", lastSegment),
-			)
-
-			// Remove the last layouts from both map and database
-			indexedSegments[file] = segments[:len(segments)-1]
-			err := i.db.wipeSegment(file, lastSegment)
-			if err != nil {
-				return fmt.Errorf("remove incomplete layouts: %w", err)
-			}
-		}
-	}
-	return nil
-}
-
-// For each file return a list of segments that need to be indexed.
-func (i *Ingestor) planIndexing(
-	indexedSegments map[string][]common.Location,
-	existingFilesLayouts map[string][]MessageLayout,
-) map[string][][]MessageLayout {
-
-	plan := make(map[string][][]MessageLayout)
-
-	for file, layouts := range existingFilesLayouts {
-		filesize := layouts[len(layouts)-1].Loc.To
-		fl := common.Location{0, filesize}
-		unindexedLocations := fl.RemoveAll(indexedSegments[file])
-		segments := segmentLayoutsByLocations(i.segmentLen, unindexedLocations, layouts)
-		plan[file] = segments
-	}
-
-	return plan
 }
