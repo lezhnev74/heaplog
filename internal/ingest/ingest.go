@@ -45,7 +45,7 @@ func (i *Ingestor) Run(ctx context.Context) error {
 		return fmt.Errorf("discover accessible files: %w", err)
 	}
 
-	// 2. Read indexed state
+	// 2. Read the index
 	indexedSegments, err := i.db.getSegments()
 	if err != nil {
 		return fmt.Errorf("get indexed segments: %w", err)
@@ -212,17 +212,12 @@ func (i *Ingestor) reconcileMissingFiles(
 // Returns error if the initial file discovery fails.
 func (i *Ingestor) discoverAccessibleFiles() (map[string]int, error) {
 	foundFiles := map[string]int{}
-	foundFilesEV, err := discoverFilesAt(i.globs)
-	if err != nil {
-		return nil, fmt.Errorf("discover files via globs: %w", err)
-	}
-	for file, v := range foundFilesEV {
-		if v.Err != nil {
-			i.logger.Warn("file not accessible", zap.String("file", file), zap.Error(v.Err))
-			delete(foundFilesEV, file)
+	for fs, err := range discoverFilesAt(i.globs) {
+		if err != nil {
+			i.logger.Warn("discover file", zap.String("path", fs.path), zap.Error(err))
 			continue
 		}
-		foundFiles[file] = v.Val
+		foundFiles[fs.path] = fs.size
 	}
 	return foundFiles, nil
 }

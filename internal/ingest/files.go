@@ -1,11 +1,15 @@
 package ingest
 
 import (
+	"iter"
 	"os"
 	"path/filepath"
-
-	"heaplog_2024/internal/common"
 )
+
+type fileSize struct {
+	path string
+	size int
+}
 
 // discoverFilesAt searches for files that match the given glob patterns and returns a map containing
 // file paths and their corresponding sizes in bytes. For each file found, the map value is an
@@ -19,25 +23,32 @@ import (
 // Returns:
 //   - map[string]common.ErrVal[int]: map of file paths to their sizes or access errors
 //   - error: returned if any glob pattern is invalid
-func discoverFilesAt(globs []string) (map[string]common.ErrVal[int], error) {
-	files := make(map[string]common.ErrVal[int])
-	for _, pattern := range globs {
-		matches, err := filepath.Glob(pattern)
-		if err != nil {
-			return nil, err
-		}
-		for _, path := range matches {
-			info, err := os.Stat(path)
+func discoverFilesAt(globs []string) iter.Seq2[fileSize, error] {
+	return func(yield func(fileSize, error) bool) {
+		for _, pattern := range globs {
+			matches, err := filepath.Glob(pattern)
 			if err != nil {
-				files[path] = common.NewErrValE[int](err) // inaccessible directory entry
+				if !yield(fileSize{path: pattern}, err) {
+					return
+				}
 				continue
 			}
-			if !info.IsDir() {
-				files[path] = common.NewErrValV(int(info.Size()))
+			for _, path := range matches {
+				info, err := os.Stat(path)
+				if err != nil {
+					if !yield(fileSize{path: path}, err) {
+						return
+					}
+					continue
+				}
+				if !info.IsDir() {
+					if !yield(fileSize{path: path, size: int(info.Size())}, err) {
+						return
+					}
+				}
 			}
 		}
 	}
-	return files, nil
 }
 
 const FileOpRemove = "remove"     // FileOpRemove indicates that a file has been removed and its data should be wiped from the index.

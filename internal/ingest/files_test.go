@@ -1,6 +1,7 @@
 package ingest
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -84,27 +85,29 @@ func TestDiscoverAt(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			discovered, err := discoverFilesAt(tc.patterns)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if len(discovered) != len(tc.expected) {
-				t.Errorf("discoverFilesAt() found %d files, want %d", len(discovered), len(tc.expected))
-			}
-			for path, errVal := range discovered {
-				if !slices.Contains(tc.expected, path) {
-					t.Errorf("File %s is unexpected", path)
+		t.Run(
+			tc.name, func(t *testing.T) {
+				discovered := maps.Collect(discoverFilesAt(tc.patterns))
+				if err != nil {
+					t.Fatal(err)
 				}
-				if errVal.Err != nil {
-					t.Errorf("File %s has error: %v", path, errVal.Err)
-					continue
+				if len(discovered) != len(tc.expected) {
+					t.Errorf("discoverFilesAt() found %d files, want %d", len(discovered), len(tc.expected))
 				}
-				if errVal.Val != len(files[path]) {
-					t.Errorf("File %s has size %d, want %d", path, errVal.Val, len(files[path]))
+				for fs, err := range discovered {
+					if !slices.Contains(tc.expected, fs.path) {
+						t.Errorf("File %s is unexpected", fs.path)
+					}
+					if err != nil {
+						t.Errorf("File %s has error: %v", fs.path, err)
+						continue
+					}
+					if fs.size != len(files[fs.path]) {
+						t.Errorf("File %s has size %d, want %d", fs.path, err, len(files[fs.path]))
+					}
 				}
-			}
-		})
+			},
+		)
 	}
 
 }
