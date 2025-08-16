@@ -23,7 +23,7 @@ type Ingestor struct {
 	globs []string
 	// regular expression to match messages' starting lines
 	messageRE *regexp.Regexp
-	// max length of a single indexed file layouts
+	// target length of a single indexed segment (segments align at message boundaries)
 	segmentLen int
 	// number of concurrent workers that index segments
 	workers int
@@ -42,6 +42,16 @@ func NewIngestor(
 	logger *zap.Logger,
 	indexer *Indexer,
 ) *Ingestor {
+	if workers <= 0 {
+		panic(fmt.Sprintf("invalid workers count: %d", workers))
+	}
+	if segmentLen <= 0 {
+		panic(fmt.Sprintf("invalid segment length: %d", segmentLen))
+	}
+	if len(globs) == 0 {
+		panic("no glob patterns provided")
+	}
+
 	return &Ingestor{
 		globs:      globs,
 		messageRE:  messageRE,
@@ -60,9 +70,13 @@ func (i *Ingestor) Run() error {
 	defer i.logger.Debug("ingestion completed")
 
 	// 1. discover current files
-	files, err := i.discoverAccessibleFiles()
-	if err != nil {
-		return fmt.Errorf("discover accessible files: %w", err)
+	files := map[string]int{}
+	for fs, err := range discoverFilesAt(i.globs) {
+		if err != nil {
+			i.logger.Warn("discover file", zap.String("path", fs.path), zap.Error(err))
+			continue
+		}
+		files[fs.path] = fs.size
 	}
 
 	// 2. Read the index
@@ -174,20 +188,4 @@ func (i *Ingestor) scanFiles(files map[string]int) (map[string][]MessageLayout, 
 		foundFilesLayouts[filePaths[j]] = layouts
 	}
 	return foundFilesLayouts, nil
-}
-
-// discoverAccessibleFiles discovers and validates files matching the configured glob patterns.
-// Returns a map where keys are file paths and values are file sizes in bytes.
-// Files that are not accessible are logged with a warning and excluded from the result.
-// Returns error if the initial file discovery fails.
-func (i *Ingestor) discoverAccessibleFiles() (map[string]int, error) {
-	foundFiles := map[string]int{}
-	for fs, err := range discoverFilesAt(i.globs) {
-		if err != nil {
-			i.logger.Warn("discover file", zap.String("path", fs.path), zap.Error(err))
-			continue
-		}
-		foundFiles[fs.path] = fs.size
-	}
-	return foundFiles, nil
 }
