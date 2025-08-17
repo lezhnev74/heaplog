@@ -7,18 +7,17 @@ CREATE TABLE files
 CREATE SEQUENCE segment_ids;
 CREATE TABLE segments
 (
-    id       UINTEGER NOT NULL, -- unique id of every segment
-    file_id  UINTEGER NOT NULL,
-    pos_from UBIGINT  NOT NULL, -- [from, to)
-    pos_to   UBIGINT  NOT NULL,
-    date_min UBIGINT  NOT NULL, -- first message's date (micro)
-    date_max UBIGINT  NOT NULL  -- last message's date (micro)
+    id            UINTEGER NOT NULL, -- unique id of every segment
+    file_id       UINTEGER NOT NULL,
+    pos_from      UBIGINT  NOT NULL, -- [from, to)
+    pos_to        UBIGINT  NOT NULL,
+    date_min      UBIGINT  NOT NULL, -- first message's date (micro)
+    date_max      UBIGINT  NOT NULL, -- last message's date (micro)
 );
 CREATE TABLE messages
 (
     segment_id    UINTEGER NOT NULL,
     rel_from      UINTEGER NOT NULL, -- relative to the segment's pos
-    rel_to        UINTEGER NOT NULL, -- relative to the segment's pos
     rel_date_from UINTEGER NOT NULL, -- relative to the segment's pos
     rel_date_to   UINTEGER NOT NULL, -- relative to the segment's pos
     date          UBIGINT  NOT NULL  -- micro

@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"strings"
+	"time"
 
 	_ "github.com/marcboeker/go-duckdb/v2"
 
@@ -137,10 +139,9 @@ func (duck *DuckDB) PutSegment(file string, terms [][]byte, messages []common.Me
 
 	for _, msg := range messages {
 		_, err = tx.Exec(
-			"INSERT INTO messages (segment_id, rel_from, rel_to, rel_date_from, rel_date_to, date) VALUES (?, ?, ?, ?, ?, ?)",
+			"INSERT INTO messages (segment_id, rel_from, rel_date_from, rel_date_to, date) VALUES (?, ?, ?, ?, ?)",
 			segmentId,
 			msg.Loc.From-messages[0].Loc.From,
-			msg.Loc.To-messages[0].Loc.From,
 			msg.DateLoc.From-messages[0].Loc.From,
 			msg.DateLoc.To-messages[0].Loc.From,
 			msg.Date.UnixMicro(),
@@ -219,4 +220,95 @@ func (duck *DuckDB) wipeFile(file string) error {
 		return err
 	}
 	return tx.Commit()
+}
+
+func (duck *DuckDB) GetAllMessages(path string) (iter.Seq[common.Message], error) {
+	fileId, err := duck.getFileIdByPath(path)
+	if err != nil {
+		return nil, err
+	}
+
+	q := `
+	SELECT
+	    segments.id,
+	    segments.pos_from,
+	    segments.pos_to,
+	    
+	    messages.rel_from,
+	    messages.rel_date_from,
+	    messages.rel_date_to,
+	    messages.date
+	FROM messages
+	JOIN segments on segments.id=messages.segment_id 
+	WHERE segments.file_id = ?
+	ORDER BY messages.date
+	`
+	rows, err := duck.db.Query(q, fileId)
+	if err != nil {
+		return nil, err
+	}
+
+	// Return an iterator over all messages in the given file path, ordered by date.
+	// Messages are yielded one by one with correct To positions calculated from the next message.
+	return func(yield func(common.Message) bool) {
+		defer rows.Close()
+
+		var (
+			prevMessage                                                 *common.Message
+			prevSegmentId, segmentId, segmentFrom, segmentTo, dateMicro int
+		)
+		for rows.Next() {
+			cur := common.Message{}
+			err = rows.Scan(
+				&segmentId,
+				&segmentFrom,
+				&segmentTo,
+
+				&cur.Loc.From,
+				&cur.DateLoc.From,
+				&cur.DateLoc.To,
+				&dateMicro,
+			)
+			if err != nil {
+				panic(err)
+			}
+
+			cur.Date = time.UnixMicro(int64(dateMicro)).UTC()
+			cur.Loc.From += segmentFrom
+			cur.Loc.To = segmentTo
+			cur.DateLoc.From += segmentFrom
+			cur.DateLoc.To += segmentFrom
+
+			if err != nil {
+				panic(err)
+			}
+			if prevMessage == nil {
+				// first message, continue to the next for position calculation
+				prevMessage = &cur
+				prevSegmentId = segmentId
+				continue
+			}
+
+			if prevSegmentId != segmentId {
+				// segments boundary reached
+				if !yield(*prevMessage) {
+					break
+				}
+				prevSegmentId = segmentId
+				prevMessage = &cur
+				continue
+			}
+
+			prevMessage.Loc.To = cur.Loc.From
+			if !yield(*prevMessage) {
+				break
+			}
+			prevMessage = &cur
+		}
+
+		if prevMessage != nil {
+			// one message is remaining
+			yield(*prevMessage)
+		}
+	}, nil
 }
