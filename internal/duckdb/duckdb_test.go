@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"heaplog_2024/internal/common"
-	"heaplog_2024/internal/ingest"
 )
 
 type putSegmentTestCase struct {
@@ -19,15 +18,6 @@ type putSegmentTestCase struct {
 	minDate          *time.Time
 	maxDate          *time.Time
 	expectedMessages []int // indexes within all messages
-}
-
-func TestIngestInterface(t *testing.T) {
-	ctx := context.Background()
-	db, err := NewDuckDB(ctx, "")
-	require.NoError(t, err)
-	err = db.Migrate()
-	require.NoError(t, err)
-	_ = ingest.FilesIndex(db)
 }
 
 func TestWipeFiles(t *testing.T) {

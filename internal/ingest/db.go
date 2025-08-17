@@ -6,7 +6,7 @@ type FilesIndex interface {
 	// GetSegments returns indexed segments (sorted by position) per file
 	GetSegments() (map[string][]common.Location, error)
 	// PutSegment adds a segment to the index
-	PutSegment(file string, messages []common.Message) (int, error)
+	PutSegment(file string, terms [][]byte, messages []common.Message) (int, error)
 	// WipeSegment resets the index for the single segment
 	WipeSegment(file string, segment common.Location) error
 	// WipeSegments resets the index for the file

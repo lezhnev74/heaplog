@@ -1,5 +1,14 @@
 package common
 
+import (
+	"fmt"
+	"hash/crc32"
+)
+
+var (
+	crc32t = crc32.MakeTable(0xD5828281)
+)
+
 // ChunksN splits items into n contiguous chunks with sizes as even as possible.
 // The first (len(items) % chunks) chunks get one extra element.
 func ChunksN[T any](items []T, n int) [][]T {
@@ -25,4 +34,10 @@ func ChunksN[T any](items []T, n int) [][]T {
 		start = end
 	}
 	return out
+}
+
+// HashString is a quick and idempotent hashing
+func HashString(s string) string {
+	h := crc32.Checksum([]byte(s), crc32t)
+	return fmt.Sprintf("%d", h)
 }

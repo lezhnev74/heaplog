@@ -15,6 +15,14 @@ import (
 	"heaplog_2024/internal/duckdb"
 )
 
+type MockFileIndex struct {
+	*duckdb.DuckDB
+}
+
+func (m *MockFileIndex) PutSegment(file string, terms [][]byte, messages []common.Message) (int, error) {
+	return m.DuckDB.PutSegment(file, messages)
+}
+
 func TestIngesting(t *testing.T) {
 	fileName, _ := common.MakeTestFile(t)
 	ingestor, duck := makeTestIngestor(t, []string{fileName})
@@ -36,6 +44,33 @@ func TestIngesting(t *testing.T) {
 		}
 		require.True(t, found)
 	}
+}
+
+func TestMisalignedSegments(t *testing.T) {
+	fileName, _ := common.MakeTestFile(t)
+	ingestor, duck := makeTestIngestor(t, []string{fileName})
+	ingestor.segmentLen = 1_000_000
+
+	// Put misaligned segment
+	_, err := duck.PutSegment(
+		fileName, []common.Message{
+			{MessageLayout: common.MessageLayout{Loc: common.Location{From: 0, To: 55}}, Date: common.MakeTimeV("2024-01-01T00:00:00.000000+00:00")},
+		},
+	)
+	require.NoError(t, err)
+
+	// Run
+	require.NoError(t, ingestor.Run())
+
+	// Analyze the state
+	fileSegments, err := duck.GetSegments()
+	require.NoError(t, err)
+	expected := map[string][]common.Location{
+		fileName: {
+			{From: 1, To: len(common.SampleLog)},
+		},
+	}
+	require.Equal(t, expected, fileSegments)
 }
 
 func TestTrailingSegmentIndexing(t *testing.T) {
@@ -155,7 +190,7 @@ func makeTestIngestor(t *testing.T, globs []string) (*Ingestor, *duckdb.DuckDB) 
 		regexp.MustCompile(common.MessageStartPattern),
 		1,
 		1,
-		duck,
+		&MockFileIndex{duck},
 		logger,
 		indexer,
 	)

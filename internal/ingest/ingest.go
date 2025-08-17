@@ -146,7 +146,7 @@ func (i *Ingestor) Run() error {
 
 	// 9. Perform indexing
 	for r := range i.indexer.indexSegments(plan) {
-		_, err = i.db.PutSegment(r.task.file, r.messages)
+		_, err := i.db.PutSegment(r.task.file, r.tokens, r.messages)
 		if err != nil {
 			return fmt.Errorf("put segment for %s: %w", r.task.file, err)
 		}
