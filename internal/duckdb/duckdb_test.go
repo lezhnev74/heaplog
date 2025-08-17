@@ -20,7 +20,117 @@ type putSegmentTestCase struct {
 	expectedMessages []int // indexes within all messages
 }
 
-func TestPutSegment(t *testing.T) {
+func TestWipeFiles(t *testing.T) {
+	ctx := context.Background()
+	db, err := NewDuckDB(ctx, "")
+	require.NoError(t, err)
+	err = db.Migrate()
+	require.NoError(t, err)
+
+	// Insert some data
+	_, err = db.PutSegment(
+		"path1", nil, []common.Message{
+			{
+				MessageLayout: common.MessageLayout{
+					Loc:     common.Location{From: 0, To: 10},
+					DateLoc: common.Location{From: 1, To: 2},
+				},
+				Date: common.MakeTimeV("2024-01-01T00:00:00.000000+00:00"),
+			},
+		},
+	)
+	require.NoError(t, err)
+
+	// Wipe files
+	err = db.wipeFile("path1")
+	require.NoError(t, err)
+
+	// Check that the file is gone
+	files, err := db.getSegments()
+	require.NoError(t, err)
+	require.Empty(t, files)
+}
+
+func TestWipeSegments(t *testing.T) {
+	ctx := context.Background()
+	db, err := NewDuckDB(ctx, "")
+	require.NoError(t, err)
+	err = db.Migrate()
+	require.NoError(t, err)
+
+	// Insert some data
+	_, err = db.PutSegment(
+		"path1", nil, []common.Message{
+			{
+				MessageLayout: common.MessageLayout{
+					Loc:     common.Location{From: 0, To: 10},
+					DateLoc: common.Location{From: 1, To: 2},
+				},
+				Date: common.MakeTimeV("2024-01-01T00:00:00.000000+00:00"),
+			},
+		},
+	)
+	require.NoError(t, err)
+
+	// Wipe files
+	err = db.wipeSegments("path1")
+	require.NoError(t, err)
+
+	// Check that the file is gone
+	files, err := db.getSegments()
+	require.NoError(t, err)
+	require.Empty(t, files)
+}
+
+func TestWipeSegment(t *testing.T) {
+	ctx := context.Background()
+	db, err := NewDuckDB(ctx, "")
+	require.NoError(t, err)
+	err = db.Migrate()
+	require.NoError(t, err)
+
+	// Insert some data
+	_, err = db.PutSegment(
+		"path1", nil, []common.Message{
+			{
+				MessageLayout: common.MessageLayout{
+					Loc:     common.Location{From: 0, To: 10},
+					DateLoc: common.Location{From: 1, To: 2},
+				},
+				Date: common.MakeTimeV("2024-01-01T00:00:00.000000+00:00"),
+			},
+		},
+	)
+	_, err = db.PutSegment(
+		"path1", nil, []common.Message{
+			{
+				MessageLayout: common.MessageLayout{
+					Loc:     common.Location{From: 20, To: 30},
+					DateLoc: common.Location{From: 21, To: 22},
+				},
+				Date: common.MakeTimeV("2024-01-02T00:00:00.000000+00:00"),
+			},
+		},
+	)
+	require.NoError(t, err)
+
+	// Wipe files
+	err = db.wipeSegment("path1", common.Location{From: 20, To: 30})
+	require.NoError(t, err)
+
+	// Check only one segment remains
+	files, err := db.getSegments()
+	require.NoError(t, err)
+
+	expectedResult := map[string][]common.Location{
+		"path1": []common.Location{
+			{From: 0, To: 10},
+		},
+	}
+	require.Equal(t, expectedResult, files)
+}
+
+func TestGetMessages(t *testing.T) {
 	tests := []putSegmentTestCase{
 		{
 			name: "gap b/w segments",

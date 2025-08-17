@@ -82,10 +82,10 @@ func (duck *DuckDB) Migrate() (err error) {
 
 func (duck *DuckDB) getSegments() (map[string][]common.Location, error) {
 	q := `
-		SELECT file.path, segments.pos_from, segments.pos_to 
+		SELECT files.path, segments.pos_from, segments.pos_to 
 		FROM segments
 		JOIN files ON files.id=segments.file_id
-		ORDER BY file.id, segments.pos_from -- sort by pos(!)
+		ORDER BY files.id, segments.pos_from -- sort by pos(!)
 `
 	rows, err := duck.db.Query(q)
 	if err != nil {
@@ -159,11 +159,16 @@ func (duck *DuckDB) PutSegment(file string, terms [][]byte, messages []common.Me
 
 func (duck *DuckDB) wipeSegment(file string, segment common.Location) error {
 
+	fileId, err := duck.getFileIdByPath(file)
+	if err != nil {
+		return err
+	}
+
 	var segmentId int
-	err := duck.db.QueryRow(
-		"SELECT id FROM segments WHERE file = ? AND pos_from = ? AND pos_to = ?",
-		file, segment.From, segment.To,
-	).Scan(segmentId)
+	err = duck.db.QueryRow(
+		"SELECT id FROM segments WHERE file_id = ? AND pos_from = ? AND pos_to = ?",
+		fileId, segment.From, segment.To,
+	).Scan(&segmentId)
 	if err != nil {
 		return err
 	}
@@ -188,7 +193,8 @@ func (duck *DuckDB) wipeSegments(file string) error {
 	if err != nil {
 		return err
 	}
-	rows, err := duck.db.Query("SELECT id FROM segments WHERE file = ?", fileId)
+
+	rows, err := duck.db.Query("SELECT id FROM segments WHERE file_id = ?", fileId)
 	if err != nil {
 		return err
 	}
@@ -199,7 +205,7 @@ func (duck *DuckDB) wipeSegments(file string) error {
 		if err != nil {
 			return err
 		}
-		_, err = duck.db.Exec("DELETE FROM terms WHERE file = ?", file)
+		_, err = duck.db.Exec("DELETE FROM messages WHERE segment_id = ?", segmentId)
 		if err != nil {
 			return err
 		}
