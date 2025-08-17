@@ -25,16 +25,16 @@ src: 127.0.0.1:5000
 `
 
 var SampleLayouts = []Message{
-	{Location{1, 78}, MakeTimeV("2024-07-29T00:02:49.231231+00:00")},
-	{Location{78, 134}, MakeTimeV("2024-07-29T01:07:21.923832+00:00")},
-	{Location{134, 235}, MakeTimeV("2024-07-29T01:11:38.258712+00:00")},
-	{Location{235, 302}, MakeTimeV("2024-07-30T00:12:22.799234+00:00")},
-	{Location{302, 365}, MakeTimeV("2024-07-30T01:16:57.293873+00:00")},
-	{Location{365, 418}, MakeTimeV("2024-07-30T02:20:36.908172+00:00")},
-	{Location{418, 469}, MakeTimeV("2024-07-30T03:24:47.245671+00:00")},
-	{Location{469, 522}, MakeTimeV("2024-07-30T04:25:27.789664+00:00")},
-	{Location{522, 571}, MakeTimeV("2024-07-30T05:28:56.918273+00:00")},
-	{Location{571, 623}, MakeTimeV("2024-07-30T06:29:23.685562+00:00")},
+	{MessageLayout{Loc: Location{1, 78}}, MakeTimeV("2024-07-29T00:02:49.231231+00:00")},
+	{MessageLayout{Loc: Location{78, 134}}, MakeTimeV("2024-07-29T01:07:21.923832+00:00")},
+	{MessageLayout{Loc: Location{134, 235}}, MakeTimeV("2024-07-29T01:11:38.258712+00:00")},
+	{MessageLayout{Loc: Location{235, 302}}, MakeTimeV("2024-07-30T00:12:22.799234+00:00")},
+	{MessageLayout{Loc: Location{302, 365}}, MakeTimeV("2024-07-30T01:16:57.293873+00:00")},
+	{MessageLayout{Loc: Location{365, 418}}, MakeTimeV("2024-07-30T02:20:36.908172+00:00")},
+	{MessageLayout{Loc: Location{418, 469}}, MakeTimeV("2024-07-30T03:24:47.245671+00:00")},
+	{MessageLayout{Loc: Location{469, 522}}, MakeTimeV("2024-07-30T04:25:27.789664+00:00")},
+	{MessageLayout{Loc: Location{522, 571}}, MakeTimeV("2024-07-30T05:28:56.918273+00:00")},
+	{MessageLayout{Loc: Location{571, 623}}, MakeTimeV("2024-07-30T06:29:23.685562+00:00")},
 }
 
 // MakeTestFile creates a temporary log file with sample log data for testing purposes.

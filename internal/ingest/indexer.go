@@ -15,7 +15,7 @@ import (
 type task struct {
 	file       string
 	segmentBuf []byte
-	layouts    []MessageLayout
+	layouts    []common.MessageLayout
 }
 type taskResult struct {
 	task     task
@@ -55,7 +55,7 @@ func NewIndexer(
 // indexSegments processes pending segments from multiple files in parallel and returns an iterator of task results.
 func (ix *Indexer) indexSegments(
 	// pendingSegments is a map of file paths to groups (called segments) of message layouts to be indexed
-	pendingSegments map[string][][]MessageLayout,
+	pendingSegments map[string][][]common.MessageLayout,
 ) iter.Seq[taskResult] {
 
 	tasks := ix.produceTasks(pendingSegments)
@@ -123,7 +123,7 @@ func (ix *Indexer) consumeTasksViaWorkerPool(in <-chan task) <-chan taskResult {
 							continue TaskLoop
 						}
 
-						messages = append(messages, common.Message{m.Loc, date})
+						messages = append(messages, common.Message{common.MessageLayout{Loc: m.Loc}, date})
 					}
 
 					// Collect unique terms from the messages
@@ -145,7 +145,7 @@ func (ix *Indexer) consumeTasksViaWorkerPool(in <-chan task) <-chan taskResult {
 // For each segment, it reads the corresponding bytes from the file using a buffer from the pool.
 // Returns a channel of tasks containing file path, segment bytes, and message layouts.
 // If file operations fail, the file is blacklisted and skipped.
-func (ix *Indexer) produceTasks(pendingSegments map[string][][]MessageLayout) <-chan task {
+func (ix *Indexer) produceTasks(pendingSegments map[string][][]common.MessageLayout) <-chan task {
 	tasks := make(chan task)
 
 	// produce tasks in a separate goroutine

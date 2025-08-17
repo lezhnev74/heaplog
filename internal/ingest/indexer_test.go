@@ -30,16 +30,17 @@ func TestIndexer(t *testing.T) {
 
 	// Prepare test data
 	fileName, fileBytes := common.MakeTestFile(t)
-	layouts, err := scan(
+	scannedLayouts, err := scan(
 		fileName,
 		len(fileBytes),
 		common.MessageStartPattern,
 		[]common.Location{{0, len(fileBytes)}},
 	)
 	require.NoError(t, err)
+	layouts := toMessageLayouts(slices.Collect(scannedLayouts))
 
 	// Test indexing
-	segments := map[string][][]MessageLayout{
+	segments := map[string][][]common.MessageLayout{
 		fileName: {layouts[:1], layouts[1:]},
 	}
 	var results []taskResult
@@ -72,13 +73,13 @@ func TestIndexer(t *testing.T) {
 
 		// Compare messages
 		for j, msg := range result.messages {
-			if msg.Location != expected.messages[j].Location {
+			if msg.Loc != expected.messages[j].Loc {
 				t.Errorf(
 					"Result %d, message %d: Expected location %v, got %v",
 					i,
 					j,
-					expected.messages[j].Location,
-					msg.Location,
+					expected.messages[j].Loc,
+					msg.Loc,
 				)
 			}
 			if !msg.Date.Equal(expected.messages[j].Date) {
@@ -126,16 +127,17 @@ func TestBlacklistedFileNotIndexed(t *testing.T) {
 
 	// Prepare test data
 	fileName, fileBytes := common.MakeTestFile(t)
-	layouts, err := scan(
+	scannedLayouts, err := scan(
 		fileName,
 		len(fileBytes),
 		common.MessageStartPattern,
 		[]common.Location{{0, len(fileBytes)}},
 	)
 	require.NoError(t, err)
+	layouts := toMessageLayouts(slices.Collect(scannedLayouts))
 
 	// First indexing attempt should fail and blacklist the file
-	segments := map[string][][]MessageLayout{
+	segments := map[string][][]common.MessageLayout{
 		fileName: {layouts},
 	}
 	results := 0
@@ -170,15 +172,16 @@ func TestIndexerContextCancellation(t *testing.T) {
 
 	// Prepare test data
 	fileName, fileBytes := common.MakeTestFile(t)
-	layouts, err := scan(
+	scannedLayouts, err := scan(
 		fileName,
 		len(fileBytes),
 		common.MessageStartPattern,
 		[]common.Location{{0, len(fileBytes)}},
 	)
 	require.NoError(t, err)
+	layouts := toMessageLayouts(slices.Collect(scannedLayouts))
 
-	segments := map[string][][]MessageLayout{
+	segments := map[string][][]common.MessageLayout{
 		fileName: {layouts},
 	}
 

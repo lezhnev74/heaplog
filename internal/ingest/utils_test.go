@@ -104,13 +104,13 @@ func TestFindMisalignedSegments(t *testing.T) {
 	tests := []struct {
 		name              string
 		indexedSegments   map[string][]common.Location
-		foundFilesLayouts map[string][]MessageLayout
+		foundFilesLayouts map[string][]common.MessageLayout
 		want              []string
 	}{
 		{
 			name:              "empty inputs",
 			indexedSegments:   map[string][]common.Location{},
-			foundFilesLayouts: map[string][]MessageLayout{},
+			foundFilesLayouts: map[string][]common.MessageLayout{},
 			want:              []string{},
 		},
 		{
@@ -118,7 +118,7 @@ func TestFindMisalignedSegments(t *testing.T) {
 			indexedSegments: map[string][]common.Location{
 				"file1": {{From: 0, To: 10}},
 			},
-			foundFilesLayouts: map[string][]MessageLayout{
+			foundFilesLayouts: map[string][]common.MessageLayout{
 				"file1": {{Loc: common.Location{From: 0, To: 10}}},
 			},
 			want: []string{},
@@ -128,7 +128,7 @@ func TestFindMisalignedSegments(t *testing.T) {
 			indexedSegments: map[string][]common.Location{
 				"file1": {{From: 0, To: 10}},
 			},
-			foundFilesLayouts: map[string][]MessageLayout{
+			foundFilesLayouts: map[string][]common.MessageLayout{
 				"file1": {{Loc: common.Location{From: 5, To: 10}}},
 			},
 			want: []string{"file1"},
@@ -138,7 +138,7 @@ func TestFindMisalignedSegments(t *testing.T) {
 			indexedSegments: map[string][]common.Location{
 				"file1": {{From: 0, To: 10}},
 			},
-			foundFilesLayouts: map[string][]MessageLayout{
+			foundFilesLayouts: map[string][]common.MessageLayout{
 				"file1": {{Loc: common.Location{From: 0, To: 15}}},
 			},
 			want: []string{"file1"},
@@ -148,7 +148,7 @@ func TestFindMisalignedSegments(t *testing.T) {
 			indexedSegments: map[string][]common.Location{
 				"file1": {{From: 0, To: 10}},
 			},
-			foundFilesLayouts: map[string][]MessageLayout{
+			foundFilesLayouts: map[string][]common.MessageLayout{
 				"file1": {
 					{Loc: common.Location{From: 0, To: 5}},
 					{Loc: common.Location{From: 5, To: 9}},
@@ -161,7 +161,7 @@ func TestFindMisalignedSegments(t *testing.T) {
 			indexedSegments: map[string][]common.Location{
 				"file1": {{From: 0, To: 10}},
 			},
-			foundFilesLayouts: map[string][]MessageLayout{
+			foundFilesLayouts: map[string][]common.MessageLayout{
 				"file1": {},
 			},
 			want: []string{"file1"},
@@ -172,7 +172,7 @@ func TestFindMisalignedSegments(t *testing.T) {
 				"file1": {{From: 0, To: 10}},
 				"file2": {{From: 0, To: 10}},
 			},
-			foundFilesLayouts: map[string][]MessageLayout{
+			foundFilesLayouts: map[string][]common.MessageLayout{
 				"file1": {{Loc: common.Location{From: 0, To: 10}}},
 				"file2": {{Loc: common.Location{From: 5, To: 15}}},
 			},
@@ -200,15 +200,15 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 		name        string
 		segmentSize int
 		locs        []common.Location
-		layouts     []MessageLayout
-		want        [][]MessageLayout
+		layouts     []common.MessageLayout
+		want        [][]common.MessageLayout
 	}{
 		{
 			name:        "empty inputs",
 			segmentSize: 10,
 			locs:        []common.Location{},
-			layouts:     []MessageLayout{},
-			want:        [][]MessageLayout{},
+			layouts:     []common.MessageLayout{},
+			want:        [][]common.MessageLayout{},
 		},
 		{
 			name:        "overlapping layouts",
@@ -216,11 +216,11 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			locs: []common.Location{
 				{From: 0, To: 100},
 			},
-			layouts: []MessageLayout{
+			layouts: []common.MessageLayout{
 				{Loc: common.Location{From: 0, To: 60}},
 				{Loc: common.Location{From: 50, To: 80}},
 			},
-			want: [][]MessageLayout{
+			want: [][]common.MessageLayout{
 				{{Loc: common.Location{From: 0, To: 60}}},
 				{{Loc: common.Location{From: 50, To: 80}}},
 			},
@@ -231,11 +231,11 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			locs: []common.Location{
 				{From: 0, To: 100},
 			},
-			layouts: []MessageLayout{
+			layouts: []common.MessageLayout{
 				{Loc: common.Location{From: 10, To: 10}},
 				{Loc: common.Location{From: 20, To: 20}},
 			},
-			want: [][]MessageLayout{
+			want: [][]common.MessageLayout{
 				{{Loc: common.Location{From: 10, To: 10}}},
 				{{Loc: common.Location{From: 20, To: 20}}},
 			},
@@ -246,11 +246,11 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			locs: []common.Location{
 				{From: 0, To: 100},
 			},
-			layouts: []MessageLayout{
+			layouts: []common.MessageLayout{
 				{Loc: common.Location{From: 0, To: 50}},
 				{Loc: common.Location{From: 50, To: 100}},
 			},
-			want: [][]MessageLayout{
+			want: [][]common.MessageLayout{
 				{{Loc: common.Location{From: 0, To: 50}}},
 				{{Loc: common.Location{From: 50, To: 100}}},
 			},
@@ -261,11 +261,11 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			locs: []common.Location{
 				{From: 0, To: 50},
 			},
-			layouts: []MessageLayout{
+			layouts: []common.MessageLayout{
 				{Loc: common.Location{From: 60, To: 80}},
 				{Loc: common.Location{From: 90, To: 100}},
 			},
-			want: [][]MessageLayout{},
+			want: [][]common.MessageLayout{},
 		},
 		{
 			name:        "single layout spanning multiple segments",
@@ -273,10 +273,10 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			locs: []common.Location{
 				{From: 0, To: 100},
 			},
-			layouts: []MessageLayout{
+			layouts: []common.MessageLayout{
 				{Loc: common.Location{From: 0, To: 90}},
 			},
-			want: [][]MessageLayout{
+			want: [][]common.MessageLayout{
 				{{Loc: common.Location{From: 0, To: 90}}},
 			},
 		},
@@ -287,10 +287,10 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 				{From: 0, To: 50},
 				{From: 60, To: 100},
 			},
-			layouts: []MessageLayout{
+			layouts: []common.MessageLayout{
 				{Loc: common.Location{From: 30, To: 80}},
 			},
-			want: [][]MessageLayout{
+			want: [][]common.MessageLayout{
 				{{Loc: common.Location{From: 30, To: 80}}},
 			},
 		},
@@ -300,11 +300,11 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			locs: []common.Location{
 				{From: 0, To: 50},
 			},
-			layouts: []MessageLayout{
+			layouts: []common.MessageLayout{
 				{Loc: common.Location{From: 0, To: 40}},
 				{Loc: common.Location{From: 40, To: 50}},
 			},
-			want: [][]MessageLayout{
+			want: [][]common.MessageLayout{
 				{
 					{Loc: common.Location{From: 0, To: 40}},
 					{Loc: common.Location{From: 40, To: 50}},
@@ -317,12 +317,12 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			locs: []common.Location{
 				{From: 0, To: 100},
 			},
-			layouts: []MessageLayout{
+			layouts: []common.MessageLayout{
 				{Loc: common.Location{From: 0, To: 30}},
 				{Loc: common.Location{From: 30, To: 60}},
 				{Loc: common.Location{From: 60, To: 90}},
 			},
-			want: [][]MessageLayout{
+			want: [][]common.MessageLayout{
 				{
 					{Loc: common.Location{From: 0, To: 30}},
 					{Loc: common.Location{From: 30, To: 60}},
@@ -338,11 +338,11 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			locs: []common.Location{
 				{From: 50, To: 150},
 			},
-			layouts: []MessageLayout{
+			layouts: []common.MessageLayout{
 				{Loc: common.Location{From: 0, To: 40}},
 				{Loc: common.Location{From: 60, To: 100}},
 			},
-			want: [][]MessageLayout{
+			want: [][]common.MessageLayout{
 				{
 					{Loc: common.Location{From: 60, To: 100}},
 				},
@@ -354,11 +354,11 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			locs: []common.Location{
 				{From: 0, To: 150},
 			},
-			layouts: []MessageLayout{
+			layouts: []common.MessageLayout{
 				{Loc: common.Location{From: 0, To: 40}},
 				{Loc: common.Location{From: 60, To: 100}},
 			},
-			want: [][]MessageLayout{
+			want: [][]common.MessageLayout{
 				{
 					{Loc: common.Location{From: 0, To: 40}},
 				},
@@ -374,11 +374,11 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 				{From: 40, To: 50},
 				{From: 60, To: 70},
 			},
-			layouts: []MessageLayout{
+			layouts: []common.MessageLayout{
 				{Loc: common.Location{From: 30, To: 45}},
 				{Loc: common.Location{From: 55, To: 65}},
 			},
-			want: [][]MessageLayout{
+			want: [][]common.MessageLayout{
 				{
 					{Loc: common.Location{From: 30, To: 45}},
 				},
@@ -393,10 +393,10 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			locs: []common.Location{
 				{From: 10, To: 20},
 			},
-			layouts: []MessageLayout{
+			layouts: []common.MessageLayout{
 				{Loc: common.Location{From: 0, To: 5}},
 			},
-			want: [][]MessageLayout{},
+			want: [][]common.MessageLayout{},
 		},
 		{
 			name:        "right from the locs",
@@ -404,10 +404,10 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			locs: []common.Location{
 				{From: 10, To: 20},
 			},
-			layouts: []MessageLayout{
+			layouts: []common.MessageLayout{
 				{Loc: common.Location{From: 30, To: 35}},
 			},
-			want: [][]MessageLayout{},
+			want: [][]common.MessageLayout{},
 		},
 		{
 			name:        "partial overlap left",
@@ -415,10 +415,10 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			locs: []common.Location{
 				{From: 10, To: 20},
 			},
-			layouts: []MessageLayout{
+			layouts: []common.MessageLayout{
 				{Loc: common.Location{From: 0, To: 11}},
 			},
-			want: [][]MessageLayout{
+			want: [][]common.MessageLayout{
 				{{Loc: common.Location{From: 0, To: 11}}},
 			},
 		},
@@ -428,10 +428,10 @@ func TestSegmentLayoutsByLocations(t *testing.T) {
 			locs: []common.Location{
 				{From: 10, To: 20},
 			},
-			layouts: []MessageLayout{
+			layouts: []common.MessageLayout{
 				{Loc: common.Location{From: 16, To: 30}},
 			},
-			want: [][]MessageLayout{
+			want: [][]common.MessageLayout{
 				{{Loc: common.Location{From: 16, To: 30}}},
 			},
 		},

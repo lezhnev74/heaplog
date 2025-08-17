@@ -7,6 +7,11 @@ type Segment struct {
 }
 
 type Message struct {
-	Location
+	MessageLayout
 	Date time.Time
+}
+
+type MessageLayout struct {
+	Loc     Location // body in the stream
+	DateLoc Location // date in the stream
 }

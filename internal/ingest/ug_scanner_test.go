@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -46,7 +47,7 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 
 	type Test struct {
 		locations       []common.Location
-		expectedLayouts []MessageLayout
+		expectedLayouts []ScannedMessage
 	}
 	tests := []Test{
 		{ // empty
@@ -69,19 +70,25 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 			locations: []common.Location{
 				{From: 0, To: 10000},
 			},
-			expectedLayouts: []MessageLayout{
+			expectedLayouts: []ScannedMessage{
 				{
-					Loc:     common.Location{From: 1, To: 125},
-					DateLoc: common.Location{From: 2, To: 34},
+					MessageLayout: common.MessageLayout{
+						Loc:     common.Location{From: 1, To: 125},
+						DateLoc: common.Location{From: 2, To: 34},
+					},
 				},
 				{
-					Loc:     common.Location{From: 125, To: 620},
-					DateLoc: common.Location{From: 126, To: 158},
+					MessageLayout: common.MessageLayout{
+						Loc:     common.Location{From: 125, To: 620},
+						DateLoc: common.Location{From: 126, To: 158},
+					},
 				},
 				{
-					Loc:     common.Location{From: 620, To: 885},
-					DateLoc: common.Location{From: 621, To: 653},
-					IsTail:  true,
+					MessageLayout: common.MessageLayout{
+						Loc:     common.Location{From: 620, To: 885},
+						DateLoc: common.Location{From: 621, To: 653},
+					},
+					IsTail: true,
 				},
 			},
 		},
@@ -89,10 +96,12 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 			locations: []common.Location{
 				{From: 0, To: 20},
 			},
-			expectedLayouts: []MessageLayout{
+			expectedLayouts: []ScannedMessage{
 				{
-					Loc:     common.Location{From: 1, To: 125},
-					DateLoc: common.Location{From: 2, To: 34},
+					MessageLayout: common.MessageLayout{
+						Loc:     common.Location{From: 1, To: 125},
+						DateLoc: common.Location{From: 2, To: 34},
+					},
 				},
 			},
 		},
@@ -100,10 +109,12 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 			locations: []common.Location{
 				{From: 0, To: 50},
 			},
-			expectedLayouts: []MessageLayout{
+			expectedLayouts: []ScannedMessage{
 				{
-					Loc:     common.Location{From: 1, To: 125}, // right boundary is the next message or the eof
-					DateLoc: common.Location{From: 2, To: 34},
+					MessageLayout: common.MessageLayout{
+						Loc:     common.Location{From: 1, To: 125}, // right boundary is the next message or the eof
+						DateLoc: common.Location{From: 2, To: 34},
+					},
 				},
 			},
 		},
@@ -112,15 +123,19 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 				{From: 0, To: 50},
 				{From: 610, To: 700},
 			},
-			expectedLayouts: []MessageLayout{
+			expectedLayouts: []ScannedMessage{
 				{
-					Loc:     common.Location{From: 1, To: 125},
-					DateLoc: common.Location{From: 2, To: 34},
+					MessageLayout: common.MessageLayout{
+						Loc:     common.Location{From: 1, To: 125},
+						DateLoc: common.Location{From: 2, To: 34},
+					},
 				},
 				{
-					Loc:     common.Location{From: 620, To: 885},
-					DateLoc: common.Location{From: 621, To: 653},
-					IsTail:  true,
+					MessageLayout: common.MessageLayout{
+						Loc:     common.Location{From: 620, To: 885},
+						DateLoc: common.Location{From: 621, To: 653},
+					},
+					IsTail: true,
 				},
 			},
 		},
@@ -131,13 +146,14 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 			fmt.Sprintf("Test %d", i), func(t *testing.T) {
 				layouts, err := scan(filePath, len(fileMap[filePath]), MsgStartRe, tt.locations)
 				require.NoError(t, err)
-				require.Equal(t, tt.expectedLayouts, layouts)
+				require.Equal(t, tt.expectedLayouts, slices.Collect(layouts))
 			},
 		)
 	}
 }
 
 func TestUgScannerHuge(t *testing.T) {
+	type ScannedMessage = common.MessageLayout
 	sourceStream := []byte(`
 [2024-07-30T00:00:04.769958+00:00] production.DEBUG: Shuffle jobs on the queue
 
@@ -179,5 +195,5 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 		[]common.Location{{From: 0, To: 1_000_000}},
 	)
 	require.NoError(t, err)
-	require.Len(t, messages, 3000)
+	require.Len(t, slices.Collect(messages), 3000)
 }

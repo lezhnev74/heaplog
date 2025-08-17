@@ -135,7 +135,7 @@ func (i *Ingestor) Run() error {
 	}
 
 	// 8. Plan segments for indexing
-	plan := make(map[string][][]MessageLayout)
+	plan := make(map[string][][]common.MessageLayout)
 	for file := range layouts {
 		filesize := layouts[file][len(layouts[file])-1].Loc.To
 		loc := common.Location{0, filesize}
@@ -157,12 +157,12 @@ func (i *Ingestor) Run() error {
 
 // scanFiles scans accessible files to build message layouts.
 // Returns a map of file paths to their message layouts and error if scanning fails.
-func (i *Ingestor) scanFiles(files map[string]int) (map[string][]MessageLayout, error) {
+func (i *Ingestor) scanFiles(files map[string]int) (map[string][]common.MessageLayout, error) {
 
 	// split files per workers
 	filePaths := slices.Collect(maps.Keys(files))
 	filesPerWorker := common.ChunksN(filePaths, i.workers)
-	fileLayouts := make([][]MessageLayout, len(filePaths))
+	fileLayouts := make([][]common.MessageLayout, len(filePaths))
 
 	// scanning is cpu intensive (RE-parsing), so run in parallel
 	wg := sync.WaitGroup{}
@@ -176,14 +176,19 @@ func (i *Ingestor) scanFiles(files map[string]int) (map[string][]MessageLayout, 
 					i.logger.Error("scan file", zap.String("file", f), zap.Error(err))
 					continue
 				}
-				fileLayouts[slices.Index(filePaths, f)] = layouts
+				for sl := range layouts {
+					fileLayouts[slices.Index(filePaths, f)] = append(
+						fileLayouts[slices.Index(filePaths, f)],
+						sl.MessageLayout,
+					)
+				}
 			}
 		}()
 	}
 	wg.Wait()
 
 	// merge layouts per file to a map
-	foundFilesLayouts := make(map[string][]MessageLayout)
+	foundFilesLayouts := make(map[string][]common.MessageLayout)
 	for j, layouts := range fileLayouts {
 		foundFilesLayouts[filePaths[j]] = layouts
 	}

@@ -14,14 +14,14 @@ import (
 func alignSegmentsByMessageBoundaries(
 	segmentSize int,
 	locs []common.Location,
-	layouts []MessageLayout,
-) [][]MessageLayout {
-	result := make([][]MessageLayout, 0)
+	layouts []common.MessageLayout,
+) [][]common.MessageLayout {
+	result := make([][]common.MessageLayout, 0)
 	if len(layouts) == 0 || len(locs) == 0 {
 		return result
 	}
 
-	currentSegment := make([]MessageLayout, 0)
+	currentSegment := make([]common.MessageLayout, 0)
 	currentSize := 0
 	latestLayoutIndex := 0
 
@@ -29,7 +29,7 @@ func alignSegmentsByMessageBoundaries(
 		li, found := slices.BinarySearchFunc(
 			layouts[latestLayoutIndex:],
 			loc,
-			func(a MessageLayout, b common.Location) int {
+			func(a common.MessageLayout, b common.Location) int {
 				if a.Loc.Intersects(b) {
 					return 0
 				}
@@ -50,7 +50,7 @@ func alignSegmentsByMessageBoundaries(
 				if len(currentSegment) > 0 {
 					result = append(result, currentSegment)
 				}
-				currentSegment = make([]MessageLayout, 0)
+				currentSegment = make([]common.MessageLayout, 0)
 				currentSize = 0
 			}
 
@@ -61,7 +61,7 @@ func alignSegmentsByMessageBoundaries(
 			// Segment full → flush
 			if currentSize >= segmentSize {
 				result = append(result, currentSegment)
-				currentSegment = make([]MessageLayout, 0)
+				currentSegment = make([]common.MessageLayout, 0)
 				currentSize = 0
 			}
 
@@ -92,7 +92,7 @@ func appendTermsUnique(all map[string]struct{}, terms [][]byte) {
 // findMisalignedSegments checks misalignment of indexed segments with actual message boundaries found in the file.
 func findMisalignedSegments(
 	indexedSegments map[string][]common.Location,
-	foundFilesLayouts map[string][]MessageLayout,
+	foundFilesLayouts map[string][]common.MessageLayout,
 ) iter.Seq[string] {
 	return func(yield func(string) bool) {
 	indexFileLoop:

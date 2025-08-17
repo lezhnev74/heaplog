@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"iter"
 	"log"
 	"os/exec"
 	"strconv"
@@ -18,10 +19,17 @@ var (
 	NoMessageStartFound = fmt.Errorf("unable to find a message in the stream")
 )
 
-type MessageLayout struct {
-	Loc     common.Location // body in the stream
-	DateLoc common.Location // date in the stream
-	IsTail  bool            // if the message is at the end of the stream
+type ScannedMessage struct {
+	common.MessageLayout
+	IsTail bool
+}
+
+func toMessageLayouts(in []ScannedMessage) []common.MessageLayout {
+	out := make([]common.MessageLayout, len(in))
+	for i, m := range in {
+		out[i] = m.MessageLayout
+	}
+	return out
 }
 
 // scan execs "ug" on the entire file and returns all message offsets within the given locations.
@@ -29,7 +37,10 @@ type MessageLayout struct {
 // It uses a custom format to extract message boundaries and date ranges.
 // Returns NoMessageStartFound error if no messages are found in the stream.
 // Returns error if there are issues executing ug or accessing the file.
-func scan(file string, fileSize int, re string, locations []common.Location) (layouts []MessageLayout, err error) {
+func scan(file string, fileSize int, re string, locations []common.Location) (
+	layouts iter.Seq[ScannedMessage],
+	err error,
+) {
 	ctx := context.Background()
 	cmd := exec.CommandContext(ctx, "ug", "-P", `--format=%[0]b,%[1]b:%[1]d%~`, re, file)
 	stdout, err := cmd.StdoutPipe()
@@ -41,22 +52,15 @@ func scan(file string, fileSize int, re string, locations []common.Location) (la
 		return nil, fmt.Errorf("ug exec: %w", err)
 	}
 
-	defer func() {
-		err = cmd.Wait()
-		if err != nil {
-			err = fmt.Errorf("ug finish: %w", err)
-		}
-	}()
-
 	// When a new layout is scanned from the file,
 	// here we decide if it within the given locations.
-	putLayout := func(l MessageLayout) {
+	matched := func(l ScannedMessage) bool {
 		for _, rloc := range locations {
 			if rloc.Contains(l.Loc.From) {
-				layouts = append(layouts, l) // yes, keep the layout
-				return
+				return true
 			}
 		}
+		return false
 	}
 
 	scanner := bufio.NewScanner(stdout)
@@ -71,27 +75,42 @@ func scan(file string, fileSize int, re string, locations []common.Location) (la
 		return nil, fmt.Errorf("parse line: %w", err)
 	}
 
-	for {
-		l := MessageLayout{}
-		l.Loc.From = m
-		l.DateLoc.From = d
-		l.DateLoc.To = d + dl
+	return func(yield func(ScannedMessage) bool) {
+		defer func() {
+			err = cmd.Wait()
+			if err != nil {
+				panic(fmt.Errorf("ug finish: %w", err))
+			}
+		}()
 
-		if !scanner.Scan() {
-			// reached EOF
-			l.Loc.To = fileSize // the last message
-			l.IsTail = true
-			putLayout(l)
-			break
+		for {
+			l := ScannedMessage{}
+			l.Loc.From = m
+			l.DateLoc.From = d
+			l.DateLoc.To = d + dl
+
+			if !scanner.Scan() {
+				// reached EOF
+				l.Loc.To = fileSize // the last message
+				l.IsTail = true
+				if matched(l) {
+					if !yield(l) {
+						return
+					}
+				}
+				break
+			}
+
+			lastLine = scanner.Text()
+			m, d, dl = parseLine(lastLine)
+			l.Loc.To = m
+			if matched(l) {
+				if !yield(l) {
+					return
+				}
+			}
 		}
-
-		lastLine = scanner.Text()
-		m, d, dl = parseLine(lastLine)
-		l.Loc.To = m
-		putLayout(l)
-	}
-
-	return
+	}, nil
 }
 
 // parseLine relies on ug format: "%[0]b,%[1]b:%[1]d%~"
