@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"math"
 	"strings"
 	"time"
 
@@ -224,7 +225,17 @@ func (duck *DuckDB) wipeFile(file string) error {
 	return tx.Commit()
 }
 
-func (duck *DuckDB) GetMessages(segments []int) (iter.Seq[common.FileMessage], error) {
+// Main gateway for getting messages from the database.
+func (duck *DuckDB) GetMessages(segments []int, minDate, maxDate *time.Time) (iter.Seq[common.FileMessage], error) {
+
+	minMicro, maxMicro := int64(0), int64(math.MaxInt64)
+	if minDate != nil {
+		minMicro = minDate.UnixMicro()
+	}
+	if maxDate != nil {
+		maxMicro = maxDate.UnixMicro()
+	}
+
 	q := `
 	SELECT
 	    files.path,
@@ -240,7 +251,7 @@ func (duck *DuckDB) GetMessages(segments []int) (iter.Seq[common.FileMessage], e
 	FROM messages
 	JOIN segments on segments.id=messages.segment_id 
 	JOIN files on files.id=segments.file_id 
-	WHERE %s
+	WHERE messages.date >= ? AND messages.date <= ? AND %s
 	ORDER BY messages.date
 	`
 	if len(segments) > 0 {
@@ -249,7 +260,10 @@ func (duck *DuckDB) GetMessages(segments []int) (iter.Seq[common.FileMessage], e
 		q = fmt.Sprintf(q, "1=1")
 	}
 
-	rows, err := duck.db.Query(q, asAny(segments)...)
+	rows, err := duck.db.Query(
+		q,
+		append([]any{minMicro, maxMicro}, asAny(segments)...)...,
+	)
 	if err != nil {
 		return nil, err
 	}

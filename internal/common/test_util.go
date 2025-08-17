@@ -75,3 +75,8 @@ func MakeTimeV(value string) time.Time {
 	}
 	return t
 }
+
+func MakeTimeP(value string) *time.Time {
+	t := MakeTimeV(value)
+	return &t
+}
