@@ -28,7 +28,7 @@ type Ingestor struct {
 	// number of concurrent workers that index segments
 	workers int
 
-	db      filesIndex
+	db      FilesIndex
 	logger  *zap.Logger
 	indexer *Indexer
 }
@@ -38,7 +38,7 @@ func NewIngestor(
 	messageRE *regexp.Regexp,
 	segmentLen int,
 	workers int,
-	db filesIndex,
+	db FilesIndex,
 	logger *zap.Logger,
 	indexer *Indexer,
 ) *Ingestor {
@@ -80,7 +80,7 @@ func (i *Ingestor) Run() error {
 	}
 
 	// 2. Read the index
-	indexedSegments, err := i.db.getSegments()
+	indexedSegments, err := i.db.GetSegments()
 	if err != nil {
 		return fmt.Errorf("get indexed segments: %w", err)
 	}
@@ -89,7 +89,7 @@ func (i *Ingestor) Run() error {
 	for file := range indexedSegments {
 		if _, ok := files[file]; !ok {
 			i.logger.Info("wipe file index", zap.String("file", file))
-			err = i.db.wipeFile(file)
+			err = i.db.WipeFile(file)
 			if err != nil {
 				return fmt.Errorf("wipe file index: %w", err)
 			}
@@ -119,7 +119,7 @@ func (i *Ingestor) Run() error {
 	// as a result it re-indexes files that somehow changed already indexed data.
 	for file := range findMisalignedSegments(indexedSegments, layouts) {
 		i.logger.Warn("indexed misalignment: re-index required", zap.String("file", file))
-		err = i.db.wipeSegments(file)
+		err = i.db.WipeSegments(file)
 		if err != nil {
 			return fmt.Errorf("wipe segments for %s: %w", file, err)
 		}
@@ -146,7 +146,7 @@ func (i *Ingestor) Run() error {
 
 	// 9. Perform indexing
 	for r := range i.indexer.indexSegments(plan) {
-		err = i.db.putSegment(r.task.file, r.tokens, r.messages)
+		_, err = i.db.PutSegment(r.task.file, r.messages)
 		if err != nil {
 			return fmt.Errorf("put segment for %s: %w", r.task.file, err)
 		}

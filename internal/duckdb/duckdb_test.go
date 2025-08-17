@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"heaplog_2024/internal/common"
+	"heaplog_2024/internal/ingest"
 )
 
 type putSegmentTestCase struct {
@@ -18,6 +19,15 @@ type putSegmentTestCase struct {
 	minDate          *time.Time
 	maxDate          *time.Time
 	expectedMessages []int // indexes within all messages
+}
+
+func TestIngestInterface(t *testing.T) {
+	ctx := context.Background()
+	db, err := NewDuckDB(ctx, "")
+	require.NoError(t, err)
+	err = db.Migrate()
+	require.NoError(t, err)
+	_ = ingest.FilesIndex(db)
 }
 
 func TestWipeFiles(t *testing.T) {
@@ -29,7 +39,7 @@ func TestWipeFiles(t *testing.T) {
 
 	// Insert some data
 	_, err = db.PutSegment(
-		"path1", nil, []common.Message{
+		"path1", []common.Message{
 			{
 				MessageLayout: common.MessageLayout{
 					Loc:     common.Location{From: 0, To: 10},
@@ -42,11 +52,11 @@ func TestWipeFiles(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wipe files
-	err = db.wipeFile("path1")
+	err = db.WipeFile("path1")
 	require.NoError(t, err)
 
 	// Check that the file is gone
-	files, err := db.getSegments()
+	files, err := db.GetSegments()
 	require.NoError(t, err)
 	require.Empty(t, files)
 }
@@ -60,7 +70,7 @@ func TestWipeSegments(t *testing.T) {
 
 	// Insert some data
 	_, err = db.PutSegment(
-		"path1", nil, []common.Message{
+		"path1", []common.Message{
 			{
 				MessageLayout: common.MessageLayout{
 					Loc:     common.Location{From: 0, To: 10},
@@ -73,11 +83,11 @@ func TestWipeSegments(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wipe files
-	err = db.wipeSegments("path1")
+	err = db.WipeSegments("path1")
 	require.NoError(t, err)
 
 	// Check that the file is gone
-	files, err := db.getSegments()
+	files, err := db.GetSegments()
 	require.NoError(t, err)
 	require.Empty(t, files)
 }
@@ -91,7 +101,7 @@ func TestWipeSegment(t *testing.T) {
 
 	// Insert some data
 	_, err = db.PutSegment(
-		"path1", nil, []common.Message{
+		"path1", []common.Message{
 			{
 				MessageLayout: common.MessageLayout{
 					Loc:     common.Location{From: 0, To: 10},
@@ -102,7 +112,7 @@ func TestWipeSegment(t *testing.T) {
 		},
 	)
 	_, err = db.PutSegment(
-		"path1", nil, []common.Message{
+		"path1", []common.Message{
 			{
 				MessageLayout: common.MessageLayout{
 					Loc:     common.Location{From: 20, To: 30},
@@ -115,11 +125,11 @@ func TestWipeSegment(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wipe files
-	err = db.wipeSegment("path1", common.Location{From: 20, To: 30})
+	err = db.WipeSegment("path1", common.Location{From: 20, To: 30})
 	require.NoError(t, err)
 
 	// Check only one segment remains
-	files, err := db.getSegments()
+	files, err := db.GetSegments()
 	require.NoError(t, err)
 
 	expectedResult := map[string][]common.Location{
@@ -333,7 +343,7 @@ func TestGetMessages(t *testing.T) {
 				segmentIds := []int(nil)
 				for path, segments := range tt.input {
 					for _, segment := range segments {
-						segmentId, err := db.PutSegment(path, nil, segment)
+						segmentId, err := db.PutSegment(path, segment)
 						require.NoError(t, err)
 						segmentIds = append(segmentIds, segmentId)
 					}

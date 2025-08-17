@@ -55,6 +55,9 @@ func scan(file string, fileSize int, re string, locations []common.Location) (
 	// When a new layout is scanned from the file,
 	// here we decide if it within the given locations.
 	matched := func(l ScannedMessage) bool {
+		if len(locations) == 0 {
+			return true
+		}
 		for _, rloc := range locations {
 			if rloc.Contains(l.Loc.From) {
 				return true

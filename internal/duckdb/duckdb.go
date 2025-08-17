@@ -24,10 +24,10 @@ type DuckDB struct {
 	db *sql.DB
 }
 
-func NewDuckDB(ctx context.Context, dir string) (*DuckDB, error) {
+func NewDuckDB(ctx context.Context, filePath string) (*DuckDB, error) {
 	var err error
 	duck := &DuckDB{}
-	duck.db, err = sql.Open("duckdb", dir)
+	duck.db, err = sql.Open("duckdb", filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func (duck *DuckDB) Migrate() (err error) {
 	return err
 }
 
-func (duck *DuckDB) getSegments() (map[string][]common.Location, error) {
+func (duck *DuckDB) GetSegments() (map[string][]common.Location, error) {
 	q := `
 		SELECT files.path, segments.pos_from, segments.pos_to 
 		FROM segments
@@ -105,7 +105,7 @@ func (duck *DuckDB) getSegments() (map[string][]common.Location, error) {
 	return result, rows.Err()
 }
 
-func (duck *DuckDB) PutSegment(file string, terms [][]byte, messages []common.Message) (segmentId int, err error) {
+func (duck *DuckDB) PutSegment(file string, messages []common.Message) (segmentId int, err error) {
 	if len(messages) == 0 {
 		err = fmt.Errorf("no messages in segment")
 		return
@@ -144,8 +144,8 @@ func (duck *DuckDB) PutSegment(file string, terms [][]byte, messages []common.Me
 			"INSERT INTO messages (segment_id, rel_from, rel_date_from, rel_date_to, date) VALUES (?, ?, ?, ?, ?)",
 			segmentId,
 			msg.Loc.From-messages[0].Loc.From,
-			msg.DateLoc.From-messages[0].Loc.From,
-			msg.DateLoc.To-messages[0].Loc.From,
+			msg.DateLoc.From,
+			msg.DateLoc.To,
 			msg.Date.UnixMicro(),
 		)
 		if err != nil {
@@ -157,7 +157,12 @@ func (duck *DuckDB) PutSegment(file string, terms [][]byte, messages []common.Me
 	return
 }
 
-func (duck *DuckDB) wipeSegment(file string, segment common.Location) error {
+func (duck *DuckDB) WipeSegment(file string, segment common.Location) error {
+	tx, err := duck.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
 
 	fileId, err := duck.getFileIdByPath(file)
 	if err != nil {
@@ -173,22 +178,21 @@ func (duck *DuckDB) wipeSegment(file string, segment common.Location) error {
 		return err
 	}
 
-	_, err = duck.db.Exec("DELETE FROM segments WHERE id = ?", segmentId)
+	err = duck._txDeleteSegment(tx, segmentId)
 	if err != nil {
 		return err
 	}
 
-	_, err = duck.db.Exec("DELETE FROM messages WHERE segment_id = ?", segmentId)
-	if err != nil {
-		return err
-	}
-
-	// todo II
-
-	return nil
+	return tx.Commit()
 }
 
-func (duck *DuckDB) wipeSegments(file string) error {
+func (duck *DuckDB) WipeSegments(file string) error {
+	tx, err := duck.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
 	fileId, err := duck.getFileIdByPath(file)
 	if err != nil {
 		return err
@@ -201,26 +205,37 @@ func (duck *DuckDB) wipeSegments(file string) error {
 	for rows.Next() {
 		var segmentId int
 		err = rows.Scan(&segmentId)
-		_, err = duck.db.Exec("DELETE FROM segments WHERE id = ?", segmentId)
 		if err != nil {
 			return err
 		}
-		_, err = duck.db.Exec("DELETE FROM messages WHERE segment_id = ?", segmentId)
+		err = duck._txDeleteSegment(tx, segmentId)
 		if err != nil {
 			return err
 		}
 	}
+	return tx.Commit()
+}
+
+func (duck *DuckDB) _txDeleteSegment(tx *sql.Tx, segmentId int) error {
+	_, err := tx.Exec("DELETE FROM segments WHERE id = ?", segmentId)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec("DELETE FROM messages WHERE segment_id = ?", segmentId)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
-func (duck *DuckDB) wipeFile(file string) error {
+func (duck *DuckDB) WipeFile(file string) error {
 	tx, err := duck.db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	err = duck.wipeSegments(file)
+	err = duck.WipeSegments(file)
 	if err != nil {
 		return err
 	}
@@ -304,8 +319,6 @@ func (duck *DuckDB) GetMessages(segments []int, minDate, maxDate *time.Time) (it
 			cur.Date = time.UnixMicro(int64(dateMicro)).UTC()
 			cur.Loc.From += segmentFrom
 			cur.Loc.To = segmentTo
-			cur.DateLoc.From += segmentFrom
-			cur.DateLoc.To += segmentFrom
 
 			if err != nil {
 				panic(err)

@@ -50,9 +50,29 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 		expectedLayouts []ScannedMessage
 	}
 	tests := []Test{
-		{ // empty
-			locations:       nil,
-			expectedLayouts: nil,
+		{ // all
+			locations: nil,
+			expectedLayouts: []ScannedMessage{
+				{
+					MessageLayout: common.MessageLayout{
+						Loc:     common.Location{From: 1, To: 125},
+						DateLoc: common.Location{From: 2, To: 34},
+					},
+				},
+				{
+					MessageLayout: common.MessageLayout{
+						Loc:     common.Location{From: 125, To: 620},
+						DateLoc: common.Location{From: 126, To: 158},
+					},
+				},
+				{
+					MessageLayout: common.MessageLayout{
+						Loc:     common.Location{From: 620, To: 885},
+						DateLoc: common.Location{From: 621, To: 653},
+					},
+					IsTail: true,
+				},
+			},
 		},
 		{ // no message start
 			locations: []common.Location{
