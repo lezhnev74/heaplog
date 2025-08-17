@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"errors"
+	"fmt"
 	"io"
 	"strings"
 
@@ -12,29 +14,51 @@ import (
 	"heaplog_2024/internal/common"
 )
 
-//go:embed migrations
+//go:embed migrations/_.sql
 var migrationFS embed.FS
 
 type DuckDB struct {
 	db *sql.DB
 }
 
-func (duck *DuckDB) Open(ctx context.Context, dir string) (err error) {
+func NewDuckDB(ctx context.Context, dir string) (*DuckDB, error) {
+	var err error
+	duck := &DuckDB{}
 	duck.db, err = sql.Open("duckdb", dir)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	go func() {
 		<-ctx.Done()
 		duck.Close() // Flush buffers
 	}()
-	return nil
+	return duck, nil
 }
 
 func (duck *DuckDB) Close() (err error) { return duck.db.Close() }
 
 func (duck *DuckDB) getFileIdByPath(path string) (id int, err error) {
+	tx, err := duck.db.Begin()
+	if err != nil {
+		return
+	}
+	defer tx.Rollback()
+
 	err = duck.db.QueryRow("SELECT id FROM files WHERE path = ?", path).Scan(&id)
+	if err != nil && errors.Is(err, sql.ErrNoRows) {
+		err = duck.db.QueryRow(`SELECT nextval('file_ids')`).Scan(&id)
+		if err != nil {
+			return
+		}
+		_, err = duck.db.Exec("INSERT INTO files (id, path) VALUES (?,?)", id, path)
+		if err != nil {
+			return
+		}
+	} else if err != nil {
+		return
+	}
+
+	err = tx.Commit()
 	return
 }
 func (duck *DuckDB) Migrate() (err error) {
@@ -78,7 +102,7 @@ func (duck *DuckDB) getSegments() (map[string][]common.Location, error) {
 	return result, rows.Err()
 }
 
-func (duck *DuckDB) putSegment(file string, terms [][]byte, messages []common.Message) error {
+func (duck *DuckDB) PutSegment(file string, terms [][]byte, messages []common.Message) error {
 	if len(messages) == 0 {
 		return nil
 	}
@@ -91,7 +115,7 @@ func (duck *DuckDB) putSegment(file string, terms [][]byte, messages []common.Me
 
 	fileId, err := duck.getFileIdByPath(file)
 	if err != nil {
-		return err
+		return fmt.Errorf("get file id: %w", err)
 	}
 	segmentId := 0
 	err = duck.db.QueryRow(`SELECT nextval('segment_ids')`).Scan(&segmentId)
@@ -99,13 +123,13 @@ func (duck *DuckDB) putSegment(file string, terms [][]byte, messages []common.Me
 		return err
 	}
 	_, err = tx.Exec(
-		"INSERT INTO segments (id, file_id, pos_from, pos_to, date_min, date_max) VALUES (?, ?, ?, ?)",
+		"INSERT INTO segments (id, file_id, pos_from, pos_to, date_min, date_max) VALUES (?, ?, ?, ?, ?, ?)",
 		segmentId,
 		fileId,
 		messages[0].Loc.From,
 		messages[len(messages)-1].Loc.To,
-		messages[0].Date,
-		messages[len(messages)-1].Date,
+		messages[0].Date.UnixMicro(),
+		messages[len(messages)-1].Date.UnixMicro(),
 	)
 	if err != nil {
 		return err
@@ -180,5 +204,19 @@ func (duck *DuckDB) wipeSegments(file string) error {
 }
 
 func (duck *DuckDB) wipeFile(file string) error {
-	return duck.wipeSegments(file)
+	tx, err := duck.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	err = duck.wipeSegments(file)
+	if err != nil {
+		return err
+	}
+	_, err = duck.db.Exec("DELETE FROM files WHERE path = ?", file)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 }
