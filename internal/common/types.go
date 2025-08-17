@@ -6,6 +6,11 @@ type Segment struct {
 	Location
 }
 
+type FileMessage struct {
+	File string
+	Message
+}
+
 type Message struct {
 	MessageLayout
 	Date time.Time

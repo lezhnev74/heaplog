@@ -104,25 +104,26 @@ func (duck *DuckDB) getSegments() (map[string][]common.Location, error) {
 	return result, rows.Err()
 }
 
-func (duck *DuckDB) PutSegment(file string, terms [][]byte, messages []common.Message) error {
+func (duck *DuckDB) PutSegment(file string, terms [][]byte, messages []common.Message) (segmentId int, err error) {
 	if len(messages) == 0 {
-		return nil
+		err = fmt.Errorf("no messages in segment")
+		return
 	}
 
 	tx, err := duck.db.Begin()
 	if err != nil {
-		return err
+		return
 	}
 	defer tx.Rollback()
 
 	fileId, err := duck.getFileIdByPath(file)
 	if err != nil {
-		return fmt.Errorf("get file id: %w", err)
+		err = fmt.Errorf("get file id: %w", err)
+		return
 	}
-	segmentId := 0
 	err = duck.db.QueryRow(`SELECT nextval('segment_ids')`).Scan(&segmentId)
 	if err != nil {
-		return err
+		return
 	}
 	_, err = tx.Exec(
 		"INSERT INTO segments (id, file_id, pos_from, pos_to, date_min, date_max) VALUES (?, ?, ?, ?, ?, ?)",
@@ -134,7 +135,7 @@ func (duck *DuckDB) PutSegment(file string, terms [][]byte, messages []common.Me
 		messages[len(messages)-1].Date.UnixMicro(),
 	)
 	if err != nil {
-		return err
+		return
 	}
 
 	for _, msg := range messages {
@@ -147,11 +148,12 @@ func (duck *DuckDB) PutSegment(file string, terms [][]byte, messages []common.Me
 			msg.Date.UnixMicro(),
 		)
 		if err != nil {
-			return err
+			return
 		}
 	}
 
-	return tx.Commit()
+	err = tx.Commit()
+	return
 }
 
 func (duck *DuckDB) wipeSegment(file string, segment common.Location) error {
@@ -222,14 +224,11 @@ func (duck *DuckDB) wipeFile(file string) error {
 	return tx.Commit()
 }
 
-func (duck *DuckDB) GetAllMessages(path string) (iter.Seq[common.Message], error) {
-	fileId, err := duck.getFileIdByPath(path)
-	if err != nil {
-		return nil, err
-	}
-
+func (duck *DuckDB) GetMessages(segments []int) (iter.Seq[common.FileMessage], error) {
 	q := `
 	SELECT
+	    files.path,
+	    
 	    segments.id,
 	    segments.pos_from,
 	    segments.pos_to,
@@ -240,26 +239,35 @@ func (duck *DuckDB) GetAllMessages(path string) (iter.Seq[common.Message], error
 	    messages.date
 	FROM messages
 	JOIN segments on segments.id=messages.segment_id 
-	WHERE segments.file_id = ?
+	JOIN files on files.id=segments.file_id 
+	WHERE %s
 	ORDER BY messages.date
 	`
-	rows, err := duck.db.Query(q, fileId)
+	if len(segments) > 0 {
+		q = fmt.Sprintf(q, "segments.id IN ("+strings.Repeat("?,", len(segments)-1)+"?)")
+	} else {
+		q = fmt.Sprintf(q, "1=1")
+	}
+
+	rows, err := duck.db.Query(q, asAny(segments)...)
 	if err != nil {
 		return nil, err
 	}
 
 	// Return an iterator over all messages in the given file path, ordered by date.
 	// Messages are yielded one by one with correct To positions calculated from the next message.
-	return func(yield func(common.Message) bool) {
+	return func(yield func(common.FileMessage) bool) {
 		defer rows.Close()
 
 		var (
-			prevMessage                                                 *common.Message
+			prevMessage                                                 *common.FileMessage
 			prevSegmentId, segmentId, segmentFrom, segmentTo, dateMicro int
 		)
 		for rows.Next() {
-			cur := common.Message{}
+			cur := common.FileMessage{}
 			err = rows.Scan(
+				&cur.File,
+
 				&segmentId,
 				&segmentFrom,
 				&segmentTo,
