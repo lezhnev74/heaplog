@@ -12,6 +12,17 @@ type BufferPool struct {
 	sizes []int
 }
 
+type Buffer struct {
+	pool *BufferPool
+	Buf  []byte
+}
+
+// Close puts the Buf back to the pool
+func (b *Buffer) Close() {
+	b.pool.Put(b.Buf)
+	b.Buf = nil
+}
+
 // NewBufferPool creates a new buffer pool with the given slice sizes.
 // Each size will have its own sync.Pool instance.
 func NewBufferPool(sizes []int) *BufferPool {
@@ -28,14 +39,14 @@ func NewBufferPool(sizes []int) *BufferPool {
 
 // Get returns a byte slice with capacity >= minSize.
 // If no suitable buffer is found in the pool, a new one is allocated.
-func (bp *BufferPool) Get(minSize int) []byte {
+func (bp *BufferPool) Get(minSize int) Buffer {
 	for _, sz := range bp.sizes {
 		if sz >= minSize {
-			return bp.pools[sz].Get().([]byte)
+			return Buffer{Buf: bp.pools[sz].Get().([]byte), pool: bp}
 		}
 	}
 	// fallback: exact size
-	return make([]byte, minSize)
+	return Buffer{Buf: make([]byte, minSize), pool: bp}
 }
 
 // Put returns a buffer to the pool if its capacity matches one of the predefined sizes.

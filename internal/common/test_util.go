@@ -39,6 +39,13 @@ var SampleLayouts = []Message{
 	{MessageLayout{Loc: Location{571, 623}}, MakeTimeV("2024-07-30T06:29:23.685562+00:00")},
 }
 
+func MakeFileMessages(file string, messages []Message) (fm []FileMessage) {
+	for _, m := range messages {
+		fm = append(fm, FileMessage{file, m})
+	}
+	return
+}
+
 // MakeTestFile creates a temporary log file with sample log data for testing purposes.
 // It returns the path to the created file.
 func MakeTestFile(t *testing.T) (string, []byte) {

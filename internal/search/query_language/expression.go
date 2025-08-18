@@ -33,6 +33,9 @@ func (c *CachedString) toLower() string {
 }
 
 func NewCachedString(s string) *CachedString {
+	if len(s) == 0 {
+		panic("empty string")
+	}
 	return &CachedString{origin: s}
 }
 

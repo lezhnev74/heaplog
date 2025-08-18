@@ -14,7 +14,7 @@ import (
 
 type task struct {
 	file       string
-	segmentBuf []byte
+	segmentBuf common.Buffer
 	layouts    []common.MessageLayout
 }
 type taskResult struct {
@@ -63,8 +63,7 @@ func (ix *Indexer) indexSegments(
 
 	return func(yield func(taskResult) bool) {
 		for r := range tasksResults {
-			ix.bufPool.Put(r.task.segmentBuf)
-			r.task.segmentBuf = nil
+			r.task.segmentBuf.Close()
 			if !yield(r) {
 				break
 			}
@@ -107,10 +106,10 @@ func (ix *Indexer) consumeTasksViaWorkerPool(in <-chan task) <-chan taskResult {
 					termsMap := make(map[string]struct{})
 					for _, m := range t.layouts {
 						// skip date tokens
-						appendTermsUnique(termsMap, ix.tokenize(t.segmentBuf[pos(m.Loc.From):pos(m.DateLoc.From)]))
-						appendTermsUnique(termsMap, ix.tokenize(t.segmentBuf[pos(m.DateLoc.To):pos(m.Loc.To)]))
+						appendTermsUnique(termsMap, ix.tokenize(t.segmentBuf.Buf[pos(m.Loc.From):pos(m.DateLoc.From)]))
+						appendTermsUnique(termsMap, ix.tokenize(t.segmentBuf.Buf[pos(m.DateLoc.To):pos(m.Loc.To)]))
 
-						dateBuf := t.segmentBuf[pos(m.DateLoc.From):pos(m.DateLoc.To)]
+						dateBuf := t.segmentBuf.Buf[pos(m.DateLoc.From):pos(m.DateLoc.To)]
 						date, err := ix.parseDate(dateBuf)
 						if err != nil {
 							ix.logger.Error(
@@ -123,7 +122,7 @@ func (ix *Indexer) consumeTasksViaWorkerPool(in <-chan task) <-chan taskResult {
 							continue TaskLoop
 						}
 
-						messages = append(messages, common.Message{common.MessageLayout{Loc: m.Loc}, date})
+						messages = append(messages, common.Message{MessageLayout: m, Date: date})
 					}
 
 					// Collect unique terms from the messages
@@ -175,14 +174,15 @@ func (ix *Indexer) produceTasks(pendingSegments map[string][][]common.MessageLay
 					}
 
 					segmentLoc := common.Location{segment[0].Loc.From, segment[len(segment)-1].Loc.To}
-					bytes := ix.bufPool.Get(segmentLoc.Len())[:segmentLoc.Len()]
-					_, err = fd.ReadAt(bytes, int64(segmentLoc.From))
+					buf := ix.bufPool.Get(segmentLoc.Len())
+					buf.Buf = buf.Buf[:segmentLoc.Len()]
+					_, err = fd.ReadAt(buf.Buf, int64(segmentLoc.From))
 					if err != nil {
 						ix.logger.Error("read file", zap.String("file", file), zap.Error(err))
 						ix.blacklist.Store(file, nil)
 						continue
 					}
-					tasks <- task{file, bytes, segment}
+					tasks <- task{file, buf, segment}
 				}
 			}()
 		}

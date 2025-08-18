@@ -4,12 +4,11 @@ import (
 	"heaplog_2024/internal/search/query_language"
 )
 
-// Given user expression, we test it if we can use the inverted index for performing the search.
+// ShouldFullScan given user expression, tests it if can use the inverted index for performing the search.
 // Expression's leaves are terms that we can exchange for indexed segments.
 // But, sometimes the index can not be used. In which case a full-scan is performed.
 // The index won't help for regular expressions, so we perform expression analysis to see if
 // full-scan is unavoidable. Also short terms (below indexable length) lead to full-scan.
-
 func ShouldFullScan(expr *query_language.Expression, tokenize func([]byte) [][]byte) bool {
 
 	var m func(e *query_language.Expression) bool

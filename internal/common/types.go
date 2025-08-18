@@ -6,6 +6,11 @@ type Segment struct {
 	Location
 }
 
+type FileMessageBody struct {
+	FileMessage
+	Body []byte
+}
+
 type FileMessage struct {
 	File string
 	Message
