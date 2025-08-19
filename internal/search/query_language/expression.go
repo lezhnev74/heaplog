@@ -268,8 +268,11 @@ func (qe *Expression) GetMatcher() MatchFunc {
 						o,
 					) // case-insensitive matching is expensive, but greatly improves UX...
 				}
-			case RegExpLiteral:
+			case RegExpLiteralCs:
 				p := regexp.MustCompile(string(o)) // RE match
+				operandFunc = func(s *CachedString) bool { return p.MatchString(s.origin) }
+			case RegExpLiteral:
+				p := regexp.MustCompile("(?i)" + string(o)) // RE match
 				operandFunc = func(s *CachedString) bool { return p.MatchString(s.origin) }
 			case *Expression:
 				operandFunc = expr2match(o)

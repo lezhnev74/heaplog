@@ -21,7 +21,6 @@ func TestAntlrQueryParser(t *testing.T) {
 		{"(A", nil, errorUserQueryInvalidSyntax},
 		{"A", &Expression{AND, []any{"A"}}, nil},
 		{`192.168.0.2`, &Expression{AND, []any{"192.168.0.2"}}, nil},
-		{`@$`, &Expression{AND, []any{"@$"}}, nil},
 		{`'A' "B"`, &Expression{AND, []any{"A", "B"}}, nil},
 		{`AA BB`, &Expression{AND, []any{"AA", "BB"}}, nil},
 		{"!A", &Expression{NOT, []any{"A"}}, nil},
@@ -35,6 +34,7 @@ func TestAntlrQueryParser(t *testing.T) {
 		{"A !B !C", &Expression{AND, []any{"A", &Expression{NOT, []any{"B"}}, &Expression{NOT, []any{"C"}}}}, nil},
 		// RE:
 		{"~a", &Expression{AND, []any{RegExpLiteral("a")}}, nil},
+		{`@a`, &Expression{AND, []any{RegExpLiteralCs("a")}}, nil},
 		{"~(a)", &Expression{AND, []any{RegExpLiteral("(a)")}}, nil},
 		{"~[ab]+", &Expression{AND, []any{RegExpLiteral("[ab]+")}}, nil},
 		{"~[ab]+ qwe", &Expression{AND, []any{RegExpLiteral("[ab]+"), "qwe"}}, nil},

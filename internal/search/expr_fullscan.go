@@ -27,6 +27,8 @@ func shouldFullScan(expr *query_language.Expression, tokenize func([]byte) [][]b
 				opValue = m(o)
 			case string:
 				opValue = len(tokenize([]byte(o))) == 0
+			case query_language.RegExpLiteralCs:
+				opValue = true
 			case query_language.RegExpLiteral:
 				opValue = true
 			}

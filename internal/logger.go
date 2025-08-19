@@ -8,7 +8,7 @@ func NewLogger(env string) (*zap.Logger, error) {
 	switch env {
 	case "prod", "production":
 		return zap.NewProduction()
-	case "dev", "development":
+	case "dev", "development", "test", "testing":
 		return zap.NewDevelopment()
 	default:
 		// In tests or unknown env, use development config but without noisy stack traces

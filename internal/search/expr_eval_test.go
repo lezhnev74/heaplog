@@ -68,6 +68,13 @@ func TestExprEval(t *testing.T) {
 			},
 			expectedSegments: []int{allSegmentsMarker},
 		},
+		{ // Test regex pattern requires full scan of segments
+			query: "@error",
+			termSegments: map[string][]int{
+				"error": {1, 2, 3},
+			},
+			expectedSegments: []int{allSegmentsMarker},
+		},
 		{ // Test implicit AND of same term preserves segments
 			query: "error error",
 			termSegments: map[string][]int{

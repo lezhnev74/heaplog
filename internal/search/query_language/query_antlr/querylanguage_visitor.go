@@ -16,6 +16,9 @@ type QueryLanguageVisitor interface {
 	// Visit a parse tree produced by QueryLanguageParser#ExprGroup.
 	VisitExprGroup(ctx *ExprGroupContext) interface{}
 
+	// Visit a parse tree produced by QueryLanguageParser#ExprRELiteralCS.
+	VisitExprRELiteralCS(ctx *ExprRELiteralCSContext) interface{}
+
 	// Visit a parse tree produced by QueryLanguageParser#ExprOr.
 	VisitExprOr(ctx *ExprOrContext) interface{}
 

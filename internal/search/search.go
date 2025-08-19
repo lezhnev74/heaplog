@@ -1,6 +1,7 @@
 package search
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"iter"
@@ -48,9 +49,10 @@ func (s *Search) Search(expr *query_language.Expression, minDate, maxDate *time.
 ) {
 	exprMatcher := expr.GetMatcher()
 	matcher := func(m common.FileMessageBody) bool {
-		// exclude date from matching
+		// exclude date from matching in the separate buffer
 		pos := func(pos int) int { return pos - m.Loc.From }
-		body := append(m.Body[:pos(m.DateLoc.From)], m.Body[pos(m.DateLoc.To):]...)
+		body := append([]byte{}, m.Body[:pos(m.DateLoc.From)]...)
+		body = append([]byte{}, m.Body[pos(m.DateLoc.To):]...)
 		bodyString := unsafe.String(unsafe.SliceData(body), len(body))
 		result := exprMatcher(query_language.NewCachedString(bodyString))
 		return result
@@ -60,8 +62,10 @@ func (s *Search) Search(expr *query_language.Expression, minDate, maxDate *time.
 	if !shouldFullScan(expr, s.tokenize) {
 		terms := make([][]byte, 0)
 		for _, t := range expr.FindKeywords() {
-			terms = append(terms, []byte(t))
+			terms = append(terms, s.tokenize([]byte(t))...)
 		}
+		slices.SortFunc(terms, bytes.Compare)
+		slices.CompactFunc(terms, bytes.Equal)
 
 		termSegments, err := s.index.GetRelevantSegments(terms)
 		if err != nil {
@@ -79,7 +83,7 @@ func (s *Search) Search(expr *query_language.Expression, minDate, maxDate *time.
 		}
 	}
 	if len(segments) > 0 {
-		s.logger.Debug("Selected segments: %d\n", zap.Int("len", len(segments)), zap.String("query", expr.String()))
+		s.logger.Debug("Selected segments\n", zap.Int("len", len(segments)), zap.String("query", expr.String()))
 	}
 
 	fileMessages, err := s.index.GetMessages(segments, minDate, maxDate)

@@ -10,7 +10,6 @@ import (
 
 	"github.com/lezhnev74/inverted_index_2"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 
 	"heaplog_2024/internal/common"
 	"heaplog_2024/internal/ingest"
@@ -20,7 +19,7 @@ import (
 )
 
 func TestSearch(t *testing.T) {
-	ingestor, _search := prepareIndex(t)
+	ingestor, _search, fileNames, fileMessages := prepareIndex(t)
 	err := ingestor.Run()
 	require.NoError(t, err)
 
@@ -28,13 +27,47 @@ func TestSearch(t *testing.T) {
 		name     string
 		query    string
 		dates    [2]*time.Time
-		expected []common.FileMessageBody
+		expected []common.FileMessage
 	}{
 		{
-			name:     "exact match no dates",
+			name:     "no match",
 			query:    `unknown`,
 			dates:    [2]*time.Time{nil, nil},
-			expected: []common.FileMessageBody{},
+			expected: []common.FileMessage(nil),
+		},
+		{
+			name:  "one hit in one file",
+			query: `Permission`,
+			dates: [2]*time.Time{nil, nil},
+			expected: []common.FileMessage{
+				fileMessages[fileNames[0]][7],
+			},
+		},
+		{
+			name:  "hits in two file (case insensitive)",
+			query: `backup`,
+			dates: [2]*time.Time{nil, nil},
+			expected: []common.FileMessage{
+				fileMessages[fileNames[0]][9],
+				fileMessages[fileNames[1]][6],
+			},
+		},
+		{
+			name:  "regexp case-insensitive",
+			query: `~conn`,
+			dates: [2]*time.Time{nil, nil},
+			expected: []common.FileMessage{
+				fileMessages[fileNames[0]][1],
+				fileMessages[fileNames[0]][3],
+			},
+		},
+		{
+			name:  "regexp case-sensitive",
+			query: `@conn`,
+			dates: [2]*time.Time{nil, nil},
+			expected: []common.FileMessage{
+				fileMessages[fileNames[0]][3],
+			},
 		},
 	}
 
@@ -48,17 +81,20 @@ func TestSearch(t *testing.T) {
 				require.NoError(t, err)
 
 				actualMessages := slices.Collect(messages)
-				require.ElementsMatch(t, tc.expected, actualMessages)
+				require.Equal(t, len(tc.expected), len(actualMessages))
+				for i, m := range actualMessages {
+					require.Equal(t, tc.expected[i], m.FileMessage)
+				}
 			},
 		)
 	}
 
 }
 
-func prepareIndex(t *testing.T) (*ingest.Ingestor, *search.Search) {
+func prepareIndex(t *testing.T) (*ingest.Ingestor, *search.Search, []string, map[string][]common.FileMessage) {
 	dir := t.TempDir()
 	testFile1 := filepath.Join(dir, "test1.log")
-	testFile2 := filepath.Join(dir, "test1.log")
+	testFile2 := filepath.Join(dir, "test2.log")
 	err := common.PopulateFiles(
 		map[string][]byte{
 			testFile1: []byte(common.SampleLog1),
@@ -67,7 +103,8 @@ func prepareIndex(t *testing.T) (*ingest.Ingestor, *search.Search) {
 	)
 	require.NoError(t, err)
 
-	logger := zap.NewNop()
+	logger, err := NewLogger("testing")
+	require.NoError(t, err)
 	duck, err := persistence.NewDuckDB(context.Background(), "")
 	require.NoError(t, err)
 	require.NoError(t, duck.Migrate())
@@ -91,7 +128,7 @@ func prepareIndex(t *testing.T) (*ingest.Ingestor, *search.Search) {
 	ingestor := ingest.NewIngestor(
 		[]string{testFile1, testFile2},
 		regexp.MustCompile(common.MessageStartPattern),
-		1,
+		1_000_000,
 		1,
 		persistentIndex,
 		logger,
@@ -100,5 +137,10 @@ func prepareIndex(t *testing.T) (*ingest.Ingestor, *search.Search) {
 
 	_search := search.NewSearch(context.Background(), tokenize, persistentIndex, logger)
 
-	return ingestor, _search
+	fileMessages := map[string][]common.FileMessage{
+		testFile1: common.MakeFileMessages(testFile1, common.LayoutsSampleLog1),
+		testFile2: common.MakeFileMessages(testFile2, common.LayoutsSampleLog2),
+	}
+
+	return ingestor, _search, []string{testFile1, testFile2}, fileMessages
 }

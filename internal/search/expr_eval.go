@@ -145,6 +145,8 @@ func exprMapLiteralsToSets(
 					expr.Operands[i] = &query_language.Expression{Operator: query_language.AND, Operands: sets}
 				case query_language.RegExpLiteral:
 					expr.Operands[i] = allSegmentsSuperset // Full-Scan
+				case query_language.RegExpLiteralCs:
+					expr.Operands[i] = allSegmentsSuperset // Full-Scan
 				}
 			}
 		},

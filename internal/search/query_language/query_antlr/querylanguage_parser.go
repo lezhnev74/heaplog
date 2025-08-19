@@ -35,26 +35,28 @@ func querylanguageParserInit() {
 		"", "'!'", "'('", "')'",
 	}
 	staticData.SymbolicNames = []string{
-		"", "", "", "", "OR", "AND", "RE_LITERAL", "LITERAL", "WS",
+		"", "", "", "", "OR", "AND", "RE_LITERAL_CS", "RE_LITERAL", "LITERAL",
+		"WS",
 	}
 	staticData.RuleNames = []string{
 		"query", "expr",
 	}
 	staticData.PredictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
-		4, 1, 8, 31, 2, 0, 7, 0, 2, 1, 7, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 16, 8, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 3, 1, 23, 8, 1, 1, 1, 5, 1, 26, 8, 1, 10, 1, 12, 1, 29, 9, 1, 1, 1,
-		0, 1, 2, 2, 0, 2, 0, 0, 34, 0, 4, 1, 0, 0, 0, 2, 15, 1, 0, 0, 0, 4, 5,
-		3, 2, 1, 0, 5, 1, 1, 0, 0, 0, 6, 7, 6, 1, -1, 0, 7, 8, 5, 1, 0, 0, 8, 16,
-		3, 2, 1, 6, 9, 10, 5, 2, 0, 0, 10, 11, 3, 2, 1, 0, 11, 12, 5, 3, 0, 0,
-		12, 16, 1, 0, 0, 0, 13, 16, 5, 6, 0, 0, 14, 16, 5, 7, 0, 0, 15, 6, 1, 0,
-		0, 0, 15, 9, 1, 0, 0, 0, 15, 13, 1, 0, 0, 0, 15, 14, 1, 0, 0, 0, 16, 27,
-		1, 0, 0, 0, 17, 18, 10, 5, 0, 0, 18, 19, 5, 4, 0, 0, 19, 26, 3, 2, 1, 6,
-		20, 22, 10, 4, 0, 0, 21, 23, 5, 5, 0, 0, 22, 21, 1, 0, 0, 0, 22, 23, 1,
-		0, 0, 0, 23, 24, 1, 0, 0, 0, 24, 26, 3, 2, 1, 5, 25, 17, 1, 0, 0, 0, 25,
-		20, 1, 0, 0, 0, 26, 29, 1, 0, 0, 0, 27, 25, 1, 0, 0, 0, 27, 28, 1, 0, 0,
-		0, 28, 3, 1, 0, 0, 0, 29, 27, 1, 0, 0, 0, 4, 15, 22, 25, 27,
+		4, 1, 9, 32, 2, 0, 7, 0, 2, 1, 7, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 17, 8, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 3, 1, 24, 8, 1, 1, 1, 5, 1, 27, 8, 1, 10, 1, 12, 1, 30, 9, 1,
+		1, 1, 0, 1, 2, 2, 0, 2, 0, 0, 36, 0, 4, 1, 0, 0, 0, 2, 16, 1, 0, 0, 0,
+		4, 5, 3, 2, 1, 0, 5, 1, 1, 0, 0, 0, 6, 7, 6, 1, -1, 0, 7, 8, 5, 1, 0, 0,
+		8, 17, 3, 2, 1, 7, 9, 10, 5, 2, 0, 0, 10, 11, 3, 2, 1, 0, 11, 12, 5, 3,
+		0, 0, 12, 17, 1, 0, 0, 0, 13, 17, 5, 7, 0, 0, 14, 17, 5, 6, 0, 0, 15, 17,
+		5, 8, 0, 0, 16, 6, 1, 0, 0, 0, 16, 9, 1, 0, 0, 0, 16, 13, 1, 0, 0, 0, 16,
+		14, 1, 0, 0, 0, 16, 15, 1, 0, 0, 0, 17, 28, 1, 0, 0, 0, 18, 19, 10, 6,
+		0, 0, 19, 20, 5, 4, 0, 0, 20, 27, 3, 2, 1, 7, 21, 23, 10, 5, 0, 0, 22,
+		24, 5, 5, 0, 0, 23, 22, 1, 0, 0, 0, 23, 24, 1, 0, 0, 0, 24, 25, 1, 0, 0,
+		0, 25, 27, 3, 2, 1, 6, 26, 18, 1, 0, 0, 0, 26, 21, 1, 0, 0, 0, 27, 30,
+		1, 0, 0, 0, 28, 26, 1, 0, 0, 0, 28, 29, 1, 0, 0, 0, 29, 3, 1, 0, 0, 0,
+		30, 28, 1, 0, 0, 0, 4, 16, 23, 26, 28,
 	}
 	deserializer := antlr.NewATNDeserializer(nil)
 	staticData.atn = deserializer.Deserialize(staticData.serializedATN)
@@ -92,15 +94,16 @@ func NewQueryLanguageParser(input antlr.TokenStream) *QueryLanguageParser {
 
 // QueryLanguageParser tokens.
 const (
-	QueryLanguageParserEOF        = antlr.TokenEOF
-	QueryLanguageParserT__0       = 1
-	QueryLanguageParserT__1       = 2
-	QueryLanguageParserT__2       = 3
-	QueryLanguageParserOR         = 4
-	QueryLanguageParserAND        = 5
-	QueryLanguageParserRE_LITERAL = 6
-	QueryLanguageParserLITERAL    = 7
-	QueryLanguageParserWS         = 8
+	QueryLanguageParserEOF           = antlr.TokenEOF
+	QueryLanguageParserT__0          = 1
+	QueryLanguageParserT__1          = 2
+	QueryLanguageParserT__2          = 3
+	QueryLanguageParserOR            = 4
+	QueryLanguageParserAND           = 5
+	QueryLanguageParserRE_LITERAL_CS = 6
+	QueryLanguageParserRE_LITERAL    = 7
+	QueryLanguageParserLITERAL       = 8
+	QueryLanguageParserWS            = 9
 )
 
 // QueryLanguageParser rules.
@@ -418,6 +421,50 @@ func (s *ExprGroupContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
+type ExprRELiteralCSContext struct {
+	ExprContext
+}
+
+func NewExprRELiteralCSContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ExprRELiteralCSContext {
+	var p = new(ExprRELiteralCSContext)
+
+	InitEmptyExprContext(&p.ExprContext)
+	p.parser = parser
+	p.CopyAll(ctx.(*ExprContext))
+
+	return p
+}
+
+func (s *ExprRELiteralCSContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *ExprRELiteralCSContext) RE_LITERAL_CS() antlr.TerminalNode {
+	return s.GetToken(QueryLanguageParserRE_LITERAL_CS, 0)
+}
+
+func (s *ExprRELiteralCSContext) EnterRule(listener antlr.ParseTreeListener) {
+	if listenerT, ok := listener.(QueryLanguageListener); ok {
+		listenerT.EnterExprRELiteralCS(s)
+	}
+}
+
+func (s *ExprRELiteralCSContext) ExitRule(listener antlr.ParseTreeListener) {
+	if listenerT, ok := listener.(QueryLanguageListener); ok {
+		listenerT.ExitExprRELiteralCS(s)
+	}
+}
+
+func (s *ExprRELiteralCSContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+	switch t := visitor.(type) {
+	case QueryLanguageVisitor:
+		return t.VisitExprRELiteralCS(s)
+
+	default:
+		return t.VisitChildren(s)
+	}
+}
+
 type ExprOrContext struct {
 	ExprContext
 }
@@ -665,7 +712,7 @@ func (p *QueryLanguageParser) expr(_p int) (localctx IExprContext) {
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
-	p.SetState(15)
+	p.SetState(16)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -687,7 +734,7 @@ func (p *QueryLanguageParser) expr(_p int) (localctx IExprContext) {
 		}
 		{
 			p.SetState(8)
-			p.expr(6)
+			p.expr(7)
 		}
 
 	case QueryLanguageParserT__1:
@@ -728,12 +775,25 @@ func (p *QueryLanguageParser) expr(_p int) (localctx IExprContext) {
 			}
 		}
 
+	case QueryLanguageParserRE_LITERAL_CS:
+		localctx = NewExprRELiteralCSContext(p, localctx)
+		p.SetParserRuleContext(localctx)
+		_prevctx = localctx
+		{
+			p.SetState(14)
+			p.Match(QueryLanguageParserRE_LITERAL_CS)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
+		}
+
 	case QueryLanguageParserLITERAL:
 		localctx = NewExprLiteralContext(p, localctx)
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(14)
+			p.SetState(15)
 			p.Match(QueryLanguageParserLITERAL)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -746,7 +806,7 @@ func (p *QueryLanguageParser) expr(_p int) (localctx IExprContext) {
 		goto errorExit
 	}
 	p.GetParserRuleContext().SetStop(p.GetTokenStream().LT(-1))
-	p.SetState(27)
+	p.SetState(28)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -761,7 +821,7 @@ func (p *QueryLanguageParser) expr(_p int) (localctx IExprContext) {
 				p.TriggerExitRuleEvent()
 			}
 			_prevctx = localctx
-			p.SetState(25)
+			p.SetState(26)
 			p.GetErrorHandler().Sync(p)
 			if p.HasError() {
 				goto errorExit
@@ -771,14 +831,14 @@ func (p *QueryLanguageParser) expr(_p int) (localctx IExprContext) {
 			case 1:
 				localctx = NewExprOrContext(p, NewExprContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, QueryLanguageParserRULE_expr)
-				p.SetState(17)
+				p.SetState(18)
 
-				if !(p.Precpred(p.GetParserRuleContext(), 5)) {
-					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 5)", ""))
+				if !(p.Precpred(p.GetParserRuleContext(), 6)) {
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 6)", ""))
 					goto errorExit
 				}
 				{
-					p.SetState(18)
+					p.SetState(19)
 					p.Match(QueryLanguageParserOR)
 					if p.HasError() {
 						// Recognition error - abort rule
@@ -786,20 +846,20 @@ func (p *QueryLanguageParser) expr(_p int) (localctx IExprContext) {
 					}
 				}
 				{
-					p.SetState(19)
-					p.expr(6)
+					p.SetState(20)
+					p.expr(7)
 				}
 
 			case 2:
 				localctx = NewExprAndContext(p, NewExprContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, QueryLanguageParserRULE_expr)
-				p.SetState(20)
+				p.SetState(21)
 
-				if !(p.Precpred(p.GetParserRuleContext(), 4)) {
-					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 4)", ""))
+				if !(p.Precpred(p.GetParserRuleContext(), 5)) {
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 5)", ""))
 					goto errorExit
 				}
-				p.SetState(22)
+				p.SetState(23)
 				p.GetErrorHandler().Sync(p)
 				if p.HasError() {
 					goto errorExit
@@ -808,7 +868,7 @@ func (p *QueryLanguageParser) expr(_p int) (localctx IExprContext) {
 
 				if _la == QueryLanguageParserAND {
 					{
-						p.SetState(21)
+						p.SetState(22)
 						p.Match(QueryLanguageParserAND)
 						if p.HasError() {
 							// Recognition error - abort rule
@@ -818,8 +878,8 @@ func (p *QueryLanguageParser) expr(_p int) (localctx IExprContext) {
 
 				}
 				{
-					p.SetState(24)
-					p.expr(5)
+					p.SetState(25)
+					p.expr(6)
 				}
 
 			case antlr.ATNInvalidAltNumber:
@@ -827,7 +887,7 @@ func (p *QueryLanguageParser) expr(_p int) (localctx IExprContext) {
 			}
 
 		}
-		p.SetState(29)
+		p.SetState(30)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -868,10 +928,10 @@ func (p *QueryLanguageParser) Sempred(localctx antlr.RuleContext, ruleIndex, pre
 func (p *QueryLanguageParser) Expr_Sempred(localctx antlr.RuleContext, predIndex int) bool {
 	switch predIndex {
 	case 0:
-		return p.Precpred(p.GetParserRuleContext(), 5)
+		return p.Precpred(p.GetParserRuleContext(), 6)
 
 	case 1:
-		return p.Precpred(p.GetParserRuleContext(), 4)
+		return p.Precpred(p.GetParserRuleContext(), 5)
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))

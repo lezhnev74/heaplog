@@ -38,6 +38,12 @@ func (s *BaseQueryLanguageListener) EnterExprGroup(ctx *ExprGroupContext) {}
 // ExitExprGroup is called when production ExprGroup is exited.
 func (s *BaseQueryLanguageListener) ExitExprGroup(ctx *ExprGroupContext) {}
 
+// EnterExprRELiteralCS is called when production ExprRELiteralCS is entered.
+func (s *BaseQueryLanguageListener) EnterExprRELiteralCS(ctx *ExprRELiteralCSContext) {}
+
+// ExitExprRELiteralCS is called when production ExprRELiteralCS is exited.
+func (s *BaseQueryLanguageListener) ExitExprRELiteralCS(ctx *ExprRELiteralCSContext) {}
+
 // EnterExprOr is called when production ExprOr is entered.
 func (s *BaseQueryLanguageListener) EnterExprOr(ctx *ExprOrContext) {}
 

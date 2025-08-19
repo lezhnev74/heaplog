@@ -16,6 +16,9 @@ type QueryLanguageListener interface {
 	// EnterExprGroup is called when entering the ExprGroup production.
 	EnterExprGroup(c *ExprGroupContext)
 
+	// EnterExprRELiteralCS is called when entering the ExprRELiteralCS production.
+	EnterExprRELiteralCS(c *ExprRELiteralCSContext)
+
 	// EnterExprOr is called when entering the ExprOr production.
 	EnterExprOr(c *ExprOrContext)
 
@@ -36,6 +39,9 @@ type QueryLanguageListener interface {
 
 	// ExitExprGroup is called when exiting the ExprGroup production.
 	ExitExprGroup(c *ExprGroupContext)
+
+	// ExitExprRELiteralCS is called when exiting the ExprRELiteralCS production.
+	ExitExprRELiteralCS(c *ExprRELiteralCSContext)
 
 	// ExitExprOr is called when exiting the ExprOr production.
 	ExitExprOr(c *ExprOrContext)

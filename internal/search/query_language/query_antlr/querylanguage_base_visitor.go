@@ -19,6 +19,10 @@ func (v *BaseQueryLanguageVisitor) VisitExprGroup(ctx *ExprGroupContext) interfa
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseQueryLanguageVisitor) VisitExprRELiteralCS(ctx *ExprRELiteralCSContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseQueryLanguageVisitor) VisitExprOr(ctx *ExprOrContext) interface{} {
 	return v.VisitChildren(ctx)
 }

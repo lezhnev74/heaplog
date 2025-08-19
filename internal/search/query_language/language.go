@@ -12,8 +12,11 @@ import (
 
 var errorUserQueryInvalidSyntax = fmt.Errorf("invalid query_language syntax")
 
-// RegExpLiteral is a string that contains regular expression as given from the user
+// RegExpLiteral is a string that contains case-insensitive regular expression as given from the user
 type RegExpLiteral string
+
+// RegExpLiteralCs is a string that contains case-sensitive regular expression as given from the user
+type RegExpLiteralCs string
 
 type AntlrListener struct {
 	query_antlr.BaseQueryLanguageListener
@@ -38,6 +41,13 @@ func (s *AntlrListener) handle(node any) (ret any) {
 			literal = strings.Trim(literal, string(literal[0])) // remove quotes if any
 		}
 		ret = RegExpLiteral(literal)
+	case *query_antlr.ExprRELiteralCSContext:
+		literal := c.GetText()                     // final RE LITERAL CS
+		literal = strings.TrimPrefix(literal, "@") // remove the Operator "~"
+		if len(literal) > 1 && literal[0] == literal[len(literal)-1] && strings.ContainsAny(literal[0:1], `"'`) {
+			literal = strings.Trim(literal, string(literal[0])) // remove quotes if any
+		}
+		ret = RegExpLiteralCs(literal)
 	case *query_antlr.ExprLiteralContext:
 		literal := c.GetText() // final LITERAL
 		if len(literal) > 1 && literal[0] == literal[len(literal)-1] && strings.ContainsAny(literal[0:1], `"'`) {
