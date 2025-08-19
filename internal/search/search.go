@@ -92,7 +92,7 @@ func (s *Search) Search(expr *query_language.Expression, minDate, maxDate *time.
 	}
 
 	return func(yield func(body common.FileMessageBody) bool) {
-		for mfb := range readMessages(fileMessages) {
+		for mfb := range readMessages(s.ctx, fileMessages) {
 			if !matcher(mfb) {
 				continue
 			}
@@ -105,7 +105,7 @@ func (s *Search) Search(expr *query_language.Expression, minDate, maxDate *time.
 
 // readMessages converts a sequence of file messages into a sequence of message bodies with their content.
 // It efficiently reads message contents from files by reusing file handles when possible.
-func readMessages(messages iter.Seq[common.FileMessage]) iter.Seq2[common.FileMessageBody, error] {
+func readMessages(ctx context.Context, messages iter.Seq[common.FileMessage]) iter.Seq2[common.FileMessageBody, error] {
 	var (
 		stream *os.File
 		err    error
@@ -118,6 +118,10 @@ func readMessages(messages iter.Seq[common.FileMessage]) iter.Seq2[common.FileMe
 		}()
 
 		for m := range messages {
+			if ctx.Err() != nil {
+				return
+			}
+
 			if stream == nil || stream.Name() != m.File {
 				if stream != nil {
 					stream.Close()

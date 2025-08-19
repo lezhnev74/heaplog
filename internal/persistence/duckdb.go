@@ -12,30 +12,244 @@ import (
 	"strings"
 	"time"
 
+	"github.com/marcboeker/go-duckdb/v2"
 	_ "github.com/marcboeker/go-duckdb/v2"
+	"go.uber.org/zap"
 
 	"heaplog_2024/internal/common"
+	"heaplog_2024/internal/search"
 )
 
 //go:embed migrations/_.sql
 var migrationFS embed.FS
 
 type DuckDB struct {
-	db *sql.DB
+	db           *sql.DB
+	queryResults *duckdb.Appender
+	logger       *zap.Logger
 }
 
-func NewDuckDB(ctx context.Context, filePath string) (*DuckDB, error) {
-	var err error
-	duck := &DuckDB{}
-	duck.db, err = sql.Open("duckdb", filePath)
+func NewDuckDB(ctx context.Context, filePath string, logger *zap.Logger) (duck *DuckDB, err error) {
+	duck = &DuckDB{
+		logger: logger,
+	}
+
+	c, err := duckdb.NewConnector(filePath, nil)
+	if err != nil {
+		err = fmt.Errorf("could not initialize new connector: %w", err)
+		return
+	}
+
+	con, err := c.Connect(context.Background())
+	if err != nil {
+		err = fmt.Errorf("could not connect: %w", err)
+	}
+	duck.db = sql.OpenDB(c)
+
+	// must migrate before making an appender
+	err = duck.Migrate()
+	if err != nil {
+		err = fmt.Errorf("could not migrate: %w", err)
+	}
+
+	duck.queryResults, err = duckdb.NewAppenderFromConn(con, "", "query_results")
+	if err != nil {
+		err = fmt.Errorf("could not create new appender for query_results: %w", err)
+		return
+	}
+
+	go func() {
+		<-ctx.Done()
+		duck.queryResults.Close()
+		duck.Close()
+	}()
+
+	return duck, nil
+}
+
+func (duck *DuckDB) PutResultsAsync(query string, results iter.Seq[common.FileMessage]) (
+	result search.SearchResult,
+	done chan struct{},
+	err error,
+) {
+	var queryId int
+	now := time.Now().UTC()
+
+	tx, err := duck.db.Begin()
+	if err != nil {
+		return
+	}
+	defer tx.Rollback()
+
+	err = duck.db.QueryRow(`SELECT nextval('query_ids')`).Scan(&queryId)
+	if err != nil {
+		return
+	}
+
+	_, err = tx.Exec(
+		"INSERT INTO queries (queryId, text, date_min, date_max, messages, finished, built_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		queryId, query, 0, 0, 0, false, now.UnixMicro(),
+	)
+	if err != nil {
+		return
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return
+	}
+
+	result = search.SearchResult{
+		Id:       queryId,
+		Query:    query,
+		Date:     time.UnixMicro(now.UnixMicro()).UTC(),
+		Messages: 0,
+		Finished: false,
+	}
+
+	done = make(chan struct{})
+	go func() {
+		defer close(done)
+		var messages int
+		var minDate, maxDate int64 = math.MaxInt64, 0
+
+		results(
+			func(msg common.FileMessage) bool {
+				messages++
+				dateMicro := msg.Date.UnixMicro()
+				if dateMicro < minDate {
+					minDate = dateMicro
+				}
+				if dateMicro > maxDate {
+					maxDate = dateMicro
+				}
+
+				fileId, err := duck.getFileIdByPath(msg.File)
+				if err != nil {
+					return false
+				}
+
+				err = duck.queryResults.AppendRow(
+					queryId,
+					fileId,
+					msg.Loc.From,
+					msg.Loc.To-msg.Loc.From,
+					dateMicro,
+				)
+				if err != nil {
+					duck.logger.Error("could not append row to query_results", zap.Error(err))
+					return false
+				}
+				return true
+			},
+		)
+
+		err = duck.queryResults.Flush()
+		if err != nil {
+			return
+		}
+
+		_, err = duck.db.Exec(
+			"UPDATE queries SET messages = ?, date_min = ?, date_max = ?, finished = ? WHERE queryId = ?",
+			messages, minDate, maxDate, true, queryId,
+		)
+	}()
+
+	return
+}
+
+func (duck *DuckDB) GetResultMessages(resultId int) (iter.Seq[common.FileMessage], error) {
+	q := `
+		SELECT files.path, pos, len, date
+		FROM query_results
+		JOIN files ON files.id = file_id
+		WHERE query_id = ?
+		ORDER BY date
+	`
+	rows, err := duck.db.Query(q, resultId)
 	if err != nil {
 		return nil, err
 	}
-	go func() {
-		<-ctx.Done()
-		duck.Close() // Flush buffers
-	}()
-	return duck, nil
+
+	return func(yield func(common.FileMessage) bool) {
+		defer rows.Close()
+		for rows.Next() {
+			msg := common.FileMessage{}
+			var dateMicro int64
+			err = rows.Scan(&msg.File, &msg.Loc.From, &msg.Loc.To, &dateMicro)
+			if err != nil {
+				panic(err)
+			}
+			msg.Date = time.UnixMicro(dateMicro).UTC()
+			msg.Loc.To += msg.Loc.From // Convert length to absolute position
+			if !yield(msg) {
+				break
+			}
+		}
+	}, nil
+}
+
+func (duck *DuckDB) GetResults(resultId int) (search.SearchResult, error) {
+	var r search.SearchResult
+	var builtAt int64
+	err := duck.db.QueryRow(
+		`
+		SELECT queryId, text, built_at, messages, finished 
+		FROM queries 
+		WHERE queryId = ?
+		`,
+		resultId,
+	).Scan(&r.Id, &r.Query, &builtAt, &r.Messages, &r.Finished)
+	if err != nil {
+		return r, err
+	}
+	r.Date = time.UnixMicro(builtAt).UTC()
+	return r, nil
+}
+
+func (duck *DuckDB) GetAllResults() ([]search.SearchResult, error) {
+	rows, err := duck.db.Query(
+		`
+		SELECT queryId, text, built_at, messages, finished 
+		FROM queries 
+		ORDER BY built_at DESC
+	`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []search.SearchResult
+	for rows.Next() {
+		var r search.SearchResult
+		var builtAt int64
+		if err := rows.Scan(&r.Id, &r.Query, &builtAt, &r.Messages, &r.Finished); err != nil {
+			return nil, err
+		}
+		r.Date = time.UnixMicro(builtAt).UTC()
+		results = append(results, r)
+	}
+	return results, rows.Err()
+}
+
+func (duck *DuckDB) WipeResults(resultId int) error {
+	tx, err := duck.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec("DELETE FROM queries WHERE queryId = ?", resultId)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec("DELETE FROM query_results WHERE query_id = ?", resultId)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func (duck *DuckDB) Close() (err error) { return duck.db.Close() }
