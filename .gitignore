@@ -3,3 +3,4 @@ _local
 dev
 vendor
 ug
+.env

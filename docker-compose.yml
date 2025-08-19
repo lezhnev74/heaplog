@@ -1,0 +1,10 @@
+services:
+  node:
+    build:
+      dockerfile: Node.Dockerfile
+    user: $DOCKER_USER_ID:$DOCKER_GROUP_ID #edit in .env
+    container_name: nodejs
+    working_dir: /var/www
+    volumes:
+      - ./frontend:/var/www
+    network_mode: host
