@@ -32,9 +32,9 @@ func TestIngesting(t *testing.T) {
 	messagesSeq, err := duck.GetMessages(nil, nil, nil)
 	require.NoError(t, err)
 	messages := slices.Collect(messagesSeq)
-	require.Equal(t, len(common.SampleLayouts), len(messages))
+	require.Equal(t, len(common.LayoutsSampleLog1), len(messages))
 
-	for _, l := range common.SampleLayouts {
+	for _, l := range common.LayoutsSampleLog1 {
 		found := false
 		for _, m := range messages {
 			if l == m.Message {
@@ -67,7 +67,7 @@ func TestMisalignedSegments(t *testing.T) {
 	require.NoError(t, err)
 	expected := map[string][]common.Location{
 		fileName: {
-			{From: 1, To: len(common.SampleLog)},
+			{From: 1, To: len(common.SampleLog1)},
 		},
 	}
 	require.Equal(t, expected, fileSegments)
@@ -78,7 +78,7 @@ func TestTrailingSegmentIndexing(t *testing.T) {
 	testFile := filepath.Join(dir, "test.log")
 	err := common.PopulateFiles(
 		map[string][]byte{
-			testFile: []byte(common.SampleLog),
+			testFile: []byte(common.SampleLog1),
 		},
 	)
 	require.NoError(t, err)
@@ -94,13 +94,13 @@ func TestTrailingSegmentIndexing(t *testing.T) {
 	require.NoError(t, err)
 	expected := map[string][]common.Location{
 		testFile: {
-			{From: 1, To: len(common.SampleLog)},
+			{From: 1, To: len(common.SampleLog1)},
 		},
 	}
 	require.Equal(t, expected, fileSegments)
 
 	// Now Add to the file
-	newLog := common.SampleLog + common.SampleLog // double it
+	newLog := common.SampleLog1 + common.SampleLog1 // double it
 	err = common.PopulateFiles(
 		map[string][]byte{
 			testFile: []byte(newLog),
@@ -116,7 +116,7 @@ func TestTrailingSegmentIndexing(t *testing.T) {
 	require.NoError(t, err)
 	expected = map[string][]common.Location{
 		testFile: {
-			{From: 1, To: len(common.SampleLog) * 2},
+			{From: 1, To: len(common.SampleLog1) * 2},
 		},
 	}
 	require.Equal(t, expected, fileSegments)
@@ -156,9 +156,9 @@ func TestReconcileMissing(t *testing.T) {
 	messagesSeq, err := duck.GetMessages(nil, nil, nil)
 	require.NoError(t, err)
 	messages := slices.Collect(messagesSeq)
-	require.Equal(t, len(common.SampleLayouts), len(messages))
+	require.Equal(t, len(common.LayoutsSampleLog1), len(messages))
 
-	for _, l := range common.SampleLayouts {
+	for _, l := range common.LayoutsSampleLog1 {
 		found := false
 		for _, m := range messages {
 			if l == m.Message {

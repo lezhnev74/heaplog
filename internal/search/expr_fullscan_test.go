@@ -43,7 +43,7 @@ func TestFullScanDetection(t *testing.T) {
 				expr, err := query_language.ParseUserQuery(tt.query)
 				require.NoError(t, err)
 
-				isFullScan := ShouldFullScan(expr, tokenize)
+				isFullScan := shouldFullScan(expr, tokenize)
 				require.Equal(t, tt.isFullScan, isFullScan)
 			},
 		)

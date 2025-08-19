@@ -29,6 +29,15 @@ type Search struct {
 	logger   *zap.Logger
 }
 
+func NewSearch(ctx context.Context, tokenize func([]byte) [][]byte, index ReadableIndex, logger *zap.Logger) *Search {
+	return &Search{
+		ctx:      ctx,
+		tokenize: tokenize,
+		index:    index,
+		logger:   logger,
+	}
+}
+
 // Search is the main gateway to the message-matching functionality.
 // Given the user query expression, it decides if the inverted index can be used
 // to reduce the amount of messages to test.
@@ -48,7 +57,7 @@ func (s *Search) Search(expr *query_language.Expression, minDate, maxDate *time.
 	}
 
 	segments := []int(nil) // segments to look into for messages (nil = All)
-	if !ShouldFullScan(expr, s.tokenize) {
+	if !shouldFullScan(expr, s.tokenize) {
 		terms := make([][]byte, 0)
 		for _, t := range expr.FindKeywords() {
 			terms = append(terms, []byte(t))
@@ -63,10 +72,14 @@ func (s *Search) Search(expr *query_language.Expression, minDate, maxDate *time.
 		segments = exprEval(setsExpr)
 		if slices.Equal(segments, allSegmentsSuperset) {
 			segments = nil // full-scan
+		} else if len(segments) == 0 {
+			// not a full-scan, but no relevant segments found in II, so early return
+			s.logger.Debug("No relevant segments found for the query", zap.String("query", expr.String()))
+			return common.Empty[common.FileMessageBody](), nil
 		}
 	}
 	if len(segments) > 0 {
-		s.logger.Debug("Selected segments: %d\n", zap.Int("len", len(segments)))
+		s.logger.Debug("Selected segments: %d\n", zap.Int("len", len(segments)), zap.String("query", expr.String()))
 	}
 
 	fileMessages, err := s.index.GetMessages(segments, minDate, maxDate)

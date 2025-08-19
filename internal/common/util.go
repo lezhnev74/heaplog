@@ -3,6 +3,7 @@ package common
 import (
 	"fmt"
 	"hash/crc32"
+	"iter"
 )
 
 var (
@@ -40,4 +41,12 @@ func ChunksN[T any](items []T, n int) [][]T {
 func HashString(s string) string {
 	h := crc32.Checksum([]byte(s), crc32t)
 	return fmt.Sprintf("%d", h)
+}
+
+func Empty[T any]() iter.Seq[T] {
+	return func(yield func(T) bool) {}
+}
+
+func Empty2[K, V any]() iter.Seq2[K, V] {
+	return func(yield func(K, V) bool) {}
 }

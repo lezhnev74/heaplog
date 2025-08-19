@@ -14,6 +14,13 @@ type Index struct {
 	ii *inverted_index_2.InvertedIndex
 }
 
+func NewPersistentIndex(duck *DuckDB, ii *inverted_index_2.InvertedIndex) (*Index, error) {
+	return &Index{
+		DuckDB: duck,
+		ii:     ii,
+	}, nil
+}
+
 func (i Index) GetRelevantSegments(terms [][]byte) (map[string][]int, error) {
 	r, err := i.ii.PrefixSearch(terms)
 	if err != nil {

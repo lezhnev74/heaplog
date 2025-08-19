@@ -55,7 +55,7 @@ func TestIndexer(t *testing.T) {
 				file:    fileName,
 				layouts: layouts[:1],
 			},
-			messages: common.SampleLayouts[:1],
+			messages: common.LayoutsSampleLog1[:1],
 			tokens:   [][]byte{[]byte("test token")},
 		},
 		{
@@ -63,7 +63,7 @@ func TestIndexer(t *testing.T) {
 				file:    fileName,
 				layouts: layouts[1:],
 			},
-			messages: common.SampleLayouts[1:],
+			messages: common.LayoutsSampleLog1[1:],
 			tokens:   [][]byte{[]byte("test token")},
 		},
 	}

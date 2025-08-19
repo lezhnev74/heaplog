@@ -11,7 +11,7 @@ import (
 
 const MessageStartPattern = `(?m)^\[(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}\.?(\d{6}([+-]\d\d:\d\d)?)?)]`
 const TimeFormat = "2006-01-02T15:04:05.000000-07:00"
-const SampleLog = `
+const SampleLog1 = `
 [2024-07-29T00:02:49.231231+00:00] User login successful
 src: 127.0.0.1:5000
 [2024-07-29T01:07:21.923832+00:00] Connection timed out
@@ -25,8 +25,28 @@ src: 127.0.0.1:5000
 [2024-07-30T05:28:56.918273+00:00] Cache cleared
 [2024-07-30T06:29:23.685562+00:00] Backup completed
 `
+const SampleLog2 = `
+[2024-07-31T00:02:49.231231+00:00] New user registration completed
+User: john_doe
+IP: 192.168.1.100
+[2024-07-31T01:07:21.923832+00:00] System maintenance started
+Details: Upgrading database to version 2.1.0
+[2024-07-31T01:11:38.258712+00:00] Critical error detected
+Stack trace: NullPointerException at line 127
+Service: AuthService
+[2024-07-31T02:15:22.799234+00:00] Batch processing completed
+Items processed: 1500
+Success rate: 99.9%
+[2024-07-31T03:20:57.293873+00:00] Security alert
+Multiple failed login attempts detected from IP: 10.0.0.55
+[2024-07-31T04:25:36.908172+00:00] Cache invalidation triggered
+Affected keys: users:*, sessions:*
+[2024-07-31T05:30:47.245671+00:00] Backup process initiated
+Target: full system backup
+Estimated duration: 30 minutes
+`
 
-var SampleLayouts = []Message{
+var LayoutsSampleLog1 = []Message{
 	{MessageLayout{Loc: Location{1, 78}}, MakeTimeV("2024-07-29T00:02:49.231231+00:00")},
 	{MessageLayout{Loc: Location{78, 134}}, MakeTimeV("2024-07-29T01:07:21.923832+00:00")},
 	{MessageLayout{Loc: Location{134, 235}}, MakeTimeV("2024-07-29T01:11:38.258712+00:00")},
@@ -37,6 +57,15 @@ var SampleLayouts = []Message{
 	{MessageLayout{Loc: Location{469, 522}}, MakeTimeV("2024-07-30T04:25:27.789664+00:00")},
 	{MessageLayout{Loc: Location{522, 571}}, MakeTimeV("2024-07-30T05:28:56.918273+00:00")},
 	{MessageLayout{Loc: Location{571, 623}}, MakeTimeV("2024-07-30T06:29:23.685562+00:00")},
+}
+var LayoutsSampleLog2 = []Message{
+	{MessageLayout{Loc: Location{1, 101}}, MakeTimeV("2024-07-31T00:02:49.231231+00:00")},
+	{MessageLayout{Loc: Location{101, 208}}, MakeTimeV("2024-07-31T01:07:21.923832+00:00")},
+	{MessageLayout{Loc: Location{208, 334}}, MakeTimeV("2024-07-31T01:11:38.258712+00:00")},
+	{MessageLayout{Loc: Location{334, 438}}, MakeTimeV("2024-07-31T02:15:22.799234+00:00")},
+	{MessageLayout{Loc: Location{438, 547}}, MakeTimeV("2024-07-31T03:20:57.293873+00:00")},
+	{MessageLayout{Loc: Location{547, 646}}, MakeTimeV("2024-07-31T04:25:36.908172+00:00")},
+	{MessageLayout{Loc: Location{646, 764}}, MakeTimeV("2024-07-31T05:30:47.245671+00:00")},
 }
 
 func MakeFileMessages(file string, messages []Message) (fm []FileMessage) {
@@ -53,11 +82,11 @@ func MakeTestFile(t *testing.T) (string, []byte) {
 	testFile := filepath.Join(dir, "test.log")
 	err := PopulateFiles(
 		map[string][]byte{
-			testFile: []byte(SampleLog),
+			testFile: []byte(SampleLog1),
 		},
 	)
 	require.NoError(t, err)
-	return testFile, []byte(SampleLog)
+	return testFile, []byte(SampleLog1)
 }
 
 // PopulateFiles writes the provided content to files specified in the map.

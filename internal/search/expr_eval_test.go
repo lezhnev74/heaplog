@@ -164,7 +164,7 @@ func TestExprEval(t *testing.T) {
 				require.Equal(t, tt.expectedSegments, segments)
 
 				if slices.Equal(segments, allSegmentsSuperset) {
-					require.True(t, ShouldFullScan(expr, tokenize))
+					require.True(t, shouldFullScan(expr, tokenize))
 				}
 			},
 		)
