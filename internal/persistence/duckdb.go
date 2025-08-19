@@ -25,7 +25,7 @@ var migrationFS embed.FS
 
 type DuckDB struct {
 	db           *sql.DB
-	queryResults *duckdb.Appender
+	queryResults *Appender
 	logger       *zap.Logger
 }
 
@@ -52,11 +52,12 @@ func NewDuckDB(ctx context.Context, filePath string, logger *zap.Logger) (duck *
 		err = fmt.Errorf("could not migrate: %w", err)
 	}
 
-	duck.queryResults, err = duckdb.NewAppenderFromConn(con, "", "query_results")
+	queryResultsAppender, err := duckdb.NewAppenderFromConn(con, "", "query_results")
 	if err != nil {
 		err = fmt.Errorf("could not create new appender for query_results: %w", err)
 		return
 	}
+	duck.queryResults = NewAppender(queryResultsAppender)
 
 	go func() {
 		<-ctx.Done()
@@ -110,39 +111,38 @@ func (duck *DuckDB) PutResultsAsync(query string, results iter.Seq[common.FileMe
 	done = make(chan struct{})
 	go func() {
 		defer close(done)
-		var messages int
-		var minDate, maxDate int64 = math.MaxInt64, 0
-
-		results(
-			func(msg common.FileMessage) bool {
-				messages++
-				dateMicro := msg.Date.UnixMicro()
-				if dateMicro < minDate {
-					minDate = dateMicro
-				}
-				if dateMicro > maxDate {
-					maxDate = dateMicro
-				}
-
-				fileId, err := duck.getFileIdByPath(msg.File)
-				if err != nil {
-					return false
-				}
-
-				err = duck.queryResults.AppendRow(
-					queryId,
-					fileId,
-					msg.Loc.From,
-					msg.Loc.To-msg.Loc.From,
-					dateMicro,
-				)
-				if err != nil {
-					duck.logger.Error("could not append row to query_results", zap.Error(err))
-					return false
-				}
-				return true
-			},
+		var (
+			messages         int
+			minDate, maxDate int64 = math.MaxInt64, 0
+			err              error
 		)
+		for msg := range results {
+			messages++
+			dateMicro := msg.Date.UnixMicro()
+			if dateMicro < minDate {
+				minDate = dateMicro
+			}
+			if dateMicro > maxDate {
+				maxDate = dateMicro
+			}
+
+			fileId, err := duck.getFileIdByPath(msg.File)
+			if err != nil {
+				break
+			}
+
+			err = duck.queryResults.AppendRow(
+				queryId,
+				fileId,
+				msg.Loc.From,
+				msg.Loc.To-msg.Loc.From,
+				dateMicro,
+			)
+			if err != nil {
+				duck.logger.Error("could not append row to query_results", zap.Error(err))
+				break
+			}
+		}
 
 		err = duck.queryResults.Flush()
 		if err != nil {
