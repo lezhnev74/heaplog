@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"iter"
 	"os"
+	"slices"
 	"time"
+	"unsafe"
 
 	"go.uber.org/zap"
 
@@ -14,8 +16,8 @@ import (
 )
 
 type ReadableIndex interface {
-	// GetSegments uses Inverted Index to get potential segments
-	GetSegments(terms [][]byte) ([]int, error)
+	// GetRelevantSegments uses Inverted Index to get potential segments
+	GetRelevantSegments(terms [][]byte) (map[string][]int, error)
 	// GetMessages streams all messages within given segments
 	GetMessages(segments []int, minDate, maxDate *time.Time) (iter.Seq[common.FileMessage], error)
 }
@@ -32,63 +34,77 @@ type Search struct {
 // to reduce the amount of messages to test.
 // It streams out matched messages.
 func (s *Search) Search(expr *query_language.Expression, minDate, maxDate *time.Time) (
-	found iter.Seq2[common.Message, []byte],
-	err error,
+	iter.Seq[common.FileMessageBody],
+	error,
 ) {
-	//exprMatcher := expr.GetMatcher()
-	//matcher := func(m common.Message, body []byte) bool {
-	//	// exclude date from matching
-	//	pos := func(pos int) int { return pos - m.Loc.From }
-	//	body = append(body[:pos(m.DateLoc.From)], body[pos(m.DateLoc.To):]...)
-	//	bodyString := unsafe.String(unsafe.SliceData(body), len(body))
-	//	result := exprMatcher(query_language.NewCachedString(bodyString))
-	//	return result
-	//}
-	//
-	//segments := []int(nil) // segments to look into for messages (nil = All)
-	//if !ShouldFullScan(expr, s.tokenize) {
-	//	terms := make([][]byte, 0)
-	//	for _, t := range expr.FindKeywords() {
-	//		terms = append(terms, []byte(t))
-	//	}
-	//	segments, err = s.index.GetSegments(terms)
-	//	if err != nil {
-	//		err = fmt.Errorf("get segments by terms: %w", err)
-	//		return
-	//	}
-	//	s.logger.Debug("Selected segments: %d\n", zap.Int("len", len(segments)))
-	//}
-	//
-	//_, err = s.index.GetMessages(segments, minDate, maxDate)
-	//if err != nil {
-	//	err = fmt.Errorf("get messages: %w", err)
-	//	return
-	//}
+	exprMatcher := expr.GetMatcher()
+	matcher := func(m common.FileMessageBody) bool {
+		// exclude date from matching
+		pos := func(pos int) int { return pos - m.Loc.From }
+		body := append(m.Body[:pos(m.DateLoc.From)], m.Body[pos(m.DateLoc.To):]...)
+		bodyString := unsafe.String(unsafe.SliceData(body), len(body))
+		result := exprMatcher(query_language.NewCachedString(bodyString))
+		return result
+	}
 
-	//messagesBodies, err := StreamFileMatch(fileMessages, matcher)
-	//
-	//return func(yield func(common.Message, []byte) bool) {
-	//	for m := range fileMessages {
-	//		if !matcher(m, b) {
-	//			continue
-	//		}
-	//		if !yield(m, b) {
-	//			break
-	//		}
-	//	}
-	//}, nil
+	segments := []int(nil) // segments to look into for messages (nil = All)
+	if !ShouldFullScan(expr, s.tokenize) {
+		terms := make([][]byte, 0)
+		for _, t := range expr.FindKeywords() {
+			terms = append(terms, []byte(t))
+		}
 
-	return
+		termSegments, err := s.index.GetRelevantSegments(terms)
+		if err != nil {
+			return nil, fmt.Errorf("get segments by terms: %w", err)
+		}
+
+		setsExpr := ExprMapLiteralsToSets(expr, s.tokenize, termSegments)
+		segments = ExprEval(setsExpr)
+		if slices.Equal(segments, allSegmentsSuperset) {
+			segments = nil // full-scan
+		}
+	}
+	if len(segments) > 0 {
+		s.logger.Debug("Selected segments: %d\n", zap.Int("len", len(segments)))
+	}
+
+	fileMessages, err := s.index.GetMessages(segments, minDate, maxDate)
+	if err != nil {
+		return nil, fmt.Errorf("get messages: %w", err)
+	}
+
+	return func(yield func(body common.FileMessageBody) bool) {
+		for mfb := range readMessages(fileMessages) {
+			if !matcher(mfb) {
+				continue
+			}
+			if !yield(mfb) {
+				break
+			}
+		}
+	}, nil
 }
 
-func ReadMessages(messages iter.Seq[common.FileMessage]) iter.Seq2[common.FileMessageBody, error] {
+// readMessages converts a sequence of file messages into a sequence of message bodies with their content.
+// It efficiently reads message contents from files by reusing file handles when possible.
+func readMessages(messages iter.Seq[common.FileMessage]) iter.Seq2[common.FileMessageBody, error] {
 	var (
 		stream *os.File
 		err    error
 	)
 	return func(yield func(common.FileMessageBody, error) bool) {
+		defer func() {
+			if stream != nil {
+				stream.Close()
+			}
+		}()
+
 		for m := range messages {
 			if stream == nil || stream.Name() != m.File {
+				if stream != nil {
+					stream.Close()
+				}
 				stream, err = os.Open(m.File)
 				if err != nil {
 					yield(common.FileMessageBody{}, fmt.Errorf("file open %s: %w", m.File, err))

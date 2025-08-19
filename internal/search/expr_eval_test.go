@@ -2,6 +2,8 @@ package search
 
 import (
 	"fmt"
+	"log"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -14,34 +16,30 @@ func TestSetOps(t *testing.T) {
 
 	// AND
 	r := setAnd(
-		[][]uint32{
+		[][]int{
 			{1, 2, 3},
 			{2, 3, 4},
 		},
 	)
-	require.Equal(t, []uint32{2, 3}, r)
+	require.Equal(t, []int{2, 3}, r)
 
 	// OR
 	r = setOr(
-		[][]uint32{
+		[][]int{
 			{1, 2, 3},
 			{2, 3, 4},
 		},
 	)
-	require.Equal(t, []uint32{1, 2, 3, 4}, r)
-
-	// EXCEPT
-	r = setExcept([]uint32{1, 2, 3, 4, 5}, []uint32{3, 9})
-	require.Equal(t, []uint32{1, 2, 4, 5}, r)
+	require.Equal(t, []int{1, 2, 3, 4}, r)
 
 }
 
 func TestExprEval(t *testing.T) {
 	type test struct {
 		query            string
-		allSegments      []uint32
-		termSegments     map[string][]uint32
-		expectedSegments []uint32
+		allSegments      []int
+		termSegments     map[string][]int
+		expectedSegments []int
 	}
 
 	tokenize := func(literal []byte) [][]byte {
@@ -49,90 +47,109 @@ func TestExprEval(t *testing.T) {
 	}
 
 	tests := []test{
-		{ // ONE TERM SEGMENTS
-			query:       "error",
-			allSegments: []uint32{1, 2, 3, 4, 5},
-			termSegments: map[string][]uint32{
+		{ // Test single term query matching multiple segments
+			query: "error",
+			termSegments: map[string][]int{
 				"error": {1, 2, 3},
 			},
-			expectedSegments: []uint32{1, 2, 3},
+			expectedSegments: []int{1, 2, 3},
 		},
-		{ // TWO TERM SEGMENTS
-			query:       "error failure",
-			allSegments: []uint32{1, 2, 3, 4, 5},
-			termSegments: map[string][]uint32{
+		{ // Test negation of single term requires full scan
+			query: "!error",
+			termSegments: map[string][]int{
+				"error": {1},
+			},
+			expectedSegments: []int{allSegmentsMarker},
+		},
+		{ // Test regex pattern requires full scan of segments
+			query: "~error",
+			termSegments: map[string][]int{
+				"error": {1, 2, 3},
+			},
+			expectedSegments: []int{allSegmentsMarker},
+		},
+		{ // Test implicit AND of same term preserves segments
+			query: "error error",
+			termSegments: map[string][]int{
+				"error": {1, 2, 3},
+			},
+			expectedSegments: []int{1, 2, 3},
+		},
+		{ // Test explicit OR of same term preserves segments
+			query: "error OR error",
+			termSegments: map[string][]int{
+				"error": {1, 2, 3},
+			},
+			expectedSegments: []int{1, 2, 3},
+		},
+		{ // Test implicit AND between different terms returns intersection
+			query: "error failure",
+			termSegments: map[string][]int{
 				"error":   {1, 2, 3},
 				"failure": {2, 6},
 			},
-			expectedSegments: []uint32{2},
+			expectedSegments: []int{2},
 		},
-		{ // TWO TERM SEGMENTS WITH INVERSION
+		{ // Test OR between different terms returns union
+			query: "error OR failure",
+			termSegments: map[string][]int{
+				"error":   {1, 2, 3},
+				"failure": {2, 6},
+			},
+			expectedSegments: []int{1, 2, 3, 6},
+		},
+		{ // Test term with negated term requires post-filtering
 			// one segment can contain messages with "failure" as well without,
 			// we can't discard segments just based on the II.
-			query:       "error !failure",
-			allSegments: []uint32{1, 2, 3},
-			termSegments: map[string][]uint32{
+			query: "error !failure",
+			termSegments: map[string][]int{
 				"error":   {1, 2},
 				"failure": {2, 3},
 			},
-			expectedSegments: []uint32{1, 2},
+			expectedSegments: []int{1, 2},
 		},
-		{ // RE -> FULL-SCAN
-			query:       "~error",
-			allSegments: []uint32{1, 2, 3, 4, 5},
-			termSegments: map[string][]uint32{
+		{ // Test OR between regex and term requires full scan
+			query: "~error OR error",
+			termSegments: map[string][]int{
 				"error": {1, 2, 3},
 			},
-			expectedSegments: []uint32{1, 2, 3, 4, 5},
+			expectedSegments: []int{allSegmentsMarker},
 		},
-		{ // RE OR TERM -> FULL-SCAN
-			query:       "~error OR error",
-			allSegments: []uint32{1, 2, 3, 4, 5},
-			termSegments: map[string][]uint32{
+		{ // Test AND between regex and term uses term segments
+			query: "~error error",
+			termSegments: map[string][]int{
 				"error": {1, 2, 3},
 			},
-			expectedSegments: []uint32{1, 2, 3, 4, 5},
+			expectedSegments: []int{1, 2, 3},
 		},
-		{ // RE AND TERM -> TERM
-			query:       "~error error",
-			allSegments: []uint32{1, 2, 3, 4, 5},
-			termSegments: map[string][]uint32{
+		{ // Test negated regex requires full scan validation
+			query: "!(~error)",
+			termSegments: map[string][]int{
 				"error": {1, 2, 3},
 			},
-			expectedSegments: []uint32{1, 2, 3},
+			expectedSegments: []int{allSegmentsMarker},
 		},
-		{ // NOT RE -> Full-FilterMessagesStream (edge case)
-			query:       "!(~error)",
-			allSegments: []uint32{1, 2, 3, 4, 5},
-			termSegments: map[string][]uint32{
+		{ // Test negation of regex AND term requires full scan
+			query: "!(~error error)",
+			termSegments: map[string][]int{
 				"error": {1, 2, 3},
 			},
-			expectedSegments: []uint32{1, 2, 3, 4, 5},
+			expectedSegments: []int{allSegmentsMarker},
 		},
-		{ // NOT (RE AND TERM) -> NOT (TERM)
-			query:       "!(~error error)",
-			allSegments: []uint32{1, 2, 3, 4, 5},
-			termSegments: map[string][]uint32{
+		{ // Test negation of regex OR term requires full scan
+			query: "!(~error OR error)",
+			termSegments: map[string][]int{
 				"error": {1, 2, 3},
 			},
-			expectedSegments: []uint32{1, 2, 3, 4, 5},
+			expectedSegments: []int{allSegmentsMarker},
 		},
-		{
-			query:       "!(~error OR error)",
-			allSegments: []uint32{1, 2, 3, 4, 5},
-			termSegments: map[string][]uint32{
-				"error": {1, 2, 3},
-			},
-			expectedSegments: []uint32{1, 2, 3, 4, 5},
-		},
-		{ // COMPLEX
-			query:       "!(~error OR error) AND failure",
-			allSegments: []uint32{1, 2, 3, 4, 5},
-			termSegments: map[string][]uint32{
+		{ // Test complex expression with negation, regex, OR and AND
+			query: "!(~error OR error) AND failure",
+			termSegments: map[string][]int{
 				"error":   {1, 2, 3},
 				"failure": {1, 5},
 			},
-			expectedSegments: []uint32{1, 5},
+			expectedSegments: []int{1, 5},
 		},
 	}
 
@@ -141,9 +158,14 @@ func TestExprEval(t *testing.T) {
 			fmt.Sprintf("Test %d", i), func(t *testing.T) {
 				expr, err := query_language.ParseUserQuery(tt.query)
 				require.NoError(t, err)
-				ExprMapLiteralsToSets(expr, tokenize, tt.termSegments, tt.allSegments)
-				segments := ExprEval(expr, tt.allSegments)
+				mappedExpr := ExprMapLiteralsToSets(expr, tokenize, tt.termSegments)
+				log.Printf("%s", mappedExpr.String())
+				segments := ExprEval(mappedExpr)
 				require.Equal(t, tt.expectedSegments, segments)
+
+				if slices.Equal(segments, allSegmentsSuperset) {
+					require.True(t, ShouldFullScan(expr, tokenize))
+				}
 			},
 		)
 	}

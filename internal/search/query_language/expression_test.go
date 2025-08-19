@@ -52,6 +52,10 @@ func TestString(t *testing.T) {
 	}
 	tests := []test{
 		{
+			&Expression{NOT, []any{1}},
+			"NOT(1)",
+		},
+		{
 			&Expression{NOT, []any{"OP4"}},
 			"NOT(OP4)",
 		},

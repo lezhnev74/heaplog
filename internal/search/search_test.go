@@ -124,7 +124,7 @@ func TestReadMessages(t *testing.T) {
 	for i, tt := range tests {
 		t.Run(
 			fmt.Sprintf("test %d", i), func(t *testing.T) {
-				fullMessages := ReadMessages(slices.Values(tt.messages))
+				fullMessages := readMessages(slices.Values(tt.messages))
 				actualMessages := make([]common.FileMessageBody, 0)
 				for msg, err := range fullMessages {
 					require.NoError(t, err)

@@ -6,27 +6,25 @@ import (
 	"heaplog_2024/internal/search/query_language"
 )
 
+var allSegmentsMarker = -1
+var allSegmentsSuperset = []int{allSegmentsMarker}
+
 // ExprEval evaluates the given user expression on top of segment sets.
 // Every term in the expression is mapped to a set of segments,
 // evaluation is done by performing set operations on top of that data.
 // expr in the function should already come normalized (tokenizer applied),
 // so we need no further expr tweaking for the query to eval.
-func ExprEval(
-	expr *query_language.Expression,
-	allSegments []uint32, // superset for NOT-operations
-) (segments []uint32) {
+func ExprEval(expr *query_language.Expression) (segments []int) {
 
-	slices.Sort(allSegments)
+	var m func(e *query_language.Expression) []int
+	m = func(e *query_language.Expression) []int {
 
-	var m func(e *query_language.Expression) []uint32
-	m = func(e *query_language.Expression) []uint32 {
-
-		operands := make([][]uint32, 0, len(e.Operands))
+		operands := make([][]int, 0, len(e.Operands))
 		for _, operand := range e.Operands {
 			switch o := operand.(type) {
 			case *query_language.Expression:
 				operands = append(operands, m(o))
-			case []uint32:
+			case []int:
 				operands = append(operands, o)
 			default:
 				panic("expr nodes are not sets")
@@ -40,7 +38,7 @@ func ExprEval(
 			return setAnd(operands)
 		case query_language.NOT:
 			// inversion does not say anything about relevant segments
-			return allSegments
+			return allSegmentsSuperset
 		}
 
 		panic("unexpected operator in expr eval")
@@ -49,14 +47,20 @@ func ExprEval(
 	return m(expr)
 }
 
-func setOr(sets [][]uint32) (r []uint32) {
+func setOr(sets [][]int) (r []int) {
+
+	for i := 0; i < len(sets); i++ {
+		if slices.Equal(sets[i], allSegmentsSuperset) {
+			return allSegmentsSuperset
+		}
+	}
 
 	l := 0
 	for i := 0; i < len(sets); i++ {
 		l += len(sets[i])
 	}
 
-	r = make([]uint32, 0, l)
+	r = make([]int, 0, l)
 	for i := 0; i < len(sets); i++ {
 		r = append(r, sets[i]...)
 	}
@@ -67,7 +71,7 @@ func setOr(sets [][]uint32) (r []uint32) {
 	return
 }
 
-func setAnd(sets [][]uint32) (r []uint32) {
+func setAnd(sets [][]int) (r []int) {
 
 	if len(sets) == 0 {
 		return
@@ -78,8 +82,19 @@ func setAnd(sets [][]uint32) (r []uint32) {
 	r1 := sets[0]
 	r2 := setAnd(sets[1:])
 
+	if slices.Equal(r1, allSegmentsSuperset) {
+		return r2
+	}
+	if slices.Equal(r2, allSegmentsSuperset) {
+		return r1
+	}
+
 	slices.Sort(r1)
 	slices.Sort(r2)
+
+	if len(r1) == 0 {
+		return r2
+	}
 
 	for _, v := range r1 {
 		_, ok := slices.BinarySearch(r2, v)
@@ -93,22 +108,6 @@ func setAnd(sets [][]uint32) (r []uint32) {
 	return
 }
 
-// superset is supposed to be dedup and sorted.
-func setExcept(superSet, set []uint32) (r []uint32) {
-
-	slices.Sort(set)
-	r = append([]uint32{}, superSet...)
-
-	for _, v := range set {
-		pos, ok := slices.BinarySearch(r, v)
-		if ok {
-			r = append(r[:pos], r[pos+1:]...)
-		}
-	}
-
-	return
-}
-
 // ExprMapLiteralsToSets transforms string literals and regular expressions in the query expression
 // into segment sets that can be used for evaluation. For string literals, it tokenizes the input
 // and maps each token to its corresponding segment set from the inverted index (termValues).
@@ -117,10 +116,10 @@ func setExcept(superSet, set []uint32) (r []uint32) {
 func ExprMapLiteralsToSets(
 	expr *query_language.Expression,
 	tokenize func([]byte) [][]byte,
-	termValues map[string][]uint32,
-	allSegments []uint32,
-) {
-	expr.Visit(
+	termValues map[string][]int,
+) (exprClone *query_language.Expression) {
+	exprClone = expr.Clone()
+	exprClone.Visit(
 		func(expr *query_language.Expression) {
 			for i, operand := range expr.Operands {
 				switch tl := operand.(type) {
@@ -128,8 +127,7 @@ func ExprMapLiteralsToSets(
 					// normal term, if short -> Full-Scan
 					terms := tokenize([]byte(tl))
 					if len(terms) == 0 {
-						// no long prefix-terms, so Full-Scan
-						expr.Operands[i] = allSegments
+						expr.Operands[i] = allSegmentsSuperset // no long prefix-terms => Full-Scan
 						continue
 					}
 					// otherwise, AND-combine results from II
@@ -143,9 +141,10 @@ func ExprMapLiteralsToSets(
 					}
 					expr.Operands[i] = &query_language.Expression{Operator: query_language.AND, Operands: sets}
 				case query_language.RegExpLiteral:
-					expr.Operands[i] = allSegments // Full-Scan
+					expr.Operands[i] = allSegmentsSuperset // Full-Scan
 				}
 			}
 		},
 	)
+	return
 }

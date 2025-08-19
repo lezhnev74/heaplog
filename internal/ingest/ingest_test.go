@@ -12,11 +12,11 @@ import (
 	"go.uber.org/zap"
 
 	"heaplog_2024/internal/common"
-	"heaplog_2024/internal/duckdb"
+	"heaplog_2024/internal/persistence"
 )
 
 type MockFileIndex struct {
-	*duckdb.DuckDB
+	*persistence.DuckDB
 }
 
 func (m *MockFileIndex) PutSegment(file string, terms [][]byte, messages []common.Message) (int, error) {
@@ -170,7 +170,7 @@ func TestReconcileMissing(t *testing.T) {
 	}
 }
 
-func makeTestIngestor(t *testing.T, globs []string) (*Ingestor, *duckdb.DuckDB) {
+func makeTestIngestor(t *testing.T, globs []string) (*Ingestor, *persistence.DuckDB) {
 	logger := zap.NewNop()
 	indexer := NewIndexer(
 		context.Background(),
@@ -182,7 +182,7 @@ func makeTestIngestor(t *testing.T, globs []string) (*Ingestor, *duckdb.DuckDB) 
 			return time.Parse(common.TimeFormat, string(b))
 		},
 	)
-	duck, err := duckdb.NewDuckDB(context.Background(), "")
+	duck, err := persistence.NewDuckDB(context.Background(), "")
 	require.NoError(t, err)
 	require.NoError(t, duck.Migrate())
 	ingestor := NewIngestor(

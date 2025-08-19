@@ -1,4 +1,4 @@
-package duckdb
+package persistence
 
 import (
 	"cmp"

@@ -1,4 +1,4 @@
-package duckdb
+package persistence
 
 import (
 	"context"
@@ -27,7 +27,7 @@ type DuckDB struct {
 func NewDuckDB(ctx context.Context, filePath string) (*DuckDB, error) {
 	var err error
 	duck := &DuckDB{}
-	duck.db, err = sql.Open("duckdb", filePath)
+	duck.db, err = sql.Open("persistence", filePath)
 	if err != nil {
 		return nil, err
 	}

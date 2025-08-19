@@ -10,19 +10,16 @@ import (
 // The index won't help for regular expressions, so we perform expression analysis to see if
 // full-scan is unavoidable. Also short terms (below indexable length) lead to full-scan.
 func ShouldFullScan(expr *query_language.Expression, tokenize func([]byte) [][]byte) bool {
-
 	var m func(e *query_language.Expression) bool
 	m = func(e *query_language.Expression) (isFullScan bool) {
-
-		collapseFn := func(prev, cur bool) bool {
-			return prev || cur
-		}
-		if e.Operator == query_language.AND || e.Operator == query_language.NOT {
-			collapseFn = func(prev, cur bool) bool {
-				return prev && cur
-			}
+		if e.Operator == query_language.NOT {
+			return true
 		}
 
+		collapseFn := func(prev, cur bool) bool { return prev || cur }
+		if e.Operator == query_language.AND {
+			collapseFn = func(prev, cur bool) bool { return prev && cur }
+		}
 		var opValue bool
 		for i, operand := range e.Operands {
 			switch o := operand.(type) {

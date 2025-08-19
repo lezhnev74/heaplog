@@ -326,6 +326,8 @@ func (qe *Expression) String() string {
 			sOps = append(sOps, fmt.Sprintf("~%s", op))
 		case *Expression:
 			sOps = append(sOps, op.String())
+		default:
+			sOps = append(sOps, fmt.Sprintf("%v", op))
 		}
 	}
 
