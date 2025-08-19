@@ -14,15 +14,15 @@ type Index struct {
 	ii *inverted_index_2.InvertedIndex
 }
 
-func (i Index) GetRelevantSegments(terms [][]byte) ([]int, error) {
+func (i Index) GetRelevantSegments(terms [][]byte) (map[string][]int, error) {
 	r, err := i.ii.PrefixSearch(terms)
 	if err != nil {
 		return nil, fmt.Errorf("inverted index lookup: %w", err)
 	}
-	segmentIds := make([]int, 0)
-	for _, ids := range r {
+	segmentIds := make(map[string][]int, len(terms))
+	for term, ids := range r {
 		for _, id := range ids {
-			segmentIds = append(segmentIds, int(id))
+			segmentIds[term] = append(segmentIds[term], int(id))
 		}
 	}
 	return segmentIds, nil

@@ -9,12 +9,14 @@ import (
 var allSegmentsMarker = -1
 var allSegmentsSuperset = []int{allSegmentsMarker}
 
-// ExprEval evaluates the given user expression on top of segment sets.
-// Every term in the expression is mapped to a set of segments,
-// evaluation is done by performing set operations on top of that data.
-// expr in the function should already come normalized (tokenizer applied),
-// so we need no further expr tweaking for the query to eval.
-func ExprEval(expr *query_language.Expression) (segments []int) {
+// exprEval evaluates the given user expression to determine relevant segments for search.
+// Each term in the expression is mapped to a set of segments, and evaluation is performed
+// through set operations (AND/OR) on these segment sets. The expression should be
+// pre-normalized and have its literals mapped to segment sets. Special handling is
+// implemented for the allSegmentsSuperset case, which indicates a full scan is needed.
+// The NOT operator always returns allSegmentsSuperset since negation alone cannot
+// determine relevant segments.
+func exprEval(expr *query_language.Expression) (segments []int) {
 
 	var m func(e *query_language.Expression) []int
 	m = func(e *query_language.Expression) []int {
@@ -108,12 +110,13 @@ func setAnd(sets [][]int) (r []int) {
 	return
 }
 
-// ExprMapLiteralsToSets transforms string literals and regular expressions in the query expression
+// exprMapLiteralsToSets transforms string literals and regular expressions in the query expression
 // into segment sets that can be used for evaluation. For string literals, it tokenizes the input
-// and maps each token to its corresponding segment set from the inverted index (termValues).
-// If a string literal produces no tokens or contains a regular expression, it maps to all segments
-// indicating a full scan is required.
-func ExprMapLiteralsToSets(
+// and maps each token to its corresponding segment set from the inverted index (termValues),
+// combining them with AND operations. If a string literal produces no tokens, it maps to
+// allSegmentsSuperset indicating a full scan is required. Regular expressions are also mapped
+// to allSegmentsSuperset as they require full scanning of segments.
+func exprMapLiteralsToSets(
 	expr *query_language.Expression,
 	tokenize func([]byte) [][]byte,
 	termValues map[string][]int,

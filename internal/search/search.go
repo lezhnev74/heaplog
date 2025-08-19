@@ -59,8 +59,8 @@ func (s *Search) Search(expr *query_language.Expression, minDate, maxDate *time.
 			return nil, fmt.Errorf("get segments by terms: %w", err)
 		}
 
-		setsExpr := ExprMapLiteralsToSets(expr, s.tokenize, termSegments)
-		segments = ExprEval(setsExpr)
+		setsExpr := exprMapLiteralsToSets(expr, s.tokenize, termSegments)
+		segments = exprEval(setsExpr)
 		if slices.Equal(segments, allSegmentsSuperset) {
 			segments = nil // full-scan
 		}

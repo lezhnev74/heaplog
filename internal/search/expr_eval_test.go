@@ -158,9 +158,9 @@ func TestExprEval(t *testing.T) {
 			fmt.Sprintf("Test %d", i), func(t *testing.T) {
 				expr, err := query_language.ParseUserQuery(tt.query)
 				require.NoError(t, err)
-				mappedExpr := ExprMapLiteralsToSets(expr, tokenize, tt.termSegments)
+				mappedExpr := exprMapLiteralsToSets(expr, tokenize, tt.termSegments)
 				log.Printf("%s", mappedExpr.String())
-				segments := ExprEval(mappedExpr)
+				segments := exprEval(mappedExpr)
 				require.Equal(t, tt.expectedSegments, segments)
 
 				if slices.Equal(segments, allSegmentsSuperset) {
