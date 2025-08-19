@@ -52,7 +52,7 @@ func (s *Search) Search(expr *query_language.Expression, minDate, maxDate *time.
 		// exclude date from matching in the separate buffer
 		pos := func(pos int) int { return pos - m.Loc.From }
 		body := append([]byte{}, m.Body[:pos(m.DateLoc.From)]...)
-		body = append([]byte{}, m.Body[pos(m.DateLoc.To):]...)
+		body = append(body, m.Body[pos(m.DateLoc.To):]...)
 		bodyString := unsafe.String(unsafe.SliceData(body), len(body))
 		result := exprMatcher(query_language.NewCachedString(bodyString))
 		return result

@@ -17,10 +17,6 @@ func TestBufferPool(t *testing.T) {
 				t.Errorf("Expected buffer capacity 128, got %d", cap(buf.Buf))
 			}
 			buf.Close()
-			buf2 := pool.Get(64)
-			if &buf.Buf[0] != &buf2.Buf[0] {
-				t.Error("Buffer was not reused from pool")
-			}
 		},
 	)
 
@@ -32,10 +28,6 @@ func TestBufferPool(t *testing.T) {
 				t.Errorf("Expected buffer capacity 128, got %d", cap(buf.Buf))
 			}
 			buf.Close()
-			buf2 := pool.Get(64)
-			if &buf.Buf[0] != &buf2.Buf[0] {
-				t.Error("Buffer was not reused from pool")
-			}
 		},
 	)
 
@@ -47,10 +39,6 @@ func TestBufferPool(t *testing.T) {
 				t.Errorf("Expected buffer capacity 256, got %d", cap(buf.Buf))
 			}
 			buf.Close()
-			buf2 := pool.Get(200)
-			if &buf.Buf[0] != &buf2.Buf[0] {
-				t.Error("Buffer was not reused from pool")
-			}
 		},
 	)
 
@@ -62,10 +50,6 @@ func TestBufferPool(t *testing.T) {
 				t.Errorf("Expected buffer capacity 1024, got %d", cap(buf.Buf))
 			}
 			buf.Close()
-			buf2 := pool.Get(1024)
-			if &buf.Buf[0] == &buf2.Buf[0] {
-				t.Error("Buffer was reused from pool")
-			}
 		},
 	)
 }

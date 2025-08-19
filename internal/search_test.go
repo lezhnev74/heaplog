@@ -69,6 +69,14 @@ func TestSearch(t *testing.T) {
 				fileMessages[fileNames[0]][3],
 			},
 		},
+		{
+			name:  "case insensitive",
+			query: `error config`,
+			dates: [2]*time.Time{nil, nil},
+			expected: []common.FileMessage{
+				fileMessages[fileNames[0]][4],
+			},
+		},
 	}
 
 	for _, tc := range testCases {
