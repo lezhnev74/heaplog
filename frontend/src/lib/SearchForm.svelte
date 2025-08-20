@@ -2,7 +2,7 @@
     import {Calendar} from "lucide-svelte";
     import {onMount} from 'svelte';
     import flatpickr from 'flatpickr';
-    import {push} from "svelte-spa-router";
+    import {renderPage} from "./navigation.svelte.js";
 
     let {
         query = "err",
@@ -36,7 +36,7 @@
 
         const data = await response.json();
         if (response.ok) {
-            push('/query/' + data.id);
+            await renderPage(data, "/query/" + data.props.id)
         } else {
             searchError = data.error ?? "bad request";
         }

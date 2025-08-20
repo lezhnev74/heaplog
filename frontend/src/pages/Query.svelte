@@ -1,21 +1,9 @@
 <script>
-    import {onMount} from 'svelte';
-
-    let random = $state(0);
-
-    async function fetchRandom() {
-        const response = await fetch('/api/random');
-        const data = await response.json();
-        random = data.random;
-    }
-
-    onMount(() => {
-        fetchRandom();
-    });
+    import SearchForm from "../lib/SearchForm.svelte";
 </script>
 
-<main>
-    Random 2 value is {random}
-    <button onclick={fetchRandom}>Refresh</button>
-</main>
+<SearchForm/>
+<div class="w-full px-4">
+    Search is in progress...
+</div>
 

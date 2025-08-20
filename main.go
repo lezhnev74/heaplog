@@ -36,6 +36,11 @@ func defaultErrorHandler(ctx *fiber.Ctx, err error) error {
 	)
 }
 
+type SveltePagePayload struct {
+	Component string      `json:"component"`
+	Props     interface{} `json:"props"`
+}
+
 func main() {
 	httpApp := fiber.New(
 		fiber.Config{
@@ -106,11 +111,15 @@ func main() {
 				}
 			}
 
-			return c.Status(fiber.StatusBadRequest).JSON(
-				fiber.Map{
-					"error": "Query is required",
+			payload := SveltePagePayload{
+				Component: "Query",
+				Props: map[string]interface{}{
+					"id":    "99",
+					"query": "q99999",
 				},
-			)
+			}
+
+			return c.JSON(payload)
 		},
 	)
 	api.Get(
