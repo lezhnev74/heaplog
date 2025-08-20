@@ -10,7 +10,15 @@
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^6.1.1",
+    "@tailwindcss/vite": "^4.1.12",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
     "svelte": "^5.38.1",
+    "tailwindcss": "^4.1.12",
     "vite": "^7.1.2"
+  },
+  "dependencies": {
+    "@eonasdan/tempus-dominus": "^6.10.4",
+    "svelte-spa-router": "^4.0.1"
   }
 }

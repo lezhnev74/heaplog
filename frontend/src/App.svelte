@@ -1,21 +1,18 @@
 <script>
-    import {onMount} from 'svelte';
+    import Router from "svelte-spa-router";
+    import Home from "./pages/Home.svelte";
+    import Query from "./pages/Query.svelte";
+    import Footer from "./lib/Footer.svelte";
 
-    let random = $state(0);
-
-    async function fetchRandom() {
-        const response = await fetch('/api/random');
-        const data = await response.json();
-        random = data.random;
-    }
-
-    onMount(() => {
-        fetchRandom();
-    });
+    const routes = {
+        "/": Home,
+        "/query/:id": Query,
+    };
 </script>
 
-<main>
-    Random value is {random}
-    <button on:click={fetchRandom}>Refresh</button>
+<main class="min-h-screen w-full flex flex-col">
+    <div class="flex-grow w-full">
+        <Router {routes}/>
+    </div>
+    <Footer/>
 </main>
-

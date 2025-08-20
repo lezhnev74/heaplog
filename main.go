@@ -58,6 +58,14 @@ func main() {
 			},
 		),
 	)
+	httpApp.Use(
+		"/query", filesystem.New(
+			filesystem.Config{
+				Root:       http.FS(frontendPublic),
+				PathPrefix: "frontend/public",
+			},
+		),
+	)
 
 	api := httpApp.Group("/api")
 	api.Get(
