@@ -182,7 +182,7 @@ func makeTestIngestor(t *testing.T, globs []string) (*Ingestor, *persistence.Duc
 			return time.Parse(common.TimeFormat, string(b))
 		},
 	)
-	duck, err := persistence.NewDuckDB(context.Background(), "")
+	duck, err := persistence.NewDuckDB(context.Background(), "", logger)
 	require.NoError(t, err)
 	require.NoError(t, duck.Migrate())
 	ingestor := NewIngestor(

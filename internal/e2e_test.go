@@ -113,7 +113,7 @@ func prepareIndex(t *testing.T) (*ingest.Ingestor, *search.Search, []string, map
 
 	logger, err := NewLogger("testing")
 	require.NoError(t, err)
-	duck, err := persistence.NewDuckDB(context.Background(), "")
+	duck, err := persistence.NewDuckDB(context.Background(), "", logger)
 	require.NoError(t, err)
 	require.NoError(t, duck.Migrate())
 

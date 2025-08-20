@@ -1,14 +1,29 @@
 package common
 
 import (
+	"context"
 	"fmt"
 	"hash/crc32"
 	"iter"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 var (
 	crc32t = crc32.MakeTable(0xD5828281)
 )
+
+func WaitSignal() context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-signalChan
+		cancel()
+	}()
+	return ctx
+}
 
 // ChunksN splits items into n contiguous chunks with sizes as even as possible.
 // The first (len(items) % chunks) chunks get one extra element.

@@ -186,7 +186,7 @@ context:
    environment: production
    started_at: 1722297612274467
    user_id: null
-   channel: { type: http, details: { method: get, url: 'https://abcde.io/api/user' } }
+   channel: { type: ui, details: { method: get, url: 'https://abcde.io/api/user' } }
    extras: { ip: 185.202.221.74 }
 event_emitted_at_format: '2024-07-30T00:00:12+00:00'
 
