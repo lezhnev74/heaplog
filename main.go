@@ -39,7 +39,7 @@ func defaultErrorHandler(ctx *fiber.Ctx, err error) error {
 func main() {
 	httpApp := fiber.New(
 		fiber.Config{
-			ErrorHandler:          defaultErrorHandler,
+			//ErrorHandler:          defaultErrorHandler,
 			DisableStartupMessage: true,
 		},
 	)
@@ -58,16 +58,61 @@ func main() {
 			},
 		),
 	)
-	httpApp.Use(
-		"/query", filesystem.New(
-			filesystem.Config{
-				Root:       http.FS(frontendPublic),
-				PathPrefix: "frontend/public",
-			},
-		),
-	)
 
 	api := httpApp.Group("/api")
+	api.Post(
+		"/query", func(c *fiber.Ctx) error {
+
+			type QueryRequest struct {
+				Query string `json:"query"`
+				From  string `json:"from"`
+				To    string `json:"to"`
+			}
+			var req QueryRequest
+			if err := c.BodyParser(&req); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(
+					fiber.Map{
+						"error": "Invalid request body",
+					},
+				)
+			}
+			if req.Query == "" {
+				return c.Status(fiber.StatusBadRequest).JSON(
+					fiber.Map{
+						"error": "Query is empty",
+					},
+				)
+			}
+
+			if req.From != "" {
+				_, err := time.Parse(time.RFC3339, req.From)
+				if err != nil {
+					return c.Status(fiber.StatusBadRequest).JSON(
+						fiber.Map{
+							"error": "Invalid 'from' date format.",
+						},
+					)
+				}
+			}
+
+			if req.To != "" {
+				_, err := time.Parse(time.RFC3339, req.To)
+				if err != nil {
+					return c.Status(fiber.StatusBadRequest).JSON(
+						fiber.Map{
+							"error": "Invalid 'to' date format.",
+						},
+					)
+				}
+			}
+
+			return c.Status(fiber.StatusBadRequest).JSON(
+				fiber.Map{
+					"error": "Query is required",
+				},
+			)
+		},
+	)
 	api.Get(
 		"/random", func(c *fiber.Ctx) error {
 			return c.JSON(

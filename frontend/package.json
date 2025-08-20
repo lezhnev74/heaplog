@@ -18,7 +18,9 @@
     "vite": "^7.1.2"
   },
   "dependencies": {
-    "@eonasdan/tempus-dominus": "^6.10.4",
+    "@popperjs/core": "^2.11.8",
+    "flatpickr": "^4.6.13",
+    "lucide-svelte": "^0.540.0",
     "svelte-spa-router": "^4.0.1"
   }
 }

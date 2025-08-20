@@ -3,10 +3,12 @@
     import Home from "./pages/Home.svelte";
     import Query from "./pages/Query.svelte";
     import Footer from "./lib/Footer.svelte";
+    import NotFound from "./pages/NotFound.svelte";
 
     const routes = {
         "/": Home,
         "/query/:id": Query,
+        "*": NotFound,
     };
 </script>
 
