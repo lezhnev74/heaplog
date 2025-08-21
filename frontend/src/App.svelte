@@ -19,14 +19,14 @@
         console.log(page, Current);
     })
 
-    // Handle browser back/forward
-    $effect(() => {
-        function handler() {
-            renderPage(window.location.pathname, true);
-        }
-        window.addEventListener("popstate", handler);
-        return () => window.removeEventListener("popstate", handler);
-    });
+    // // Handle browser back/forward
+    // $effect(() => {
+    //     function handler() {
+    //         renderPage(window.location.pathname);
+    //     }
+    //     window.addEventListener("popstate", handler);
+    //     return () => window.removeEventListener("popstate", handler);
+    // });
 </script>
 
 <main class="min-h-screen w-full flex flex-col">

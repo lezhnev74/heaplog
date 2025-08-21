@@ -2,7 +2,9 @@ package ui
 
 import (
 	"context"
+	"maps"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -48,9 +50,30 @@ func NewHttpApp(ctx context.Context, frontendPublic http.FileSystem, heaplog Hea
 
 	api := app.Group("/api")
 	api.Get(
-		"/", func(c *fiber.Ctx) error {
+		"/query", func(c *fiber.Ctx) error {
 			// List all queries
-			return c.SendString("Hello, World!")
+			results, err := heaplog.Results.GetResults(nil)
+			if err != nil {
+				heaplog.Logger.Error("failed to get results", zap.Error(err))
+				return c.Status(fiber.StatusInternalServerError).JSON(
+					fiber.Map{
+						"error": "Error.",
+					},
+				)
+			}
+
+			list := append([]*common.SearchResult{}, slices.Collect(maps.Values(results))...)
+			slices.SortFunc(
+				list, func(a, b *common.SearchResult) int {
+					return b.CreatedAt.Compare(a.CreatedAt)
+				},
+			)
+
+			return c.Status(fiber.StatusOK).JSON(
+				fiber.Map{
+					"queries": list,
+				},
+			)
 		},
 	)
 	api.Post(
