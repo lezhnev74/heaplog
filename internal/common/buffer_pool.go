@@ -29,7 +29,7 @@ func NewBufferPool(sizes []int) *BufferPool {
 	pools := make(map[int]*sync.Pool, len(sizes))
 	for _, sz := range sizes {
 		pools[sz] = &sync.Pool{
-			New: func() interface{} {
+			New: func() any {
 				return make([]byte, sz)
 			},
 		}

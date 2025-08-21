@@ -11,6 +11,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
+	"github.com/gofiber/template/html/v2"
 	"go.uber.org/zap"
 
 	"heaplog_2024/internal/common"
@@ -19,14 +20,16 @@ import (
 
 // SveltePagePayload allows server-side navigation flow, it addresses a page to be opened on FE with its payload(props).
 type SveltePagePayload struct {
-	Component string      `json:"component"`
-	Props     interface{} `json:"props"`
+	Component string `json:"component"`
+	Props     any    `json:"props"`
 }
 
 func NewHttpApp(ctx context.Context, frontendPublic http.FileSystem, heaplog Heaplog) *fiber.App {
+	engine := html.NewFileSystem(frontendPublic, ".html")
 	app := fiber.New(
 		fiber.Config{
 			DisableStartupMessage: true,
+			Views:                 engine,
 		},
 	)
 	go func() {
@@ -39,13 +42,101 @@ func NewHttpApp(ctx context.Context, frontendPublic http.FileSystem, heaplog Hea
 	app.Use(cors.New(c))
 	app.Use(compress.New(compress.Config{Level: compress.LevelBestCompression}))
 	app.Use(
-		"/", filesystem.New(
+		"/assets", filesystem.New(
 			filesystem.Config{
 				Root:       frontendPublic,
-				PathPrefix: "frontend/public",
+				PathPrefix: "frontend/public/assets",
 				Browse:     false,
 			},
 		),
+	)
+	app.Get(
+		"/", func(ctx *fiber.Ctx) error {
+			// List all queries
+			results, err := heaplog.Results.GetResults(nil)
+			if err != nil {
+				heaplog.Logger.Error("failed to get results", zap.Error(err))
+				return ctx.Status(fiber.StatusInternalServerError).JSON(
+					fiber.Map{
+						"error": "Error.",
+					},
+				)
+			}
+
+			list := append([]*common.SearchResult{}, slices.Collect(maps.Values(results))...)
+			slices.SortFunc(
+				list, func(a, b *common.SearchResult) int {
+					return b.CreatedAt.Compare(a.CreatedAt)
+				},
+			)
+
+			payload := SveltePagePayload{
+				Component: "Home",
+				Props: map[string]any{
+					"queries": list,
+				},
+			}
+
+			// Render index.html, injecting the payload
+			return ctx.Render(
+				"frontend/public/index", fiber.Map{
+					"InitialPage": payload,
+				},
+			)
+		},
+	)
+
+	app.Get(
+		"/query/:id", func(ctx *fiber.Ctx) error {
+
+			id, err := ctx.ParamsInt("id")
+			if err != nil {
+				heaplog.Logger.Error("failed to parse query id", zap.Error(err))
+				return ctx.Status(fiber.StatusBadRequest).JSON(
+					fiber.Map{
+						"error": "Invalid query ID.",
+					},
+				)
+			}
+
+			// List all queries
+			results, err := heaplog.Results.GetResults([]int{id})
+			if err != nil {
+				heaplog.Logger.Error("failed to get results", zap.Error(err))
+				return ctx.Status(fiber.StatusInternalServerError).JSON(
+					fiber.Map{
+						"error": "Error.",
+					},
+				)
+			}
+
+			payload := SveltePagePayload{
+				Component: "NotFound",
+				Props:     map[string]any{},
+			}
+			if results[id] != nil {
+				list := append([]*common.SearchResult{}, slices.Collect(maps.Values(results))...)
+				slices.SortFunc(
+					list, func(a, b *common.SearchResult) int {
+						return b.CreatedAt.Compare(a.CreatedAt)
+					},
+				)
+
+				payload = SveltePagePayload{
+					Component: "Query",
+					Props: map[string]any{
+						"queries": list,
+					},
+				}
+			}
+
+			// Render index.html, injecting the payload
+			return ctx.Render(
+				"frontend/public/index", fiber.Map{
+					"InitialPage": payload,
+				},
+			)
+		},
 	)
 
 	api := app.Group("/api")
@@ -81,8 +172,8 @@ func NewHttpApp(ctx context.Context, frontendPublic http.FileSystem, heaplog Hea
 
 			type QueryRequest struct {
 				Query string `json:"query"`
-				From  string `json:"from"`
-				To    string `json:"to"`
+				From  string `json:"fromDate"`
+				To    string `json:"toDate"`
 			}
 
 			var (
@@ -184,7 +275,7 @@ func NewHttpApp(ctx context.Context, frontendPublic http.FileSystem, heaplog Hea
 
 			payload := SveltePagePayload{
 				Component: "Query",
-				Props: map[string]interface{}{
+				Props: map[string]any{
 					"id":    r.Id,
 					"query": r.Query,
 					"from":  fromMicro,

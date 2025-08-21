@@ -6,8 +6,8 @@
 
     let {
         query = "err",
-        from = 1755706024333,
-        to = "",
+        fromDate = 1755706024333,
+        toDate = 0,
     } = $props()
 
     let isLoading = $state(false);
@@ -22,8 +22,8 @@
         isLoading = true;
         let body = {
             query: query,
-            from: fromPicker.selectedDates.length ? fromPicker.formatDate(fromPicker.selectedDates[0], "Z") : "",
-            to: toPicker.selectedDates.length ? toPicker.formatDate(toPicker.selectedDates[0], "Z") : ""
+            fromDate: fromPicker.selectedDates.length ? fromPicker.formatDate(fromPicker.selectedDates[0], "Z") : "",
+            toDate: toPicker.selectedDates.length ? toPicker.formatDate(toPicker.selectedDates[0], "Z") : ""
         }
         console.log(body)
         const response = await fetch('/api/query/', {
@@ -52,8 +52,8 @@
             allowInvalidPreload: true,
             clickOpens: false
         }
-        fromPicker = flatpickr(fromInput, {...conf, defaultDate: from || null});
-        toPicker = flatpickr(toInput, {...conf, defaultDate: to || null});
+        fromPicker = flatpickr(fromInput, {...conf, defaultDate: fromDate || null});
+        toPicker = flatpickr(toInput, {...conf, defaultDate: toDate || null});
         return () => {
             fromPicker && fromPicker.destroy();
             toPicker && toPicker.destroy();

@@ -202,7 +202,7 @@ func (duck *DuckDB) GetResults(ids []int) (map[int]*common.SearchResult, error) 
 		WHERE %s
 		ORDER BY built_at DESC
 	`
-	var args []interface{}
+	var args []any
 	where := "1=1"
 	if len(ids) > 0 {
 		where = "queryId IN (" + strings.Repeat("?,", len(ids)-1) + "?)"
