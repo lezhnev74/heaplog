@@ -11,8 +11,10 @@
     } = $props()
 
     let perPage = 100
-    let page = 1
-    let pages = messages / perPage
+    let pages = $derived(messages / perPage + 100)
+    let page = $state(1)
+
+    $effect(() => console.log('new page', page))
 
 </script>
 
@@ -22,14 +24,16 @@
 
 <div class="w-full px-4">
 
-    <Pagination/>
+    {#if pages}
+        <Pagination bind:page {pages}/>
+    {/if}
 
     <div class="py-4">
         Search is in progress...
     </div>
 
-    {#if messages > 0}
-        <Pagination/>
+    {#if pages}
+        <Pagination bind:page {pages}/>
     {/if}
 </div>
 
