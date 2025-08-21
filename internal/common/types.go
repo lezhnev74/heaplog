@@ -27,14 +27,15 @@ type MessageLayout struct {
 }
 
 type UserQuery struct {
-	Query            string
-	FromDate, ToDate *time.Time
+	Query    string     `json:"query"`
+	FromDate *time.Time `json:"fromDate"`
+	ToDate   *time.Time `json:"toDate"`
 }
 
 type SearchResult struct {
 	UserQuery
-	Id        int // query id
-	Messages  int
-	CreatedAt time.Time // created at
-	Finished  bool
+	Id        int       `json:"id"` // query id
+	Messages  int       `json:"messages"`
+	CreatedAt time.Time `json:"createdAt"` // created at
+	Finished  bool      `json:"finished"`
 }

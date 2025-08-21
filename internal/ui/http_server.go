@@ -115,18 +115,9 @@ func NewHttpApp(ctx context.Context, frontendPublic http.FileSystem, heaplog Hea
 				Props:     map[string]any{},
 			}
 			if results[id] != nil {
-				list := append([]*common.SearchResult{}, slices.Collect(maps.Values(results))...)
-				slices.SortFunc(
-					list, func(a, b *common.SearchResult) int {
-						return b.CreatedAt.Compare(a.CreatedAt)
-					},
-				)
-
 				payload = SveltePagePayload{
 					Component: "Query",
-					Props: map[string]any{
-						"queries": list,
-					},
+					Props:     results[id],
 				}
 			}
 
@@ -265,22 +256,9 @@ func NewHttpApp(ctx context.Context, frontendPublic http.FileSystem, heaplog Hea
 				)
 			}
 
-			var fromMicro, toMicro int64
-			if r.FromDate != nil {
-				fromMicro = r.FromDate.UnixMicro()
-			}
-			if r.ToDate != nil {
-				toMicro = r.ToDate.UnixMicro()
-			}
-
 			payload := SveltePagePayload{
 				Component: "Query",
-				Props: map[string]any{
-					"id":    r.Id,
-					"query": r.Query,
-					"from":  fromMicro,
-					"to":    toMicro,
-				},
+				Props:     r,
 			}
 
 			return c.JSON(payload)

@@ -5,10 +5,7 @@
     let {queries = []} = $props()
 
     function openQuery(query) {
-        renderPage({
-            component: "Query",
-            props: query
-        }, '/query/' + query.Id)
+        renderPage({component: "Query", props: query}, '/query/' + query.id)
     }
 
 </script>
@@ -23,14 +20,14 @@
                 <div onclick={() => openQuery(query)}
                      class="py-4 rounded-lg cursor-pointer flex">
                     <div class="w-1/5 bg-gray-100">
-                        <code class="p-4">{query.Query}</code>
+                        <code class="p-4">{query.query}</code>
                     </div>
                     <div class="flex-grow text-gray-400 pl-4">
-                        {#if query.FromDate}
-                            <div>From: &nbsp;{new Date(query.FromDate).toLocaleString()}</div>
+                        {#if query.fromDate}
+                            <div>From: &nbsp;{new Date(query.fromDate).toLocaleString()}</div>
                         {/if}
-                        {#if query.ToDate}
-                            <div>To: &nbsp;&nbsp;&nbsp;{new Date(query.ToDate).toLocaleString()}</div>
+                        {#if query.toDate}
+                            <div>To: &nbsp;&nbsp;&nbsp;{new Date(query.toDate).toLocaleString()}</div>
                         {/if}
                     </div>
                 </div>

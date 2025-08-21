@@ -5,8 +5,8 @@
     import {renderPage} from "./navigation.svelte.js";
 
     let {
-        query = "err",
-        fromDate = 1755706024333,
+        query = "",
+        fromDate = 0,
         toDate = 0,
     } = $props()
 
@@ -25,7 +25,6 @@
             fromDate: fromPicker.selectedDates.length ? fromPicker.formatDate(fromPicker.selectedDates[0], "Z") : "",
             toDate: toPicker.selectedDates.length ? toPicker.formatDate(toPicker.selectedDates[0], "Z") : ""
         }
-        console.log(body)
         const response = await fetch('/api/query/', {
             method: 'POST',
             headers: {
