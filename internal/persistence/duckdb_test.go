@@ -330,8 +330,6 @@ func TestGetMessages(t *testing.T) {
 				require.NoError(t, err)
 				db, err := NewDuckDB(ctx, "", logger)
 				require.NoError(t, err)
-				err = db.Migrate()
-				require.NoError(t, err)
 
 				segmentIds := []int(nil)
 				for path, segments := range tt.input {

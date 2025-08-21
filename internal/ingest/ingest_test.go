@@ -184,7 +184,6 @@ func makeTestIngestor(t *testing.T, globs []string) (*Ingestor, *persistence.Duc
 	)
 	duck, err := persistence.NewDuckDB(context.Background(), "", logger)
 	require.NoError(t, err)
-	require.NoError(t, duck.Migrate())
 	ingestor := NewIngestor(
 		globs,
 		regexp.MustCompile(common.MessageStartPattern),

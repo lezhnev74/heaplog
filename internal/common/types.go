@@ -25,3 +25,16 @@ type MessageLayout struct {
 	Loc     Location // body in the stream
 	DateLoc Location // date in the stream
 }
+
+type UserQuery struct {
+	Query            string
+	FromDate, ToDate *time.Time
+}
+
+type SearchResult struct {
+	UserQuery
+	Id        int // query id
+	Messages  int
+	CreatedAt time.Time // created at
+	Finished  bool
+}

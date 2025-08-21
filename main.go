@@ -14,6 +14,6 @@ var frontendPublic embed.FS
 func main() {
 	ctx := common.WaitSignal()
 	heaplog := ui.NewHeaplog(ctx)
-	httpApp := ui.NewHttpApp(http.FS(frontendPublic), heaplog)
+	httpApp := ui.NewHttpApp(ctx, http.FS(frontendPublic), heaplog)
 	httpApp.Listen(":3000")
 }

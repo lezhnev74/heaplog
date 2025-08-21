@@ -2,7 +2,6 @@ package persistence
 
 import (
 	"context"
-	"database/sql"
 	"slices"
 	"testing"
 
@@ -12,6 +11,16 @@ import (
 	"heaplog_2024/internal/common"
 	"heaplog_2024/internal/search"
 )
+
+func TestInterfaces(t *testing.T) {
+	ctx := context.Background()
+	logger, err := internal.NewLogger("test")
+	require.NoError(t, err)
+	db, err := NewDuckDB(ctx, "", logger)
+	require.NoError(t, err)
+
+	var _ search.ResultsStorage = db
+}
 
 func TestConcurrentPutResults(t *testing.T) {
 	ctx := context.Background()
@@ -33,12 +42,15 @@ func TestConcurrentPutResults(t *testing.T) {
 	}
 
 	const numConcurrent = 1_000
-	var results []search.SearchResult
+	var results []common.SearchResult
 	var doneChannels []<-chan struct{}
 
 	// Start concurrent puts
 	for i := 0; i < numConcurrent; i++ {
-		result, done, err := db.PutResultsAsync("test query "+string(rune('A'+i)), slices.Values(messages))
+		result, done, err := db.PutResultsAsync(
+			common.UserQuery{"test query " + string(rune('A'+i)), nil, nil},
+			slices.Values(messages),
+		)
 		require.NoError(t, err)
 		results = append(results, result)
 		doneChannels = append(doneChannels, done)
@@ -51,10 +63,10 @@ func TestConcurrentPutResults(t *testing.T) {
 
 	// Verify results
 	for _, result := range results {
-		gotResult, err := db.GetResults(result.Id)
+		gotResult, err := db.GetResults([]int{result.Id})
 		require.NoError(t, err)
-		require.Equal(t, result.Query, gotResult.Query)
-		require.True(t, gotResult.Finished)
+		require.Equal(t, result.Query, gotResult[result.Id].Query)
+		require.True(t, gotResult[result.Id].Finished)
 
 		// Cleanup
 		err = db.WipeResults(result.Id)
@@ -91,7 +103,10 @@ func TestResults(t *testing.T) {
 	}
 
 	// Put results
-	result, done, err := db.PutResultsAsync("test query", slices.Values(messages))
+	result, done, err := db.PutResultsAsync(
+		common.UserQuery{"test query", nil, nil},
+		slices.Values(messages),
+	)
 	require.NoError(t, err)
 	require.Equal(t, "test query", result.Query)
 	require.False(t, result.Finished)
@@ -102,9 +117,9 @@ func TestResults(t *testing.T) {
 	result.Messages = len(messages)
 	result.Finished = true
 
-	gotResult, err := db.GetResults(result.Id)
+	gotResult, err := db.GetResults([]int{result.Id})
 	require.NoError(t, err)
-	require.Equal(t, result, gotResult)
+	require.Equal(t, result, *gotResult[result.Id])
 
 	// Get messages
 	messagesSeq, err := db.GetResultMessages(result.Id)
@@ -117,8 +132,9 @@ func TestResults(t *testing.T) {
 	require.NoError(t, err)
 
 	// Try to get wiped results
-	_, err = db.GetResults(result.Id)
-	require.ErrorIs(t, err, sql.ErrNoRows)
+	r, err := db.GetResults([]int{result.Id})
+	require.NoError(t, err)
+	require.Nil(t, r[result.Id])
 
 	// Try to get wiped messages
 	messagesSeq, err = db.GetResultMessages(result.Id)

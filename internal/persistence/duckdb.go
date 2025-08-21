@@ -17,7 +17,6 @@ import (
 	"go.uber.org/zap"
 
 	"heaplog_2024/internal/common"
-	"heaplog_2024/internal/search"
 )
 
 //go:embed migrations/_.sql
@@ -68,8 +67,8 @@ func NewDuckDB(ctx context.Context, filePath string, logger *zap.Logger) (duck *
 	return duck, nil
 }
 
-func (duck *DuckDB) PutResultsAsync(query string, results iter.Seq[common.FileMessage]) (
-	result search.SearchResult,
+func (duck *DuckDB) PutResultsAsync(query common.UserQuery, results iter.Seq[common.FileMessage]) (
+	result common.SearchResult,
 	done chan struct{},
 	err error,
 ) {
@@ -87,9 +86,16 @@ func (duck *DuckDB) PutResultsAsync(query string, results iter.Seq[common.FileMe
 		return
 	}
 
+	var minDateMicro, maxDateMicro int64
+	if query.FromDate != nil {
+		minDateMicro = query.FromDate.UnixMicro()
+	}
+	if query.ToDate != nil {
+		maxDateMicro = query.ToDate.UnixMicro()
+	}
 	_, err = tx.Exec(
 		"INSERT INTO queries (queryId, text, date_min, date_max, messages, finished, built_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		queryId, query, 0, 0, 0, false, now.UnixMicro(),
+		queryId, query.Query, minDateMicro, maxDateMicro, 0, false, now.UnixMicro(),
 	)
 	if err != nil {
 		return
@@ -100,12 +106,12 @@ func (duck *DuckDB) PutResultsAsync(query string, results iter.Seq[common.FileMe
 		return
 	}
 
-	result = search.SearchResult{
-		Id:       queryId,
-		Query:    query,
-		Date:     time.UnixMicro(now.UnixMicro()).UTC(),
-		Messages: 0,
-		Finished: false,
+	result = common.SearchResult{
+		UserQuery: query,
+		Id:        queryId,
+		CreatedAt: time.UnixMicro(now.UnixMicro()).UTC(),
+		Messages:  0,
+		Finished:  false,
 	}
 
 	done = make(chan struct{})
@@ -150,8 +156,8 @@ func (duck *DuckDB) PutResultsAsync(query string, results iter.Seq[common.FileMe
 		}
 
 		_, err = duck.db.Exec(
-			"UPDATE queries SET messages = ?, date_min = ?, date_max = ?, finished = ? WHERE queryId = ?",
-			messages, minDate, maxDate, true, queryId,
+			"UPDATE queries SET messages = ?, finished = ? WHERE queryId = ?",
+			messages, true, queryId,
 		)
 	}()
 
@@ -189,46 +195,52 @@ func (duck *DuckDB) GetResultMessages(resultId int) (iter.Seq[common.FileMessage
 	}, nil
 }
 
-func (duck *DuckDB) GetResults(resultId int) (search.SearchResult, error) {
-	var r search.SearchResult
-	var builtAt int64
-	err := duck.db.QueryRow(
-		`
-		SELECT queryId, text, built_at, messages, finished 
-		FROM queries 
-		WHERE queryId = ?
-		`,
-		resultId,
-	).Scan(&r.Id, &r.Query, &builtAt, &r.Messages, &r.Finished)
-	if err != nil {
-		return r, err
-	}
-	r.Date = time.UnixMicro(builtAt).UTC()
-	return r, nil
-}
-
-func (duck *DuckDB) GetAllResults() ([]search.SearchResult, error) {
-	rows, err := duck.db.Query(
-		`
-		SELECT queryId, text, built_at, messages, finished 
-		FROM queries 
+func (duck *DuckDB) GetResults(ids []int) (map[int]*common.SearchResult, error) {
+	q := `
+		SELECT queryId, text, built_at, messages, finished, date_min, date_max 
+		FROM queries
+		WHERE %s
 		ORDER BY built_at DESC
-	`,
-	)
+	`
+	var args []interface{}
+	where := "1=1"
+	if len(ids) > 0 {
+		where = "queryId IN (" + strings.Repeat("?,", len(ids)-1) + "?)"
+		args = asAny(ids)
+	}
+	rows, err := duck.db.Query(fmt.Sprintf(q, where), args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var results []search.SearchResult
+	results := make(map[int]*common.SearchResult)
 	for rows.Next() {
-		var r search.SearchResult
-		var builtAt int64
-		if err := rows.Scan(&r.Id, &r.Query, &builtAt, &r.Messages, &r.Finished); err != nil {
+		var r common.SearchResult
+		var builtAt, minDateMicro, maxDateMicro int64
+		err = rows.Scan(
+			&r.Id,
+			&r.Query,
+			&builtAt,
+			&r.Messages,
+			&r.Finished,
+			&minDateMicro,
+			&maxDateMicro,
+		)
+		if err != nil {
 			return nil, err
 		}
-		r.Date = time.UnixMicro(builtAt).UTC()
-		results = append(results, r)
+		r.CreatedAt = time.UnixMicro(builtAt).UTC()
+
+		if minDateMicro > 0 {
+			t := time.UnixMicro(minDateMicro).UTC()
+			r.FromDate = &t
+		}
+		if maxDateMicro > 0 {
+			t := time.UnixMicro(maxDateMicro).UTC()
+			r.ToDate = &t
+		}
+		results[r.Id] = &r
 	}
 	return results, rows.Err()
 }

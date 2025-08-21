@@ -14,6 +14,16 @@ var (
 	crc32t = crc32.MakeTable(0xD5828281)
 )
 
+func ToFileMessages(messages iter.Seq[FileMessageBody]) iter.Seq[FileMessage] {
+	return func(yield func(FileMessage) bool) {
+		for m := range messages {
+			if !yield(m.FileMessage) {
+				break
+			}
+		}
+	}
+}
+
 func WaitSignal() context.Context {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalChan := make(chan os.Signal, 1)

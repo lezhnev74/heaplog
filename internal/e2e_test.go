@@ -115,7 +115,6 @@ func prepareIndex(t *testing.T) (*ingest.Ingestor, *search.Search, []string, map
 	require.NoError(t, err)
 	duck, err := persistence.NewDuckDB(context.Background(), "", logger)
 	require.NoError(t, err)
-	require.NoError(t, duck.Migrate())
 
 	ii, err := inverted_index_2.NewInvertedIndex(dir, false)
 	require.NoError(t, err)

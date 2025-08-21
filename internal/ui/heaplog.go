@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/lezhnev74/inverted_index_2"
+	"go.uber.org/zap"
 
 	"heaplog_2024/internal"
 	"heaplog_2024/internal/common"
@@ -17,8 +18,10 @@ import (
 )
 
 type Heaplog struct {
+	Logger   *zap.Logger
 	Ingestor *ingest.Ingestor
 	Searcher *search.Search
+	Results  search.ResultsStorage
 }
 
 func NewHeaplog(ctx context.Context) Heaplog {
@@ -34,12 +37,10 @@ func NewHeaplog(ctx context.Context) Heaplog {
 	} else if err != nil {
 		log.Fatal(err)
 	}
+	dbFile := cfg.StoragePath + "/heaplog.db"
+	dbFile = "" // debug
 
-	duck, err := persistence.NewDuckDB(ctx, cfg.StoragePath, logger)
-	err = duck.Migrate()
-	if err != nil {
-		log.Fatal(err)
-	}
+	duck, err := persistence.NewDuckDB(ctx, dbFile, logger)
 
 	ii, err := inverted_index_2.NewInvertedIndex(cfg.StoragePath, false)
 	if err != nil {
@@ -71,5 +72,10 @@ func NewHeaplog(ctx context.Context) Heaplog {
 
 	searcher := search.NewSearch(ctx, tokenize, persistentIndex, logger)
 
-	return Heaplog{Ingestor: ingestor, Searcher: searcher}
+	return Heaplog{
+		Logger:   logger,
+		Ingestor: ingestor,
+		Searcher: searcher,
+		Results:  duck,
+	}
 }

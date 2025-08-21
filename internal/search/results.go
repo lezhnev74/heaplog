@@ -2,24 +2,19 @@ package search
 
 import (
 	"iter"
-	"time"
 
 	"heaplog_2024/internal/common"
 )
 
-type SearchResult struct {
-	Id       int
-	Query    string
-	Date     time.Time
-	Messages int
-	Finished bool
-}
-
 type ResultsStorage interface {
 	// PutResultsAsync streams results into the storage in a separate goroutine, returns instantly.
-	PutResultsAsync(query string, results iter.Seq[common.FileMessage]) (SearchResult, error)
+	PutResultsAsync(q common.UserQuery, results iter.Seq[common.FileMessage]) (
+		common.SearchResult,
+		chan struct{}, // done chan
+		error,
+	)
 	GetResultMessages(resultId int) (iter.Seq[common.FileMessage], error)
-	GetResults(resultId int) (SearchResult, error)
-	GetAllResults() ([]SearchResult, error)
+	// GetResults returns the result with given ids or all if empty.
+	GetResults(resultIds []int) (map[int]*common.SearchResult, error)
 	WipeResults(resultId int) error
 }
