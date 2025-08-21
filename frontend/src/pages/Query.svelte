@@ -25,15 +25,20 @@
 <div class="w-full px-4">
 
     {#if pages}
-        <Pagination bind:page {pages}/>
+        <Pagination bind:page
+                    {pages}
+                    showStatus={true}
+                    {finished}
+                    {messages}/>
     {/if}
 
     <div class="py-4">
-        Search is in progress...
+        Loading messages...
     </div>
 
     {#if pages}
-        <Pagination bind:page {pages}/>
+        <Pagination bind:page
+                    {pages}/>
     {/if}
 </div>
 

@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"iter"
-	"os"
 	"slices"
 	"time"
 	"unsafe"
@@ -92,7 +91,7 @@ func (s *Search) Search(expr *query_language.Expression, minDate, maxDate *time.
 	}
 
 	return func(yield func(body common.FileMessageBody) bool) {
-		for mfb := range readMessages(s.ctx, fileMessages) {
+		for mfb := range common.ReadMessages(s.ctx, fileMessages) {
 			if !matcher(mfb) {
 				continue
 			}
@@ -101,49 +100,4 @@ func (s *Search) Search(expr *query_language.Expression, minDate, maxDate *time.
 			}
 		}
 	}, nil
-}
-
-// readMessages converts a sequence of file messages into a sequence of message bodies with their content.
-// It efficiently reads message contents from files by reusing file handles when possible.
-func readMessages(ctx context.Context, messages iter.Seq[common.FileMessage]) iter.Seq2[common.FileMessageBody, error] {
-	var (
-		stream *os.File
-		err    error
-	)
-	return func(yield func(common.FileMessageBody, error) bool) {
-		defer func() {
-			if stream != nil {
-				stream.Close()
-			}
-		}()
-
-		for m := range messages {
-			if ctx.Err() != nil {
-				return
-			}
-
-			if stream == nil || stream.Name() != m.File {
-				if stream != nil {
-					stream.Close()
-				}
-				stream, err = os.Open(m.File)
-				if err != nil {
-					yield(common.FileMessageBody{}, fmt.Errorf("file open %s: %w", m.File, err))
-					return
-				}
-			}
-
-			mLen := m.Loc.To - m.Loc.From
-			buf := make([]byte, mLen) // alloc memory for the message
-			_, err = stream.ReadAt(buf, int64(m.Loc.From))
-			if err != nil {
-				yield(common.FileMessageBody{}, fmt.Errorf("read file %s: %w", m.File, err))
-				return
-			}
-
-			if !yield(common.FileMessageBody{FileMessage: m, Body: buf}, nil) {
-				return
-			}
-		}
-	}
 }

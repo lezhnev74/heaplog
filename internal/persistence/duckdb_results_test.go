@@ -122,10 +122,22 @@ func TestResults(t *testing.T) {
 	require.Equal(t, result, *gotResult[result.Id])
 
 	// Get messages
-	messagesSeq, err := db.GetResultMessages(result.Id)
+	messagesSeq, err := db.GetResultMessages(result.Id, 0, 1000)
 	require.NoError(t, err)
 	gotMessages := slices.Collect(messagesSeq)
 	require.Equal(t, messages, gotMessages)
+
+	// Get messages + skip
+	messagesSeq, err = db.GetResultMessages(result.Id, 1, 1000)
+	require.NoError(t, err)
+	gotMessages = slices.Collect(messagesSeq)
+	require.Equal(t, messages[1:], gotMessages)
+
+	// Get messages + limit
+	messagesSeq, err = db.GetResultMessages(result.Id, 0, 1)
+	require.NoError(t, err)
+	gotMessages = slices.Collect(messagesSeq)
+	require.Equal(t, messages[:1], gotMessages)
 
 	// Wipe results
 	err = db.WipeResults(result.Id)
@@ -137,7 +149,7 @@ func TestResults(t *testing.T) {
 	require.Nil(t, r[result.Id])
 
 	// Try to get wiped messages
-	messagesSeq, err = db.GetResultMessages(result.Id)
+	messagesSeq, err = db.GetResultMessages(result.Id, 0, 1000)
 	require.NoError(t, err)
 	gotMessages = slices.Collect(messagesSeq)
 	require.Empty(t, gotMessages)

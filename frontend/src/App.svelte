@@ -50,6 +50,8 @@
     //     window.addEventListener("popstate", handler);
     //     return () => window.removeEventListener("popstate", handler);
     // });
+    
+    
 </script>
 
 <main class="min-h-screen w-full flex flex-col">

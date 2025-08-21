@@ -13,7 +13,7 @@ type ResultsStorage interface {
 		chan struct{}, // done chan
 		error,
 	)
-	GetResultMessages(resultId int) (iter.Seq[common.FileMessage], error)
+	GetResultMessages(resultId, skip, limit int) (iter.Seq[common.FileMessage], error)
 	// GetResults returns the result with given ids or all if empty.
 	GetResults(resultIds []int) (map[int]*common.SearchResult, error)
 	WipeResults(resultId int) error

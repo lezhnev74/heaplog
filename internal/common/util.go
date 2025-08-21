@@ -14,6 +14,50 @@ var (
 	crc32t = crc32.MakeTable(0xD5828281)
 )
 
+// ReadMessages converts a sequence of file messages into a sequence of message bodies with their content.
+// It efficiently reads message contents from files by reusing file handles when possible.
+func ReadMessages(ctx context.Context, messages iter.Seq[FileMessage]) iter.Seq2[FileMessageBody, error] {
+	var (
+		stream *os.File
+		err    error
+	)
+	return func(yield func(FileMessageBody, error) bool) {
+		defer func() {
+			if stream != nil {
+				stream.Close()
+			}
+		}()
+
+		for m := range messages {
+			if ctx.Err() != nil {
+				return
+			}
+
+			if stream == nil || stream.Name() != m.File {
+				if stream != nil {
+					stream.Close()
+				}
+				stream, err = os.Open(m.File)
+				if err != nil {
+					yield(FileMessageBody{}, fmt.Errorf("file open %s: %w", m.File, err))
+					return
+				}
+			}
+
+			mLen := m.Loc.To - m.Loc.From
+			buf := make([]byte, mLen) // alloc memory for the message
+			_, err = stream.ReadAt(buf, int64(m.Loc.From))
+			if err != nil {
+				yield(FileMessageBody{}, fmt.Errorf("read file %s: %w", m.File, err))
+				return
+			}
+
+			if !yield(FileMessageBody{FileMessage: m, Body: buf}, nil) {
+				return
+			}
+		}
+	}
+}
 func ToFileMessages(messages iter.Seq[FileMessageBody]) iter.Seq[FileMessage] {
 	return func(yield func(FileMessage) bool) {
 		for m := range messages {

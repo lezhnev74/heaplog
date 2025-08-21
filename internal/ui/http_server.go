@@ -51,12 +51,12 @@ func NewHttpApp(ctx context.Context, frontendPublic http.FileSystem, heaplog Hea
 		),
 	)
 	app.Get(
-		"/", func(ctx *fiber.Ctx) error {
+		"/", func(c *fiber.Ctx) error {
 			// List all queries
 			results, err := heaplog.Results.GetResults(nil)
 			if err != nil {
 				heaplog.Logger.Error("failed to get results", zap.Error(err))
-				return ctx.Status(fiber.StatusInternalServerError).JSON(
+				return c.Status(fiber.StatusInternalServerError).JSON(
 					fiber.Map{
 						"error": "Error.",
 					},
@@ -78,7 +78,7 @@ func NewHttpApp(ctx context.Context, frontendPublic http.FileSystem, heaplog Hea
 			}
 
 			// Render index.html, injecting the payload
-			return ctx.Render(
+			return c.Render(
 				"frontend/public/index", fiber.Map{
 					"InitialPage": payload,
 				},
@@ -87,12 +87,12 @@ func NewHttpApp(ctx context.Context, frontendPublic http.FileSystem, heaplog Hea
 	)
 
 	app.Get(
-		"/query/:id", func(ctx *fiber.Ctx) error {
+		"/query/:id", func(c *fiber.Ctx) error {
 
-			id, err := ctx.ParamsInt("id")
+			id, err := c.ParamsInt("id")
 			if err != nil {
 				heaplog.Logger.Error("failed to parse query id", zap.Error(err))
-				return ctx.Status(fiber.StatusBadRequest).JSON(
+				return c.Status(fiber.StatusBadRequest).JSON(
 					fiber.Map{
 						"error": "Invalid query ID.",
 					},
@@ -103,7 +103,7 @@ func NewHttpApp(ctx context.Context, frontendPublic http.FileSystem, heaplog Hea
 			results, err := heaplog.Results.GetResults([]int{id})
 			if err != nil {
 				heaplog.Logger.Error("failed to get results", zap.Error(err))
-				return ctx.Status(fiber.StatusInternalServerError).JSON(
+				return c.Status(fiber.StatusInternalServerError).JSON(
 					fiber.Map{
 						"error": "Error.",
 					},
@@ -122,7 +122,7 @@ func NewHttpApp(ctx context.Context, frontendPublic http.FileSystem, heaplog Hea
 			}
 
 			// Render index.html, injecting the payload
-			return ctx.Render(
+			return c.Render(
 				"frontend/public/index", fiber.Map{
 					"InitialPage": payload,
 				},
@@ -154,6 +154,52 @@ func NewHttpApp(ctx context.Context, frontendPublic http.FileSystem, heaplog Hea
 			return c.Status(fiber.StatusOK).JSON(
 				fiber.Map{
 					"queries": list,
+				},
+			)
+		},
+	)
+	api.Get(
+		"/query/:id", func(c *fiber.Ctx) error {
+			id, err := c.ParamsInt("id")
+			if err != nil {
+				heaplog.Logger.Error("failed to parse query id", zap.Error(err))
+				return c.Status(fiber.StatusBadRequest).JSON(
+					fiber.Map{
+						"error": "Invalid query ID.",
+					},
+				)
+			}
+
+			skip := c.QueryInt("skip", 0)
+			limit := c.QueryInt("limit", 100)
+
+			// List all queries
+			results, err := heaplog.Results.GetResultMessages(id, skip, limit)
+			if err != nil {
+				heaplog.Logger.Error("failed to get results", zap.Error(err))
+				return c.Status(fiber.StatusInternalServerError).JSON(
+					fiber.Map{
+						"error": "Error.",
+					},
+				)
+			}
+
+			bodies := func(yield func([]byte) bool) {
+				for mf, err := range common.ReadMessages(ctx, results) {
+					if err != nil {
+						yield([]byte("read message failed:" + err.Error()))
+						break
+					}
+					if !yield(mf.Body) {
+						break
+					}
+				}
+			}
+
+			return c.JSON(
+				fiber.Map{
+					"component": "QueryPage",
+					"props":     slices.Collect(bodies),
 				},
 			)
 		},

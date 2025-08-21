@@ -164,15 +164,16 @@ func (duck *DuckDB) PutResultsAsync(query common.UserQuery, results iter.Seq[com
 	return
 }
 
-func (duck *DuckDB) GetResultMessages(resultId int) (iter.Seq[common.FileMessage], error) {
+func (duck *DuckDB) GetResultMessages(resultId, skip, limit int) (iter.Seq[common.FileMessage], error) {
 	q := `
 		SELECT files.path, pos, len, date
 		FROM query_results
 		JOIN files ON files.id = file_id
 		WHERE query_id = ?
 		ORDER BY date
+		LIMIT ? OFFSET ?
 	`
-	rows, err := duck.db.Query(q, resultId)
+	rows, err := duck.db.Query(q, resultId, limit, skip)
 	if err != nil {
 		return nil, err
 	}
