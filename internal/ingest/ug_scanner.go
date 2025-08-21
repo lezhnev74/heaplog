@@ -32,12 +32,12 @@ func toMessageLayouts(in []ScannedMessage) []common.MessageLayout {
 	return out
 }
 
-// scan execs "ug" on the entire file and returns all message offsets within the given locations.
+// Scan execs "ug" on the entire file and returns all message offsets within the given locations.
 // The "ug" command is based on https://github.com/Genivia/ugrep by Robert A. van Engelen.
 // It uses a custom format to extract message boundaries and date ranges.
 // Returns NoMessageStartFound error if no messages are found in the stream.
 // Returns error if there are issues executing ug or accessing the file.
-func scan(file string, fileSize int, re string, locations []common.Location) (
+func Scan(file string, fileSize int, re string, locations []common.Location) (
 	layouts iter.Seq[ScannedMessage],
 	err error,
 ) {

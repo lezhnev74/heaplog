@@ -184,9 +184,9 @@ func (i *Ingestor) scanFiles(files map[string]int) (map[string][]common.MessageL
 		go func() {
 			defer wg.Done()
 			for _, f := range filesPerWorker[j] {
-				layouts, err := scan(f, files[f], i.messageRE.String(), nil)
+				layouts, err := Scan(f, files[f], i.messageRE.String(), nil)
 				if err != nil {
-					i.logger.Error("scan file", zap.String("file", f), zap.Error(err))
+					i.logger.Error("Scan file", zap.String("file", f), zap.Error(err))
 					continue
 				}
 				for sl := range layouts {

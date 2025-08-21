@@ -164,7 +164,7 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 	for i, tt := range tests {
 		t.Run(
 			fmt.Sprintf("Test %d", i), func(t *testing.T) {
-				layouts, err := scan(filePath, len(fileMap[filePath]), MsgStartRe, tt.locations)
+				layouts, err := Scan(filePath, len(fileMap[filePath]), MsgStartRe, tt.locations)
 				require.NoError(t, err)
 				require.Equal(t, tt.expectedLayouts, slices.Collect(layouts))
 			},
@@ -208,7 +208,7 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 	}
 	require.NoError(t, common.PopulateFiles(fileMap))
 
-	messages, err := scan(
+	messages, err := Scan(
 		filePath,
 		len(fileMap[filePath]),
 		MsgStartRe,

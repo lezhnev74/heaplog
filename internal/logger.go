@@ -2,18 +2,23 @@ package internal
 
 import (
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 func NewLogger(env string) (*zap.Logger, error) {
+
+	var cfg zap.Config
+
 	switch env {
 	case "prod", "production":
-		return zap.NewProduction()
-	case "dev", "development", "test", "testing":
-		return zap.NewDevelopment()
+		cfg = zap.NewProductionConfig()
+		cfg.DisableCaller = true
 	default:
-		// In tests or unknown env, use development config but without noisy stack traces
-		cfg := zap.NewDevelopmentConfig()
-		cfg.DisableStacktrace = true
-		return cfg.Build()
+		cfg = zap.NewDevelopmentConfig()
 	}
+
+	cfg.Encoding = "console"
+	cfg.EncoderConfig.TimeKey = "time"
+	cfg.EncoderConfig.EncodeTime = zapcore.RFC3339TimeEncoder
+	return cfg.Build()
 }

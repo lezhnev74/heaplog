@@ -4,3 +4,4 @@ dev
 vendor
 ug
 .env
+tmp

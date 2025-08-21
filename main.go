@@ -2,8 +2,12 @@ package main
 
 import (
 	"embed"
-	"net/http"
+	"log"
+	"os"
 
+	"go.uber.org/zap"
+
+	"heaplog_2024/internal"
 	"heaplog_2024/internal/common"
 	"heaplog_2024/internal/ui"
 )
@@ -12,8 +16,19 @@ import (
 var frontendPublic embed.FS
 
 func main() {
+	logger, err := internal.NewLogger("prod")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer logger.Sync()
+
 	ctx := common.WaitSignal()
-	heaplog := ui.NewHeaplog(ctx)
-	httpApp := ui.NewHttpApp(ctx, http.FS(frontendPublic), heaplog)
-	httpApp.Listen(":3000")
+	//heaplog := ui.NewHeaplog(ctx)
+	//httpApp := ui.NewHttpApp(ctx, http.FS(frontendPublic), heaplog)
+	//httpApp.Listen(":3000")
+
+	console := ui.NewConsole(ctx, logger)
+	if err := console.Run(ctx, os.Args); err != nil {
+		logger.Error("application failed", zap.Error(err))
+	}
 }

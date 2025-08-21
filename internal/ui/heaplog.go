@@ -3,14 +3,17 @@ package ui
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"regexp"
+	"slices"
 	"time"
 
 	"github.com/lezhnev74/inverted_index_2"
 	"go.uber.org/zap"
 
-	"heaplog_2024/internal"
 	"heaplog_2024/internal/common"
 	"heaplog_2024/internal/ingest"
 	"heaplog_2024/internal/persistence"
@@ -24,13 +27,65 @@ type Heaplog struct {
 	Results  search.ResultsStorage
 }
 
-func NewHeaplog(ctx context.Context) Heaplog {
-	logger, err := internal.NewLogger("prod")
+// TestConfig	performs basic config test and tries to find a single message in a single file.
+// If no error is found, it means that mostly all is set up correctly.
+func TestConfig(cfg Config) (string, error) {
+	files, err := filepath.Glob(cfg.FilesGlobPattern)
 	if err != nil {
-		log.Fatal(err)
+		return "", fmt.Errorf("unable to find files at %s: %w", cfg.FilesGlobPattern, err)
 	}
-	defer logger.Sync()
+	if len(files) == 0 {
+		return "", fmt.Errorf("unable to find files at %s: no files found", cfg.FilesGlobPattern)
+	}
 
+	var file string
+	file, err = filepath.Abs(files[0])
+	if err != nil {
+		return "", fmt.Errorf("unable to find the file at %s: %w", file, err)
+	}
+
+	fileInfo, err := os.Stat(file)
+	if err != nil {
+		return "", fmt.Errorf("unable to get file info at %s: %w", file, err)
+	}
+	fileSize := fileInfo.Size()
+
+	scannedMessages, err := ingest.Scan(
+		file,
+		int(fileSize),
+		cfg.MessageStartRE,
+		[]common.Location{{From: 0, To: 100_000}},
+	)
+	if err != nil {
+		return "", fmt.Errorf("unable to test the file at %s: %w", file, err)
+	}
+
+	layouts := slices.Collect(scannedMessages)
+
+	if len(layouts) == 0 {
+		return "", fmt.Errorf("no messages found in %s (check regular expression again)", file)
+	}
+	ml := layouts[0]
+
+	// test date extraction:
+	f, err := os.Open(file)
+	if err != nil {
+		return "", fmt.Errorf("unable to test the file at %s: %w", file, err)
+	}
+	dateBuf := make([]byte, ml.DateLoc.To-ml.DateLoc.From)
+	_, err = f.ReadAt(dateBuf, int64(ml.DateLoc.From))
+	if err != nil {
+		return "", fmt.Errorf("unable to test the file at %s: %w", file, err)
+	}
+	_, err = time.Parse(cfg.DateFormat, string(dateBuf))
+	if err != nil {
+		return "", fmt.Errorf("unable to test the file at %s: parse date: %w", file, err)
+	}
+
+	return file, nil
+}
+
+func NewHeaplog(ctx context.Context, logger *zap.Logger) Heaplog {
 	cfg, err := LoadConfig()
 	if err != nil && errors.Is(err, errNoConfigFile) {
 		logger.Info("No config file found, using default config")

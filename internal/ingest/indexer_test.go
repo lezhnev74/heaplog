@@ -30,7 +30,7 @@ func TestIndexer(t *testing.T) {
 
 	// Prepare test data
 	fileName, fileBytes := common.MakeTestFile(t)
-	scannedLayouts, err := scan(
+	scannedLayouts, err := Scan(
 		fileName,
 		len(fileBytes),
 		common.MessageStartPattern,
@@ -127,7 +127,7 @@ func TestBlacklistedFileNotIndexed(t *testing.T) {
 
 	// Prepare test data
 	fileName, fileBytes := common.MakeTestFile(t)
-	scannedLayouts, err := scan(
+	scannedLayouts, err := Scan(
 		fileName,
 		len(fileBytes),
 		common.MessageStartPattern,
@@ -172,7 +172,7 @@ func TestIndexerContextCancellation(t *testing.T) {
 
 	// Prepare test data
 	fileName, fileBytes := common.MakeTestFile(t)
-	scannedLayouts, err := scan(
+	scannedLayouts, err := Scan(
 		fileName,
 		len(fileBytes),
 		common.MessageStartPattern,
