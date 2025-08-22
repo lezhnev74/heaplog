@@ -32,10 +32,6 @@ func NewHttpApp(ctx context.Context, frontendPublic http.FileSystem, heaplog Hea
 			Views:                 engine,
 		},
 	)
-	go func() {
-		<-ctx.Done()
-		app.Shutdown()
-	}()
 
 	c := cors.ConfigDefault
 	c.ExposeHeaders = "*"
@@ -50,6 +46,7 @@ func NewHttpApp(ctx context.Context, frontendPublic http.FileSystem, heaplog Hea
 			},
 		),
 	)
+
 	app.Get(
 		"/", func(c *fiber.Ctx) error {
 			// List all queries
@@ -130,9 +127,8 @@ func NewHttpApp(ctx context.Context, frontendPublic http.FileSystem, heaplog Hea
 		},
 	)
 
-	api := app.Group("/api")
-	api.Get(
-		"/query", func(c *fiber.Ctx) error {
+	app.Get(
+		"/api/query", func(c *fiber.Ctx) error {
 			// List all queries
 			results, err := heaplog.Results.GetResults(nil)
 			if err != nil {
@@ -158,8 +154,9 @@ func NewHttpApp(ctx context.Context, frontendPublic http.FileSystem, heaplog Hea
 			)
 		},
 	)
-	api.Get(
-		"/query/:id", func(c *fiber.Ctx) error {
+
+	app.Get(
+		"/api/query/:id", func(c *fiber.Ctx) error {
 			id, err := c.ParamsInt("id")
 			if err != nil {
 				heaplog.Logger.Error("failed to parse query id", zap.Error(err))
@@ -169,9 +166,21 @@ func NewHttpApp(ctx context.Context, frontendPublic http.FileSystem, heaplog Hea
 					},
 				)
 			}
-
 			skip := c.QueryInt("skip", 0)
 			limit := c.QueryInt("limit", 100)
+			limit = 1
+
+			// List all queries
+			resultsMap, err := heaplog.Results.GetResults(nil)
+			if err != nil {
+				heaplog.Logger.Error("failed to get results", zap.Error(err))
+				return c.Status(fiber.StatusInternalServerError).JSON(
+					fiber.Map{
+						"error": "Error.",
+					},
+				)
+			}
+			query := resultsMap[id]
 
 			// List all queries
 			results, err := heaplog.Results.GetResultMessages(id, skip, limit)
@@ -184,13 +193,13 @@ func NewHttpApp(ctx context.Context, frontendPublic http.FileSystem, heaplog Hea
 				)
 			}
 
-			bodies := func(yield func([]byte) bool) {
+			bodies := func(yield func(string) bool) {
 				for mf, err := range common.ReadMessages(ctx, results) {
 					if err != nil {
-						yield([]byte("read message failed:" + err.Error()))
+						yield("read message failed:" + err.Error())
 						break
 					}
-					if !yield(mf.Body) {
+					if !yield(string(mf.Body)) {
 						break
 					}
 				}
@@ -198,14 +207,15 @@ func NewHttpApp(ctx context.Context, frontendPublic http.FileSystem, heaplog Hea
 
 			return c.JSON(
 				fiber.Map{
-					"component": "QueryPage",
-					"props":     slices.Collect(bodies),
+					"query":    query,
+					"messages": append([]string{}, slices.Collect(bodies)...),
 				},
 			)
 		},
 	)
-	api.Post(
-		"/query", func(c *fiber.Ctx) error {
+
+	app.Post(
+		"/api/query", func(c *fiber.Ctx) error {
 
 			type QueryRequest struct {
 				Query string `json:"query"`

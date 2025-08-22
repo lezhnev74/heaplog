@@ -78,10 +78,6 @@ func NewIngestor(
 
 // Run performs the main ingestion workflow
 func (i *Ingestor) Run() error {
-
-	i.logger.Debug("ingestion launched")
-	defer i.logger.Debug("ingestion completed")
-
 	// 1. discover current files
 	files := map[string]int{}
 	for fs, err := range discoverFilesAt(i.globs) {

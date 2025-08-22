@@ -9,7 +9,6 @@ export let page = $state({
  * @param {String} url - Either a payload {component, props} or a URL string.
  */
 export async function renderPage(data, url) {
-    console.log('RENDER', data, url)
     page.component = data.component;
     page.props = data.props;
 

@@ -23,12 +23,8 @@ func main() {
 	defer logger.Sync()
 
 	ctx := common.WaitSignal()
-	//heaplog := ui.NewHeaplog(ctx)
-	//httpApp := ui.NewHttpApp(ctx, http.FS(frontendPublic), heaplog)
-	//httpApp.Listen(":3000")
-
-	console := ui.NewConsole(ctx, logger)
+	console := ui.NewConsole(ctx, logger, frontendPublic)
 	if err := console.Run(ctx, os.Args); err != nil {
-		logger.Error("application failed", zap.Error(err))
+		logger.Error("heaplog failed", zap.Error(err))
 	}
 }

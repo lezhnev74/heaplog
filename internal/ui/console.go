@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
+	"net/http"
+	"time"
 
 	"github.com/urfave/cli/v3"
 	"go.uber.org/zap"
@@ -38,7 +41,7 @@ func overrideConfig(cfg Config, cmd *cli.Command) Config {
 
 	return cfg
 }
-func NewConsole(c context.Context, logger *zap.Logger) *cli.Command {
+func NewConsole(c context.Context, logger *zap.Logger, frontendPublic fs.FS) *cli.Command {
 	prepareCfg := func(cmd *cli.Command) (Config, error) {
 		cfg, err := LoadConfig()
 		if err != nil {
@@ -107,11 +110,28 @@ func NewConsole(c context.Context, logger *zap.Logger) *cli.Command {
 					}
 
 					heaplog := NewHeaplog(c, logger, cfg)
-					return heaplog.Ingestor.Run()
+					go func() {
+						ticker := time.NewTicker(60 * time.Second) // todo put in config
+						defer ticker.Stop()
+						for {
+							select {
+							case <-c.Done():
+								return
+							case <-ticker.C:
+								err = heaplog.Ingestor.Run()
+								if err != nil {
+									logger.Error("Ingestor failed", zap.Error(err))
+								}
+							}
+						}
+					}()
 
-					//httpApp := NewHttpApp(c, http.FS(frontendPublic), heaplog)
-					//httpApp.Listen(":3000")
-					return nil
+					httpApp := NewHttpApp(c, http.FS(frontendPublic), heaplog)
+					go func() {
+						<-ctx.Done()
+						httpApp.Shutdown()
+					}()
+					return httpApp.Listen(":3000")
 				},
 			},
 			{
