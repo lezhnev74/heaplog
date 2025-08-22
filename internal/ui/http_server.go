@@ -168,7 +168,6 @@ func NewHttpApp(ctx context.Context, frontendPublic http.FileSystem, heaplog Hea
 			}
 			skip := c.QueryInt("skip", 0)
 			limit := c.QueryInt("limit", 100)
-			limit = 1
 
 			// List all queries
 			resultsMap, err := heaplog.Results.GetResults(nil)

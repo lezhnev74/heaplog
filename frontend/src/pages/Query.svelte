@@ -1,8 +1,9 @@
 <script>
     import SearchForm from "../lib/SearchForm.svelte";
     import Pagination from "../lib/Pagination.svelte";
-    import {ArrowDownFromLine} from "lucide-svelte";
+    import {ArrowDownFromLine, Loader2} from "lucide-svelte";
     import {untrack} from "svelte";
+    import {ExplicitEffect} from "../lib/lib.svelte.js";
 
     let {
         id,
@@ -17,7 +18,6 @@
     let perPage = $state(5)
     let pages = $derived(Math.floor(messages / perPage))
     let pageMessages = $state([])
-    let isLoading = $state(false)
     let truncatedMessages = $state([])
     // derived: page is incomplete if not enough messages yet
     let pageComplete = $derived(
@@ -26,22 +26,17 @@
     )
     let currentController = null;
 
-    $inspect('pageComplete', pageComplete, pageMessages.length, finished, messages)
-
     $effect(() => {
         if (pageMessages.length) {
             detectTruncated()
         }
     })
 
-    function explicitEffect(fn, depsFn) {
-        // https://github.com/sveltejs/svelte/issues/9248
-        $effect(() => {
-            depsFn();
-            untrack(fn);
-        });
-    }
-    explicitEffect(() => {
+    ExplicitEffect(() => {
+        page = 1
+    }, () => [id])
+    ExplicitEffect(() => {
+        // page reload
         pageMessages = []
         untrack(() => pageMessages)
         loadMessages()
@@ -57,7 +52,6 @@
         currentController = new AbortController();
 
         try {
-            isLoading = true
             const skip = (page - 1) * perPage + pageMessages.length
             const limit = perPage - pageMessages.length
             if (limit <= 0) return;
@@ -67,7 +61,6 @@
             pageMessages = [...pageMessages, ...data.messages]
             finished = data.query.finished
             messages = data.query.messages
-            isLoading = false
 
             if (!pageComplete) {
                 let p = new Promise(resolve => setTimeout(resolve, 1_000))
@@ -76,8 +69,6 @@
             }
         } catch (error) {
             console.error('Failed to fetch messages:', error)
-        } finally {
-            isLoading = false
         }
     }
 
@@ -99,13 +90,17 @@
 
 <div class="w-full px-4">
 
-    {#if pages}
-        <Pagination bind:page
-                    {pages}
-                    showStatus={true}
-                    {finished}
-                    {messages}/>
-    {/if}
+    <Pagination bind:page
+                {pages}>
+        <div class="py-2 flex items-center gap-2">
+            {#if messages}
+                {messages} messages
+            {/if}
+            {#if !pageComplete}
+                <Loader2 class="animate-spin"/>
+            {/if}
+        </div>
+    </Pagination>
 
     <div class="py-4">
 
@@ -132,7 +127,7 @@
                 </div>
             </div>
         {:else}
-            {#if isLoading}
+            {#if !pageComplete}
                 Loading messages...
             {:else}
                 Nothing found.
@@ -140,9 +135,9 @@
         {/each}
     </div>
 
-    <!--{#if pages}-->
-    <!--    <Pagination bind:page-->
-    <!--                {pages}/>-->
-    <!--{/if}-->
+    {#if pages}
+        <Pagination bind:page
+                    {pages}/>
+    {/if}
 </div>
 
