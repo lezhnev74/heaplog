@@ -12,6 +12,7 @@ func NewLogger(env string) (*zap.Logger, error) {
 	switch env {
 	case "prod", "production":
 		cfg = zap.NewProductionConfig()
+		cfg.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
 		cfg.DisableCaller = true
 	default:
 		cfg = zap.NewDevelopmentConfig()

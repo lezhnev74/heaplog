@@ -16,7 +16,7 @@ import (
 var frontendPublic embed.FS
 
 func main() {
-	logger, err := internal.NewLogger("dev")
+	logger, err := internal.NewLogger("prod")
 	if err != nil {
 		log.Fatal(err)
 	}

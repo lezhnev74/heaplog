@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"slices"
 	"sync"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -162,12 +163,13 @@ func (i *Ingestor) Run() error {
 		}
 		i.logger.Debug(
 			fmt.Sprintf(
-				"indexed segment %s [%d:%d] %d messages, %d tokens",
+				"indexed segment %s [%d:%d] %d messages, %d tokens in %s",
 				r.task.file,
 				r.task.layouts[0].Loc.From,
 				r.task.layouts[len(r.task.layouts)-1].Loc.To,
 				len(r.messages),
 				len(r.tokens),
+				time.Now().Sub(r.task.at).String(),
 			),
 		)
 	}

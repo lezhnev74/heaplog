@@ -74,7 +74,7 @@ func TestWipeSegments(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wipe files
-	err = db.WipeSegments("path1")
+	_, err = db.WipeSegments("path1")
 	require.NoError(t, err)
 
 	// Check that the file is gone
@@ -116,7 +116,7 @@ func TestWipeSegment(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wipe files
-	err = db.WipeSegment("path1", common.Location{From: 20, To: 30})
+	_, err = db.WipeSegment("path1", common.Location{From: 20, To: 30})
 	require.NoError(t, err)
 
 	// Check only one segment remains

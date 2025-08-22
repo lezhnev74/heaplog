@@ -11,6 +11,9 @@ import (
 	"github.com/urfave/cli/v3"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
+
+	"heaplog_2024/internal/common"
+	"heaplog_2024/internal/search/query_language"
 )
 
 func overrideConfig(cfg Config, cmd *cli.Command) Config {
@@ -27,7 +30,7 @@ func overrideConfig(cfg Config, cmd *cli.Command) Config {
 		cfg.DateFormat = cmd.String("DateFormat")
 	}
 	if cmd.Int("Concurrency") != 0 {
-		cfg.Concurrency = uint(cmd.Int("Concurrency"))
+		cfg.Concurrency = cmd.Int("Concurrency")
 	}
 	if cmd.Int("MinTermLen") != 0 {
 		cfg.MinTermLen = cmd.Int("MinTermLen")
@@ -110,21 +113,31 @@ func NewConsole(c context.Context, logger *zap.Logger, frontendPublic fs.FS) *cl
 					}
 
 					heaplog := NewHeaplog(c, logger, cfg)
-					go func() {
-						ticker := time.NewTicker(60 * time.Second) // todo put in config
-						defer ticker.Stop()
-						for {
-							select {
-							case <-c.Done():
-								return
-							case <-ticker.C:
-								err = heaplog.Ingestor.Run()
-								if err != nil {
-									logger.Error("Ingestor failed", zap.Error(err))
-								}
+					// INGESTION
+					common.RepeatEvery(
+						ctx, 60*time.Second, func() {
+							err := heaplog.Ingestor.Run()
+							if err != nil {
+								heaplog.Logger.Error("Ingestor failed", zap.Error(err))
 							}
-						}
-					}()
+						},
+					)
+
+					// II MERGING
+					common.RepeatEvery(
+						ctx, 60*time.Second, func() {
+							for {
+								merged, err := heaplog.II.Merge(20, 40, 4)
+								if err != nil {
+									heaplog.Logger.Error("II merging failed", zap.Error(err))
+								}
+								if merged == 0 {
+									break
+								}
+								heaplog.Logger.Info(fmt.Sprintf("Merged %d segments in II", merged))
+							}
+						},
+					)
 
 					httpApp := NewHttpApp(c, http.FS(frontendPublic), heaplog)
 					go func() {
@@ -132,6 +145,37 @@ func NewConsole(c context.Context, logger *zap.Logger, frontendPublic fs.FS) *cl
 						httpApp.Shutdown()
 					}()
 					return httpApp.Listen(":3000")
+				},
+			},
+			{
+				Name:        "search",
+				Flags:       flags,
+				Description: "Search via the console",
+				Action: func(ctx context.Context, cmd *cli.Command) error {
+					cfg, err := LoadConfig()
+					if err != nil && errors.Is(err, errNoConfigFile) {
+						logger.Info("No config file found, using default config")
+					} else if err != nil {
+						return err
+					}
+
+					query := cmd.Args().First()
+					expr, err := query_language.ParseUserQuery(query)
+					if err != nil {
+						return fmt.Errorf("failed to parse query: %w", err)
+					}
+
+					heaplog := NewHeaplog(c, logger, cfg)
+					msgs, err := heaplog.Searcher.Search(expr, nil, nil)
+					if err != nil {
+						return err
+					}
+
+					for m := range msgs {
+						fmt.Println(string(m.Body))
+					}
+
+					return nil
 				},
 			},
 			{

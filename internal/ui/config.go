@@ -29,7 +29,7 @@ type Config struct {
 	DateFormat string `validate:"required" yaml:"date_format"`
 	// sets the degree of concurrency in the service (affects ingestion and search),
 	// defaults to the number of cores if omitted or <1.
-	Concurrency uint `yaml:"concurrency"`
+	Concurrency int `yaml:"concurrency"`
 	// Terms are extracted from messages and indexed.
 	// These control how fast ingestion goes (and space taken for the inverted index),
 	// as well as how fast search goes (as shorter terms may duplicate in the index).
@@ -105,7 +105,7 @@ var DefaultCfg = Config{
 	MinTermLen:       4,
 	MaxTermLen:       8,
 	DuckdbMaxMemMb:   500,
-	Concurrency:      uint(runtime.NumCPU()),
+	Concurrency:      runtime.NumCPU(),
 }
 
 func LoadConfig() (cfg Config, err error) {

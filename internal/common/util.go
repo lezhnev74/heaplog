@@ -8,11 +8,31 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 var (
 	crc32t = crc32.MakeTable(0xD5828281)
 )
+
+// RepeatEvery executes the given function f repeatedly at specified intervals until the context is cancelled.
+// The function is called immediately upon start, then repeatedly after each interval duration.
+// The execution runs in a separate goroutine and can be stopped by cancelling the provided context.
+func RepeatEvery(ctx context.Context, interval time.Duration, f func()) {
+	go func() {
+		f() // instant call
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				f()
+			}
+		}
+	}()
+}
 
 // ReadMessages converts a sequence of file messages into a sequence of message bodies with their content.
 // It efficiently reads message contents from files by reusing file handles when possible.
@@ -45,6 +65,10 @@ func ReadMessages(ctx context.Context, messages iter.Seq[FileMessage]) iter.Seq2
 			}
 
 			mLen := m.Loc.To - m.Loc.From
+			if mLen < 0 {
+				yield(FileMessageBody{}, fmt.Errorf("invalid message location: %d-%d", m.Loc.From, m.Loc.To))
+				return
+			}
 			buf := make([]byte, mLen) // alloc memory for the message
 			_, err = stream.ReadAt(buf, int64(m.Loc.From))
 			if err != nil {

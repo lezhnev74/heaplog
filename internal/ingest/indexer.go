@@ -13,6 +13,7 @@ import (
 )
 
 type task struct {
+	at         time.Time
 	file       string
 	segmentBuf common.Buffer
 	layouts    []common.MessageLayout
@@ -182,7 +183,7 @@ func (ix *Indexer) produceTasks(pendingSegments map[string][][]common.MessageLay
 						ix.blacklist.Store(file, nil)
 						continue
 					}
-					tasks <- task{file, buf, segment}
+					tasks <- task{time.Now(), file, buf, segment}
 				}
 			}()
 		}

@@ -35,6 +35,32 @@ func (i Index) GetRelevantSegments(terms [][]byte) (map[string][]int, error) {
 	return segmentIds, nil
 }
 
+func (i Index) WipeSegments(file string) error {
+	ids, err := i.DuckDB.WipeSegments(file)
+	if err != nil {
+		return fmt.Errorf("db wipe segments: %w", err)
+	}
+	idsUint32 := make([]uint32, 0, len(ids))
+	for _, id := range ids {
+		idsUint32 = append(idsUint32, uint32(id))
+	}
+	return i.ii.PutRemoved(idsUint32)
+}
+
+func (i Index) WipeSegment(file string, segment common.Location) error {
+	id, err := i.DuckDB.WipeSegment(file, segment)
+	if err != nil {
+		return fmt.Errorf("db wipe segment: %w", err)
+	}
+
+	err = i.ii.PutRemoved([]uint32{uint32(id)})
+	if err != nil {
+		return fmt.Errorf("inverted index delete: %w", err)
+	}
+
+	return nil
+}
+
 func (i Index) PutSegment(file string, terms [][]byte, messages []common.Message) (int, error) {
 	segmentId, err := i.DuckDB.PutSegment(file, messages)
 	if err != nil {

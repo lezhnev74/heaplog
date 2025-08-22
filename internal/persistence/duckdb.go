@@ -23,9 +23,10 @@ import (
 var migrationFS embed.FS
 
 type DuckDB struct {
-	db           *sql.DB
-	queryResults *Appender
-	logger       *zap.Logger
+	db               *sql.DB
+	queryResults     *Appender
+	messagesAppender *Appender
+	logger           *zap.Logger
 }
 
 func NewDuckDB(ctx context.Context, filePath string, logger *zap.Logger) (duck *DuckDB, err error) {
@@ -57,6 +58,13 @@ func NewDuckDB(ctx context.Context, filePath string, logger *zap.Logger) (duck *
 		return
 	}
 	duck.queryResults = NewAppender(queryResultsAppender)
+
+	messagesAppender, err := duckdb.NewAppenderFromConn(con, "", "messages")
+	if err != nil {
+		err = fmt.Errorf("could not create new appender for query_results: %w", err)
+		return
+	}
+	duck.messagesAppender = NewAppender(messagesAppender)
 
 	go func() {
 		<-ctx.Done()
@@ -366,9 +374,22 @@ func (duck *DuckDB) PutSegment(file string, messages []common.Message) (segmentI
 		return
 	}
 
+	//for _, msg := range messages {
+	//	_, err = tx.Exec(
+	//		"INSERT INTO messages (segment_id, rel_from, rel_date_from, rel_date_to, date) VALUES (?, ?, ?, ?, ?)",
+	//		segmentId,
+	//		msg.Loc.From-messages[0].Loc.From,
+	//		msg.DateLoc.From,
+	//		msg.DateLoc.To,
+	//		msg.Date.UnixMicro(),
+	//	)
+	//	if err != nil {
+	//		return
+	//	}
+	//}
+
 	for _, msg := range messages {
-		_, err = tx.Exec(
-			"INSERT INTO messages (segment_id, rel_from, rel_date_from, rel_date_to, date) VALUES (?, ?, ?, ?, ?)",
+		err = duck.messagesAppender.AppendRow(
 			segmentId,
 			msg.Loc.From-messages[0].Loc.From,
 			msg.DateLoc.From,
@@ -376,71 +397,79 @@ func (duck *DuckDB) PutSegment(file string, messages []common.Message) (segmentI
 			msg.Date.UnixMicro(),
 		)
 		if err != nil {
-			return
+			duck.logger.Error("could not append row to messages", zap.Error(err))
+			break
 		}
+	}
+
+	err = duck.messagesAppender.Flush()
+	if err != nil {
+		return
 	}
 
 	err = tx.Commit()
 	return
 }
 
-func (duck *DuckDB) WipeSegment(file string, segment common.Location) error {
+func (duck *DuckDB) WipeSegment(file string, segment common.Location) (segmentId int, err error) {
 	tx, err := duck.db.Begin()
 	if err != nil {
-		return err
+		return
 	}
 	defer tx.Rollback()
 
 	fileId, err := duck.getFileIdByPath(file)
 	if err != nil {
-		return err
+		return
 	}
 
-	var segmentId int
 	err = duck.db.QueryRow(
 		"SELECT id FROM segments WHERE file_id = ? AND pos_from = ? AND pos_to = ?",
 		fileId, segment.From, segment.To,
 	).Scan(&segmentId)
 	if err != nil {
-		return err
+		return
 	}
 
 	err = duck._txDeleteSegment(tx, segmentId)
 	if err != nil {
-		return err
+		return
 	}
 
-	return tx.Commit()
+	err = tx.Commit()
+	return
 }
 
-func (duck *DuckDB) WipeSegments(file string) error {
+func (duck *DuckDB) WipeSegments(file string) (segmentIds []int, err error) {
 	tx, err := duck.db.Begin()
 	if err != nil {
-		return err
+		return
 	}
 	defer tx.Rollback()
 
 	fileId, err := duck.getFileIdByPath(file)
 	if err != nil {
-		return err
+		return
 	}
 
 	rows, err := duck.db.Query("SELECT id FROM segments WHERE file_id = ?", fileId)
 	if err != nil {
-		return err
+		return
 	}
 	for rows.Next() {
 		var segmentId int
 		err = rows.Scan(&segmentId)
 		if err != nil {
-			return err
+			return
 		}
 		err = duck._txDeleteSegment(tx, segmentId)
 		if err != nil {
-			return err
+			return
 		}
+		segmentIds = append(segmentIds, segmentId)
 	}
-	return tx.Commit()
+	err = tx.Commit()
+	return
 }
 
 func (duck *DuckDB) _txDeleteSegment(tx *sql.Tx, segmentId int) error {
@@ -462,7 +491,7 @@ func (duck *DuckDB) WipeFile(file string) error {
 	}
 	defer tx.Rollback()
 
-	err = duck.WipeSegments(file)
+	_, err = duck.WipeSegments(file)
 	if err != nil {
 		return err
 	}
@@ -500,7 +529,7 @@ func (duck *DuckDB) GetMessages(segments []int, minDate, maxDate *time.Time) (it
 	JOIN segments on segments.id=messages.segment_id 
 	JOIN files on files.id=segments.file_id 
 	WHERE messages.date >= ? AND messages.date <= ? AND %s
-	ORDER BY messages.date
+	ORDER BY messages.rel_from
 	`
 	if len(segments) > 0 {
 		q = fmt.Sprintf(q, "segments.id IN ("+strings.Repeat("?,", len(segments)-1)+"?)")

@@ -25,6 +25,7 @@ type Heaplog struct {
 	Ingestor *ingest.Ingestor
 	Searcher *search.Search
 	Results  search.ResultsStorage
+	II       *inverted_index_2.InvertedIndex
 }
 
 // TestConfig	performs basic config test and tries to find a single message in a single file.
@@ -117,8 +118,8 @@ func NewHeaplog(ctx context.Context, logger *zap.Logger, cfg Config) Heaplog {
 	ingestor := ingest.NewIngestor(
 		[]string{cfg.FilesGlobPattern},
 		regexp.MustCompile(cfg.MessageStartRE),
-		1_000_000,
-		1,
+		5_000_000,
+		cfg.Concurrency,
 		persistentIndex,
 		logger,
 		indexer,
@@ -131,5 +132,6 @@ func NewHeaplog(ctx context.Context, logger *zap.Logger, cfg Config) Heaplog {
 		Ingestor: ingestor,
 		Searcher: searcher,
 		Results:  duck,
+		II:       ii,
 	}
 }
