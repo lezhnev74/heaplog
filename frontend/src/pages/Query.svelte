@@ -27,16 +27,18 @@
     let currentController = null;
 
     $effect(() => {
+        // detect truncated messages
         if (pageMessages.length) {
             detectTruncated()
         }
     })
 
     ExplicitEffect(() => {
+        // reset on new id for the query
         page = 1
     }, () => [id])
     ExplicitEffect(() => {
-        // page reload
+        // on next/prev page initiation
         pageMessages = []
         untrack(() => pageMessages)
         loadMessages()
