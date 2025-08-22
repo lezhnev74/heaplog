@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/urfave/cli/v3"
@@ -37,7 +38,7 @@ func overrideConfig(cfg Config, cmd *cli.Command) Config {
 
 	return cfg
 }
-func NewConsole(ctx context.Context, logger *zap.Logger) *cli.Command {
+func NewConsole(c context.Context, logger *zap.Logger) *cli.Command {
 	prepareCfg := func(cmd *cli.Command) (Config, error) {
 		cfg, err := LoadConfig()
 		if err != nil {
@@ -93,6 +94,26 @@ func NewConsole(ctx context.Context, logger *zap.Logger) *cli.Command {
 
 	cmd := &cli.Command{
 		Commands: []*cli.Command{
+			{
+				Name:        "run",
+				Flags:       flags,
+				Description: "Run indexing and start a web UI",
+				Action: func(ctx context.Context, cmd *cli.Command) error {
+					cfg, err := LoadConfig()
+					if err != nil && errors.Is(err, errNoConfigFile) {
+						logger.Info("No config file found, using default config")
+					} else if err != nil {
+						return err
+					}
+
+					heaplog := NewHeaplog(c, logger, cfg)
+					return heaplog.Ingestor.Run()
+
+					//httpApp := NewHttpApp(c, http.FS(frontendPublic), heaplog)
+					//httpApp.Listen(":3000")
+					return nil
+				},
+			},
 			{
 				Name:        "gen",
 				Flags:       flags,

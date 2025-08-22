@@ -119,6 +119,7 @@ func (i *Ingestor) Run() error {
 		unindexed := loc.RemoveAll(indexedSegments[file])
 		if len(unindexed) == 0 {
 			delete(files, file)
+			delete(indexedSegments, file)
 		}
 	}
 
@@ -159,10 +160,20 @@ func (i *Ingestor) Run() error {
 
 	// 9. Perform indexing
 	for r := range i.indexer.indexSegments(plan) {
-		_, err := i.db.PutSegment(r.task.file, r.tokens, r.messages)
+		_, err = i.db.PutSegment(r.task.file, r.tokens, r.messages)
 		if err != nil {
 			return fmt.Errorf("put segment for %s: %w", r.task.file, err)
 		}
+		i.logger.Debug(
+			fmt.Sprintf(
+				"indexed segment %s [%d:%d] %d messages, %d tokens",
+				r.task.file,
+				r.task.layouts[0].Loc.From,
+				r.task.layouts[len(r.task.layouts)-1].Loc.To,
+				len(r.messages),
+				len(r.tokens),
+			),
+		)
 	}
 
 	return nil

@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 
+	"heaplog_2024/internal"
 	"heaplog_2024/internal/common"
 	"heaplog_2024/internal/persistence"
 )
@@ -21,6 +21,25 @@ type MockFileIndex struct {
 
 func (m *MockFileIndex) PutSegment(file string, terms [][]byte, messages []common.Message) (int, error) {
 	return m.DuckDB.PutSegment(file, messages)
+}
+
+func TestIngestionDryRun(t *testing.T) {
+	fileName, contents := common.MakeTestFile(t)
+	ingestor, duck := makeTestIngestor(t, []string{fileName})
+
+	// Put misaligned segment
+	_, err := duck.PutSegment(
+		fileName, []common.Message{
+			{MessageLayout: common.MessageLayout{Loc: common.Location{From: 0, To: len(contents)}}, Date: common.MakeTimeV("2024-01-01T00:00:00.000000+00:00")},
+		},
+	)
+	require.NoError(t, err)
+	require.NoError(t, ingestor.Run())
+
+	// make sure it did not wiped the indexed segment
+	segments, err := duck.GetSegments()
+	require.NoError(t, err)
+	require.NotEmpty(t, segments[fileName])
 }
 
 func TestIngesting(t *testing.T) {
@@ -171,7 +190,8 @@ func TestReconcileMissing(t *testing.T) {
 }
 
 func makeTestIngestor(t *testing.T, globs []string) (*Ingestor, *persistence.DuckDB) {
-	logger := zap.NewNop()
+	logger, err := internal.NewLogger("test")
+	require.NoError(t, err)
 	indexer := NewIndexer(
 		context.Background(),
 		logger,

@@ -95,6 +95,7 @@ func findMisalignedSegments(
 	foundFilesLayouts map[string][]common.MessageLayout,
 ) iter.Seq[string] {
 	return func(yield func(string) bool) {
+		reportedFiles := make(map[string]struct{})
 	indexFileLoop:
 		for file, indexedLocs := range indexedSegments {
 			if len(indexedLocs) == 0 {
@@ -116,7 +117,11 @@ func findMisalignedSegments(
 					continue
 				}
 
-				if !yield(file) {
+				if _, ok := reportedFiles[file]; !ok {
+					reportedFiles[file] = struct{}{}
+					if !yield(file) {
+						return
+					}
 					continue indexFileLoop
 				}
 			}

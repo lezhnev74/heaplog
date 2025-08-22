@@ -2,10 +2,10 @@ package ui
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -85,19 +85,18 @@ func TestConfig(cfg Config) (string, error) {
 	return file, nil
 }
 
-func NewHeaplog(ctx context.Context, logger *zap.Logger) Heaplog {
-	cfg, err := LoadConfig()
-	if err != nil && errors.Is(err, errNoConfigFile) {
-		logger.Info("No config file found, using default config")
-	} else if err != nil {
-		log.Fatal(err)
-	}
-	dbFile := cfg.StoragePath + "/heaplog.db"
-	dbFile = "" // debug
+func NewHeaplog(ctx context.Context, logger *zap.Logger, cfg Config) Heaplog {
 
+	dbFile := path.Join(cfg.StoragePath, "heaplog.db")
 	duck, err := persistence.NewDuckDB(ctx, dbFile, logger)
 
-	ii, err := inverted_index_2.NewInvertedIndex(cfg.StoragePath, false)
+	iiPath := path.Join(cfg.StoragePath, "ii")
+	err = os.MkdirAll(iiPath, 0755)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ii, err := inverted_index_2.NewInvertedIndex(iiPath, false)
 	if err != nil {
 		log.Fatal(err)
 	}

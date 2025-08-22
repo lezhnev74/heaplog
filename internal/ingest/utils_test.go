@@ -178,6 +178,24 @@ func TestFindMisalignedSegments(t *testing.T) {
 			},
 			want: []string{"file2"},
 		},
+		{
+			name: "reports once per file",
+			indexedSegments: map[string][]common.Location{
+				"file1": {{From: 0, To: 10}, {From: 10, To: 20}},
+				"file2": {{From: 0, To: 10}, {From: 10, To: 20}},
+			},
+			foundFilesLayouts: map[string][]common.MessageLayout{
+				"file1": {
+					{Loc: common.Location{From: 0, To: 9}},
+					{Loc: common.Location{From: 12, To: 15}},
+				},
+				"file2": {
+					{Loc: common.Location{From: 5, To: 15}},
+					{Loc: common.Location{From: 16, To: 17}},
+				},
+			},
+			want: []string{"file1", "file2"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -187,6 +205,8 @@ func TestFindMisalignedSegments(t *testing.T) {
 				for v := range findMisalignedSegments(tt.indexedSegments, tt.foundFilesLayouts) {
 					got = append(got, v)
 				}
+				slices.Sort(got)
+				slices.Sort(tt.want)
 				if !slices.Equal(got, tt.want) {
 					t.Errorf("findMisalignedSegments() = %v, want %v", got, tt.want)
 				}
