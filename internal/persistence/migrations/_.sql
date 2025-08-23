@@ -18,8 +18,9 @@ CREATE TABLE messages
 (
     segment_id    UINTEGER NOT NULL,
     rel_from      UINTEGER NOT NULL, -- relative to the segment's pos
-    rel_date_from UINTEGER NOT NULL, -- relative to the segment's pos
-    rel_date_to   UINTEGER NOT NULL, -- relative to the segment's pos
+    rel_to      UINTEGER NOT NULL, -- relative to the segment's pos
+    rel_date_from UINTEGER NOT NULL, -- relative to the message's pos
+    rel_date_to   UINTEGER NOT NULL, -- relative to the message's pos
     date          UBIGINT  NOT NULL  -- micro
 );
 CREATE SEQUENCE query_ids;

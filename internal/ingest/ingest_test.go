@@ -16,11 +16,34 @@ import (
 )
 
 type MockFileIndex struct {
-	*persistence.DuckDB
+	duck *persistence.DuckDB
+}
+
+func (m *MockFileIndex) GetSegments() (map[string][]common.Location, error) {
+	return m.duck.GetSegments()
+}
+
+func (m *MockFileIndex) WipeSegment(file string, segment common.Location) error {
+	_, err := m.duck.WipeSegment(file, segment)
+	return err
+}
+
+func (m *MockFileIndex) WipeFile(file string) error {
+	return m.duck.WipeFile(file)
+}
+
+func (m *MockFileIndex) WipeSegments(file string) error {
+	_, err := m.duck.WipeSegments(file)
+	return err
+}
+
+func (m *MockFileIndex) WipeSegmentsForFiles(file string, segment common.Location) error {
+	_, err := m.duck.WipeSegment(file, segment)
+	return err
 }
 
 func (m *MockFileIndex) PutSegment(file string, terms [][]byte, messages []common.Message) (int, error) {
-	return m.DuckDB.PutSegment(file, messages)
+	return m.duck.PutSegment(file, messages)
 }
 
 func TestIngestionDryRun(t *testing.T) {

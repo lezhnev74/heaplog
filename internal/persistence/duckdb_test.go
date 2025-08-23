@@ -1,7 +1,6 @@
 package persistence
 
 import (
-	"cmp"
 	"context"
 	"slices"
 	"testing"
@@ -354,7 +353,7 @@ func TestGetMessages(t *testing.T) {
 				}
 				slices.SortFunc(
 					expectedMessages, func(a, b common.FileMessage) int {
-						return cmp.Compare(a.Date.UnixMicro(), b.Date.UnixMicro())
+						return a.Date.Compare(b.Date)
 					},
 				)
 				if tt.expectedMessages != nil {

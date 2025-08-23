@@ -142,6 +142,12 @@ func (i *Ingestor) Run() error {
 	// it is considered to be incomplete and needs to be re-indexed.
 	for file := range filesWithIncompleteTrailingSegments(i.segmentLen, indexedSegments, files) {
 		i.logger.Debug("re-index trailing segment", zap.String("file", file))
+		// here it wipes trailing index data, which can briefly affect searches that are currently running.
+		// past searches won't be affected as they keep found messages in a separate results storage.
+		err = i.db.WipeSegment(file, indexedSegments[file][len(indexedSegments[file])-1])
+		if err != nil {
+			return fmt.Errorf("wipe trailing segment for %s: %w", file, err)
+		}
 		indexedSegments[file] = indexedSegments[file][:len(indexedSegments[file])-1]
 	}
 

@@ -391,9 +391,10 @@ func (duck *DuckDB) PutSegment(file string, messages []common.Message) (segmentI
 	for _, msg := range messages {
 		err = duck.messagesAppender.AppendRow(
 			segmentId,
-			msg.Loc.From-messages[0].Loc.From,
-			msg.DateLoc.From,
-			msg.DateLoc.To,
+			msg.Loc.From-messages[0].Loc.From, // relative to segment's pos
+			msg.Loc.To-messages[0].Loc.From,   // relative to segment's pos
+			msg.DateLoc.From-msg.Loc.From,     // relative to message's pos
+			msg.DateLoc.To-msg.Loc.From,       // relative to message's pos
 			msg.Date.UnixMicro(),
 		)
 		if err != nil {
@@ -522,14 +523,16 @@ func (duck *DuckDB) GetMessages(segments []int, minDate, maxDate *time.Time) (it
 	    segments.pos_to,
 	    
 	    messages.rel_from,
+	    messages.rel_to,
 	    messages.rel_date_from,
 	    messages.rel_date_to,
 	    messages.date
+	
 	FROM messages
 	JOIN segments on segments.id=messages.segment_id 
 	JOIN files on files.id=segments.file_id 
 	WHERE messages.date >= ? AND messages.date <= ? AND %s
-	ORDER BY messages.rel_from
+	ORDER BY messages.date
 	`
 	if len(segments) > 0 {
 		q = fmt.Sprintf(q, "segments.id IN ("+strings.Repeat("?,", len(segments)-1)+"?)")
@@ -551,8 +554,7 @@ func (duck *DuckDB) GetMessages(segments []int, minDate, maxDate *time.Time) (it
 		defer rows.Close()
 
 		var (
-			prevMessage                                                 *common.FileMessage
-			prevSegmentId, segmentId, segmentFrom, segmentTo, dateMicro int
+			segmentId, segmentFrom, segmentTo, dateMicro int
 		)
 		for rows.Next() {
 			cur := common.FileMessage{}
@@ -564,6 +566,7 @@ func (duck *DuckDB) GetMessages(segments []int, minDate, maxDate *time.Time) (it
 				&segmentTo,
 
 				&cur.Loc.From,
+				&cur.Loc.To,
 				&cur.DateLoc.From,
 				&cur.DateLoc.To,
 				&dateMicro,
@@ -574,38 +577,13 @@ func (duck *DuckDB) GetMessages(segments []int, minDate, maxDate *time.Time) (it
 
 			cur.Date = time.UnixMicro(int64(dateMicro)).UTC()
 			cur.Loc.From += segmentFrom
-			cur.Loc.To = segmentTo
+			cur.Loc.To += segmentFrom
+			cur.DateLoc.From += cur.Loc.From
+			cur.DateLoc.To += cur.Loc.From
 
-			if err != nil {
-				panic(err)
+			if !yield(cur) {
+				return
 			}
-			if prevMessage == nil {
-				// first message, continue to the next for position calculation
-				prevMessage = &cur
-				prevSegmentId = segmentId
-				continue
-			}
-
-			if prevSegmentId != segmentId {
-				// segments boundary reached
-				if !yield(*prevMessage) {
-					break
-				}
-				prevSegmentId = segmentId
-				prevMessage = &cur
-				continue
-			}
-
-			prevMessage.Loc.To = cur.Loc.From
-			if !yield(*prevMessage) {
-				break
-			}
-			prevMessage = &cur
-		}
-
-		if prevMessage != nil {
-			// one message is remaining
-			yield(*prevMessage)
 		}
 	}, nil
 }
