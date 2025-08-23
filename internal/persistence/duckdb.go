@@ -168,8 +168,8 @@ func (duck *DuckDB) PutResultsAsync(query common.UserQuery, results iter.Seq[com
 					break
 				}
 				_, err = duck.db.Exec(
-					"UPDATE queries SET messages = ?, finished = ? WHERE queryId = ?",
-					messages, true, queryId,
+					"UPDATE queries SET messages = ? WHERE queryId = ?",
+					messages, queryId,
 				)
 			default:
 			}

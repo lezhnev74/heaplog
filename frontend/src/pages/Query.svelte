@@ -15,7 +15,7 @@
     } = $props()
 
     let page = $state(1)
-    let perPage = $state(5)
+    let perPage = $state(localStorage.getItem('perPage') ? parseInt(localStorage.getItem('perPage')) : 100)
     let pages = $derived(Math.floor(messages / perPage))
     let pageMessages = $state([])
     let truncatedMessages = $state([])
@@ -42,8 +42,11 @@
         pageMessages = []
         untrack(() => pageMessages)
         loadMessages()
-    }, () => [id, page])
+    }, () => [id, page, perPage])
 
+    $effect(() => {
+        localStorage.setItem('perPage', perPage.toString())
+    })
 
     // Load messages loads the remaining messages from the server to fill up the current page.
     async function loadMessages(delay = 1000) {
@@ -52,7 +55,7 @@
             currentController.abort();
         }
         currentController = new AbortController();
-        
+
         try {
             const skip = (page - 1) * perPage + pageMessages.length
             const limit = perPage - pageMessages.length
@@ -63,9 +66,11 @@
             messages = data.query.messages
 
             if (!pageComplete || !finished) {
-                let p = new Promise(resolve => setTimeout(resolve, delay * 1.1))
+                console.log('before', new Date().toLocaleString())
+                let p = new Promise(resolve => setTimeout(resolve, delay))
                 await p
-                p.then(() => loadMessages(delay))
+                console.log('after', new Date().toLocaleString())
+                p.then(() => loadMessages(delay * 1.2))
             }
         } catch (error) {
             console.error('Failed to fetch messages:', error)
@@ -87,9 +92,7 @@
 <style>
     .truncate {
         overflow: hidden;
-        display: -webkit-box;
-        -webkit-line-clamp: 1;
-        -webkit-box-orient: vertical;
+        height:1.8em;
     }
 </style>
 
@@ -100,12 +103,13 @@
 <div class="w-full px-4">
 
     <Pagination bind:page
+                bind:perPage
                 {pages}>
         <div class="py-2 flex items-center gap-2">
             {#if messages}
                 {messages} messages
             {/if}
-            {#if !pageComplete}
+            {#if !finished}
                 <Loader2 class="animate-spin"/>
             {/if}
         </div>
@@ -117,9 +121,10 @@
             <div class="message"
                  id="msg_{i}">
                 <div class="flex flex-row">
-                    <div class="min-w-4 text-gray-400 w-4 cursor-pointer" title="Expand">
+                    <div class="min-w-4 text-gray-400 w-4"
+                         title="Expand">
                         <div
-                                class="hide_icon"
+                                class="hide_icon cursor-pointer"
                                 class:hidden={!truncatedMessages.includes(i)}
                                 onclick={(e) => {
                                    document.querySelector(`#msg_${i} .message_content`).classList.remove('truncate');
@@ -129,7 +134,7 @@
                             <ArrowDownFromLine class="w-3"/>
                         </div>
                     </div>
-                    <div class="message_content truncate py-1 w-full text-sm"
+                    <div class="message_content truncate p-1 w-full text-sm"
                          class:bg-gray-100={i % 2 === 1}>
                         <pre>{message}</pre>
                     </div>
