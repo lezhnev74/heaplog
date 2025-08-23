@@ -35,6 +35,14 @@ func (i Index) GetRelevantSegments(terms [][]byte) (map[string][]int, error) {
 	return segmentIds, nil
 }
 
+func (i Index) WipeFile(file string) error {
+	err := i.WipeSegments(file)
+	if err != nil {
+		return fmt.Errorf("db wipe segments: %w", err)
+	}
+	return i.DuckDB.WipeFile(file)
+}
+
 func (i Index) WipeSegments(file string) error {
 	ids, err := i.DuckDB.WipeSegments(file)
 	if err != nil {

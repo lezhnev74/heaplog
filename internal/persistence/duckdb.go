@@ -130,6 +130,9 @@ func (duck *DuckDB) PutResultsAsync(query common.UserQuery, results iter.Seq[com
 			minDate, maxDate int64 = math.MaxInt64, 0
 			err              error
 		)
+		flushTicker := time.NewTicker(3 * time.Second)
+		defer flushTicker.Stop()
+
 		for msg := range results {
 			messages++
 			dateMicro := msg.Date.UnixMicro()
@@ -156,13 +159,27 @@ func (duck *DuckDB) PutResultsAsync(query common.UserQuery, results iter.Seq[com
 				duck.logger.Error("could not append row to query_results", zap.Error(err))
 				break
 			}
+
+			select {
+			case <-flushTicker.C:
+				// intermediary stats update:
+				if err := duck.queryResults.Flush(); err != nil {
+					duck.logger.Error("could not flush query results", zap.Error(err))
+					break
+				}
+				_, err = duck.db.Exec(
+					"UPDATE queries SET messages = ?, finished = ? WHERE queryId = ?",
+					messages, true, queryId,
+				)
+			default:
+			}
 		}
 
+		// final update to the query stats:
 		err = duck.queryResults.Flush()
 		if err != nil {
 			return
 		}
-
 		_, err = duck.db.Exec(
 			"UPDATE queries SET messages = ?, finished = ? WHERE queryId = ?",
 			messages, true, queryId,

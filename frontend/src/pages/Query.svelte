@@ -46,28 +46,26 @@
 
 
     // Load messages loads the remaining messages from the server to fill up the current page.
-    async function loadMessages() {
+    async function loadMessages(delay = 1000) {
         // cancel previous fetch
         if (currentController) {
             currentController.abort();
         }
         currentController = new AbortController();
-
+        
         try {
             const skip = (page - 1) * perPage + pageMessages.length
             const limit = perPage - pageMessages.length
-            if (limit <= 0) return;
-            console.log('loadMessages', skip, limit)
             const response = await fetch(`/api/query/` + id + `?skip=${skip}&limit=${limit}`)
             const data = await response.json()
             pageMessages = [...pageMessages, ...data.messages]
             finished = data.query.finished
             messages = data.query.messages
 
-            if (!pageComplete) {
-                let p = new Promise(resolve => setTimeout(resolve, 1_000))
+            if (!pageComplete || !finished) {
+                let p = new Promise(resolve => setTimeout(resolve, delay * 1.1))
                 await p
-                p.then(() => loadMessages())
+                p.then(() => loadMessages(delay))
             }
         } catch (error) {
             console.error('Failed to fetch messages:', error)
@@ -85,6 +83,15 @@
     }
 
 </script>
+
+<style>
+    .truncate {
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 1;
+        -webkit-box-orient: vertical;
+    }
+</style>
 
 <SearchForm {query}
             {fromDate}
@@ -110,7 +117,7 @@
             <div class="message"
                  id="msg_{i}">
                 <div class="flex flex-row">
-                    <div class="min-w-4 py-1 text-gray-400 w-4 cursor-pointer">
+                    <div class="min-w-4 text-gray-400 w-4 cursor-pointer" title="Expand">
                         <div
                                 class="hide_icon"
                                 class:hidden={!truncatedMessages.includes(i)}
@@ -119,12 +126,12 @@
                                    e.currentTarget.closest('.hide_icon').classList.add('hidden');
                                 }}
                         >
-                            <ArrowDownFromLine class="w-4 cursor-pointer"/>
+                            <ArrowDownFromLine class="w-3"/>
                         </div>
                     </div>
-                    <div class="message_content truncate py-1"
+                    <div class="message_content truncate py-1 w-full text-sm"
                          class:bg-gray-100={i % 2 === 1}>
-                        {message}
+                        <pre>{message}</pre>
                     </div>
                 </div>
             </div>
