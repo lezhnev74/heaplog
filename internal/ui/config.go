@@ -124,6 +124,7 @@ func LoadConfig() (cfg Config, err error) {
 		)
 		if err != nil {
 			err = fmt.Errorf("unable to decode into config struct: %w", err)
+			return
 		}
 	} else {
 		// Check config read errors

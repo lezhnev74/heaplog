@@ -173,7 +173,6 @@ trace: 80847f4b-c06e-4f2b-9b77-80c6428d925b
 }
 
 func TestUgScannerHuge(t *testing.T) {
-	type ScannedMessage = common.MessageLayout
 	sourceStream := []byte(`
 [2024-07-30T00:00:04.769958+00:00] production.DEBUG: Shuffle jobs on the queue
 

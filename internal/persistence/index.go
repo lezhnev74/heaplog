@@ -78,7 +78,7 @@ func (i Index) PutSegment(file string, terms [][]byte, messages []common.Message
 
 	err = i.ii.Put(terms, uint32(segmentId))
 	if err != nil {
-		i.DuckDB.WipeSegment(file, messages[0].Loc)
+		_, _ = i.DuckDB.WipeSegment(file, messages[0].Loc)
 		return segmentId, fmt.Errorf("inverted index put terms: %w", err)
 	}
 

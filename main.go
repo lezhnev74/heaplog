@@ -20,7 +20,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer logger.Sync()
+	defer func() {
+		_ = logger.Sync()
+	}()
 
 	ctx := common.WaitSignal()
 	console := ui.NewConsole(ctx, logger, frontendPublic)

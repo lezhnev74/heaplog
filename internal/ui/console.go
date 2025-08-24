@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
-	"os"
-	"runtime/pprof"
 	"time"
 
 	"github.com/urfave/cli/v3"
@@ -148,7 +146,7 @@ func NewConsole(c context.Context, logger *zap.Logger, frontendPublic fs.FS) *cl
 					httpApp := NewHttpApp(c, http.FS(frontendPublic), heaplog)
 					go func() {
 						<-ctx.Done()
-						httpApp.ShutdownWithTimeout(3 * time.Second)
+						_ = httpApp.ShutdownWithTimeout(3 * time.Second)
 					}()
 					return httpApp.Listen(":3000")
 				},
@@ -159,26 +157,11 @@ func NewConsole(c context.Context, logger *zap.Logger, frontendPublic fs.FS) *cl
 				Description: "Search via the console",
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 					if cmd.Bool("Profile") {
-						cpuProfile, err := os.Create("heaplog.cpu.pprof")
+						cleanup, err := common.Profile()
 						if err != nil {
-							return fmt.Errorf("could not create CPU profile: %v", err)
+							return err
 						}
-						defer cpuProfile.Close()
-						if err := pprof.StartCPUProfile(cpuProfile); err != nil {
-							return fmt.Errorf("could not start CPU profile: %v", err)
-						}
-						defer pprof.StopCPUProfile()
-
-						memProfile, err := os.Create("heaplog.mem.pprof")
-						if err != nil {
-							return fmt.Errorf("could not create memory profile: %v", err)
-						}
-						defer memProfile.Close()
-						defer func() {
-							if err := pprof.WriteHeapProfile(memProfile); err != nil {
-								logger.Error("could not write memory profile", zap.Error(err))
-							}
-						}()
+						defer cleanup()
 					}
 
 					cfg, err := LoadConfig()

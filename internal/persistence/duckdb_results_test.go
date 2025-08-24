@@ -48,7 +48,7 @@ func TestConcurrentPutResults(t *testing.T) {
 	// Start concurrent puts
 	for i := 0; i < numConcurrent; i++ {
 		result, done, err := db.PutResultsAsync(
-			common.UserQuery{"test query " + string(rune('A'+i)), nil, nil},
+			common.UserQuery{Query: "test query " + string(rune('A'+i)), FromDate: nil, ToDate: nil},
 			slices.Values(messages),
 		)
 		require.NoError(t, err)
@@ -104,7 +104,7 @@ func TestResults(t *testing.T) {
 
 	// Put results
 	result, done, err := db.PutResultsAsync(
-		common.UserQuery{"test query", nil, nil},
+		common.UserQuery{Query: "test query", FromDate: nil, ToDate: nil},
 		slices.Values(messages),
 	)
 	require.NoError(t, err)

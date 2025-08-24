@@ -43,6 +43,7 @@ func NewDuckDB(ctx context.Context, filePath string, logger *zap.Logger) (duck *
 	con, err := c.Connect(context.Background())
 	if err != nil {
 		err = fmt.Errorf("could not connect: %w", err)
+		return
 	}
 	duck.db = sql.OpenDB(c)
 
@@ -50,6 +51,7 @@ func NewDuckDB(ctx context.Context, filePath string, logger *zap.Logger) (duck *
 	err = duck.Migrate()
 	if err != nil {
 		err = fmt.Errorf("could not migrate: %w", err)
+		return
 	}
 
 	queryResultsAppender, err := duckdb.NewAppenderFromConn(con, "", "query_results")
@@ -87,7 +89,9 @@ func (duck *DuckDB) PutResultsAsync(query common.UserQuery, results iter.Seq[com
 	if err != nil {
 		return
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	err = duck.db.QueryRow(`SELECT nextval('query_ids')`).Scan(&queryId)
 	if err != nil {
@@ -126,7 +130,7 @@ func (duck *DuckDB) PutResultsAsync(query common.UserQuery, results iter.Seq[com
 	go func() {
 		defer close(done)
 		var (
-			messages         int
+			messages, fileId int
 			minDate, maxDate int64 = math.MaxInt64, 0
 			err              error
 		)
@@ -143,7 +147,7 @@ func (duck *DuckDB) PutResultsAsync(query common.UserQuery, results iter.Seq[com
 				maxDate = dateMicro
 			}
 
-			fileId, err := duck.getFileIdByPath(msg.File)
+			fileId, err = duck.getFileIdByPath(msg.File)
 			if err != nil {
 				break
 			}
@@ -163,14 +167,18 @@ func (duck *DuckDB) PutResultsAsync(query common.UserQuery, results iter.Seq[com
 			select {
 			case <-flushTicker.C:
 				// intermediary stats update:
-				if err := duck.queryResults.Flush(); err != nil {
+				if err = duck.queryResults.Flush(); err != nil {
 					duck.logger.Error("could not flush query results", zap.Error(err))
-					break
+					return
 				}
 				_, err = duck.db.Exec(
 					"UPDATE queries SET messages = ? WHERE queryId = ?",
 					messages, queryId,
 				)
+				if err != nil {
+					return
+				}
+
 			default:
 			}
 		}
@@ -184,6 +192,9 @@ func (duck *DuckDB) PutResultsAsync(query common.UserQuery, results iter.Seq[com
 			"UPDATE queries SET messages = ?, finished = ? WHERE queryId = ?",
 			messages, true, queryId,
 		)
+		if err != nil {
+			return
+		}
 	}()
 
 	return
@@ -276,7 +287,9 @@ func (duck *DuckDB) WipeResults(resultId int) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	_, err = tx.Exec("DELETE FROM queries WHERE queryId = ?", resultId)
 	if err != nil {
@@ -297,7 +310,9 @@ func (duck *DuckDB) getFileIdByPath(path string) (id int, err error) {
 	if err != nil {
 		return
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	err = duck.db.QueryRow("SELECT id FROM files WHERE path = ?", path).Scan(&id)
 	if err != nil && errors.Is(err, sql.ErrNoRows) {
@@ -367,7 +382,9 @@ func (duck *DuckDB) PutSegment(file string, messages []common.Message) (segmentI
 	if err != nil {
 		return
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	fileId, err := duck.getFileIdByPath(file)
 	if err != nil {
@@ -434,7 +451,9 @@ func (duck *DuckDB) WipeSegment(file string, segment common.Location) (segmentId
 	if err != nil {
 		return
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	fileId, err := duck.getFileIdByPath(file)
 	if err != nil {
@@ -463,7 +482,9 @@ func (duck *DuckDB) WipeSegments(file string) (segmentIds []int, err error) {
 	if err != nil {
 		return
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	fileId, err := duck.getFileIdByPath(file)
 	if err != nil {
@@ -507,7 +528,9 @@ func (duck *DuckDB) WipeFile(file string) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	_, err = duck.WipeSegments(file)
 	if err != nil {

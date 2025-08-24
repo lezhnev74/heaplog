@@ -12,6 +12,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
 	"github.com/gofiber/template/html/v2"
+	jsoniter "github.com/json-iterator/go"
 	"go.uber.org/zap"
 
 	"heaplog_2024/internal/common"
@@ -25,18 +26,24 @@ type SveltePagePayload struct {
 }
 
 func NewHttpApp(ctx context.Context, frontendPublic http.FileSystem, heaplog Heaplog) *fiber.App {
+	jsonIter := jsoniter.ConfigFastest
+
 	engine := html.NewFileSystem(frontendPublic, ".html")
 	app := fiber.New(
 		fiber.Config{
 			DisableStartupMessage: true,
 			Views:                 engine,
+			WriteBufferSize:       1024 * 100,
+			StreamRequestBody:     true,
+			JSONEncoder:           jsonIter.Marshal,
+			JSONDecoder:           jsonIter.Unmarshal,
 		},
 	)
 
 	c := cors.ConfigDefault
 	c.ExposeHeaders = "*"
 	app.Use(cors.New(c))
-	app.Use(compress.New(compress.Config{Level: compress.LevelBestCompression}))
+	app.Use(compress.New(compress.Config{Level: compress.LevelBestSpeed}))
 	app.Use(
 		"/assets", filesystem.New(
 			filesystem.Config{
@@ -157,6 +164,12 @@ func NewHttpApp(ctx context.Context, frontendPublic http.FileSystem, heaplog Hea
 
 	app.Get(
 		"/api/query/:id", func(c *fiber.Ctx) error {
+			//cleanup, err := common.Profile()
+			//if err != nil {
+			//	return err
+			//}
+			//defer cleanup()
+
 			id, err := c.ParamsInt("id")
 			if err != nil {
 				heaplog.Logger.Error("failed to parse query id", zap.Error(err))
@@ -208,7 +221,7 @@ func NewHttpApp(ctx context.Context, frontendPublic http.FileSystem, heaplog Hea
 			return c.JSON(
 				fiber.Map{
 					"query":    query,
-					"messages": append([]string{}, slices.Collect(bodies)...),
+					"messages": slices.Collect(bodies),
 				},
 			)
 		},

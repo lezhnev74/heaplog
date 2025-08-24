@@ -30,7 +30,8 @@ func NewBufferPool(sizes []int) *BufferPool {
 	for _, sz := range sizes {
 		pools[sz] = &sync.Pool{
 			New: func() any {
-				return make([]byte, sz)
+				buf := make([]byte, sz)
+				return &buf
 			},
 		}
 	}
@@ -42,7 +43,8 @@ func NewBufferPool(sizes []int) *BufferPool {
 func (bp *BufferPool) Get(minSize int) Buffer {
 	for _, sz := range bp.sizes {
 		if sz >= minSize {
-			return Buffer{Buf: bp.pools[sz].Get().([]byte)[:minSize], pool: bp}
+			bufPtr := bp.pools[sz].Get().(*[]byte)
+			return Buffer{Buf: (*bufPtr)[:minSize], pool: bp}
 		}
 	}
 	// fallback: exact size
@@ -54,7 +56,9 @@ func (bp *BufferPool) Get(minSize int) Buffer {
 func (bp *BufferPool) Put(buf []byte) {
 	for _, sz := range bp.sizes {
 		if sz == cap(buf) {
-			bp.pools[sz].Put(buf[:cap(buf)])
+			// return full-capacity slice pointer
+			b := buf[:cap(buf)]
+			bp.pools[sz].Put(&b)
 			return
 		}
 	}

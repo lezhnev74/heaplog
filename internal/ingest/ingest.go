@@ -155,7 +155,7 @@ func (i *Ingestor) Run() error {
 	plan := make(map[string][][]common.MessageLayout)
 	for file := range layouts {
 		filesize := layouts[file][len(layouts[file])-1].Loc.To
-		loc := common.Location{0, filesize}
+		loc := common.Location{From: 0, To: filesize}
 		unindexedLocations := loc.RemoveAll(indexedSegments[file])
 		segments := alignSegmentsByMessageBoundaries(i.segmentLen, unindexedLocations, layouts[file])
 		plan[file] = segments
@@ -175,7 +175,7 @@ func (i *Ingestor) Run() error {
 				r.task.layouts[len(r.task.layouts)-1].Loc.To,
 				len(r.messages),
 				len(r.tokens),
-				time.Now().Sub(r.task.at).String(),
+				time.Since(r.task.at).String(),
 			),
 		)
 	}

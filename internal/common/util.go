@@ -7,6 +7,7 @@ import (
 	"iter"
 	"os"
 	"os/signal"
+	"runtime/pprof"
 	"syscall"
 	"time"
 
@@ -157,4 +158,38 @@ func Empty[T any]() iter.Seq[T] {
 
 func Empty2[K, V any]() iter.Seq2[K, V] {
 	return func(yield func(K, V) bool) {}
+}
+
+func Profile() (stopFn func(), err error) {
+	cpuProfile, err := os.Create("heaplog.cpu.pprof")
+	if err != nil {
+		return nil, fmt.Errorf("could not create CPU profile: %w", err)
+	}
+
+	if err := pprof.StartCPUProfile(cpuProfile); err != nil {
+		_ = cpuProfile.Close()
+		return nil, fmt.Errorf("could not start CPU profile: %w", err)
+	}
+
+	memProfile, err := os.Create("heaplog.mem.pprof")
+	if err != nil {
+		pprof.StopCPUProfile()
+		_ = cpuProfile.Close()
+		return nil, fmt.Errorf("could not create memory profile: %w", err)
+	}
+
+	stopFn = func() {
+		pprof.StopCPUProfile()
+		if werr := pprof.WriteHeapProfile(memProfile); werr != nil {
+			panic("could not write memory profile: " + werr.Error())
+		}
+		if cerr := cpuProfile.Close(); cerr != nil {
+			panic("could not close CPU profile: " + cerr.Error())
+		}
+		if merr := memProfile.Close(); merr != nil {
+			panic("could not close memory profile: " + merr.Error())
+		}
+	}
+
+	return stopFn, nil
 }

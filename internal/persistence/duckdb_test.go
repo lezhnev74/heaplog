@@ -101,6 +101,7 @@ func TestWipeSegment(t *testing.T) {
 			},
 		},
 	)
+	require.NoError(t, err)
 	_, err = db.PutSegment(
 		"path1", []common.Message{
 			{
@@ -123,7 +124,7 @@ func TestWipeSegment(t *testing.T) {
 	require.NoError(t, err)
 
 	expectedResult := map[string][]common.Location{
-		"path1": []common.Location{
+		"path1": {
 			{From: 0, To: 10},
 		},
 	}

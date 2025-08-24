@@ -37,7 +37,6 @@ func TestSetOps(t *testing.T) {
 func TestExprEval(t *testing.T) {
 	type test struct {
 		query            string
-		allSegments      []int
 		termSegments     map[string][]int
 		expectedSegments []int
 	}

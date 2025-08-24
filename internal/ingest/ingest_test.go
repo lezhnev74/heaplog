@@ -211,7 +211,7 @@ func TestReconcileMissing(t *testing.T) {
 	require.Equal(
 		t,
 		[]common.FileMessage{
-			common.FileMessage{
+			{
 				File: "unknown",
 				Message: common.Message{
 					MessageLayout: common.MessageLayout{Loc: common.Location{From: 0, To: 10}}, Date: common.MakeTimeV("2024-01-01T00:00:00.000000+00:00"),

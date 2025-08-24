@@ -64,7 +64,7 @@ func (s *Search) Search(expr *query_language.Expression, minDate, maxDate *time.
 			terms = append(terms, s.tokenize([]byte(t))...)
 		}
 		slices.SortFunc(terms, bytes.Compare)
-		slices.CompactFunc(terms, bytes.Equal)
+		terms = slices.CompactFunc(terms, bytes.Equal)
 
 		termSegments, err := s.index.GetRelevantSegments(s.ctx, terms)
 		if err != nil {

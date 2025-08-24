@@ -174,7 +174,7 @@ func (ix *Indexer) produceTasks(pendingSegments map[string][][]common.MessageLay
 						return
 					}
 
-					segmentLoc := common.Location{segment[0].Loc.From, segment[len(segment)-1].Loc.To}
+					segmentLoc := common.Location{From: segment[0].Loc.From, To: segment[len(segment)-1].Loc.To}
 					buf := ix.bufPool.Get(segmentLoc.Len())
 					buf.Buf = buf.Buf[:segmentLoc.Len()]
 					_, err = fd.ReadAt(buf.Buf, int64(segmentLoc.From))

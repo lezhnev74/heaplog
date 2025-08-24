@@ -90,6 +90,9 @@ func NewHeaplog(ctx context.Context, logger *zap.Logger, cfg Config) Heaplog {
 
 	dbFile := path.Join(cfg.StoragePath, "heaplog.db")
 	duck, err := persistence.NewDuckDB(ctx, dbFile, logger)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	iiPath := path.Join(cfg.StoragePath, "ii")
 	err = os.MkdirAll(iiPath, 0755)

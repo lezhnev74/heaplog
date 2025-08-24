@@ -34,7 +34,7 @@ func TestIndexer(t *testing.T) {
 		fileName,
 		len(fileBytes),
 		common.MessageStartPattern,
-		[]common.Location{{0, len(fileBytes)}},
+		[]common.Location{{From: 0, To: len(fileBytes)}},
 	)
 	require.NoError(t, err)
 	layouts := toMessageLayouts(slices.Collect(scannedLayouts))
@@ -131,7 +131,7 @@ func TestBlacklistedFileNotIndexed(t *testing.T) {
 		fileName,
 		len(fileBytes),
 		common.MessageStartPattern,
-		[]common.Location{{0, len(fileBytes)}},
+		[]common.Location{{To: len(fileBytes)}},
 	)
 	require.NoError(t, err)
 	layouts := toMessageLayouts(slices.Collect(scannedLayouts))
@@ -176,7 +176,7 @@ func TestIndexerContextCancellation(t *testing.T) {
 		fileName,
 		len(fileBytes),
 		common.MessageStartPattern,
-		[]common.Location{{0, len(fileBytes)}},
+		[]common.Location{{To: len(fileBytes)}},
 	)
 	require.NoError(t, err)
 	layouts := toMessageLayouts(slices.Collect(scannedLayouts))

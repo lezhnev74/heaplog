@@ -44,8 +44,8 @@ func TestReadMessages(t *testing.T) {
 				{
 					File: testFile1,
 					Message: common.Message{MessageLayout: common.MessageLayout{
-						Loc:     common.Location{0, 2},
-						DateLoc: common.Location{0, 1},
+						Loc:     common.Location{To: 2},
+						DateLoc: common.Location{To: 1},
 					}},
 				},
 			},
@@ -54,8 +54,8 @@ func TestReadMessages(t *testing.T) {
 					FileMessage: common.FileMessage{
 						File: testFile1,
 						Message: common.Message{MessageLayout: common.MessageLayout{
-							Loc:     common.Location{0, 2},
-							DateLoc: common.Location{0, 1},
+							Loc:     common.Location{To: 2},
+							DateLoc: common.Location{To: 1},
 						}},
 					},
 					Body: []byte("AB"),
@@ -68,22 +68,22 @@ func TestReadMessages(t *testing.T) {
 				{
 					File: testFile1,
 					Message: common.Message{MessageLayout: common.MessageLayout{
-						Loc:     common.Location{0, 2},
-						DateLoc: common.Location{0, 1},
+						Loc:     common.Location{To: 2},
+						DateLoc: common.Location{To: 1},
 					}},
 				},
 				{
 					File: testFile1,
 					Message: common.Message{MessageLayout: common.MessageLayout{
-						Loc:     common.Location{2, 3},
-						DateLoc: common.Location{2, 3},
+						Loc:     common.Location{From: 2, To: 3},
+						DateLoc: common.Location{From: 2, To: 3},
 					}},
 				},
 				{
 					File: testFile2,
 					Message: common.Message{MessageLayout: common.MessageLayout{
-						Loc:     common.Location{3, 4},
-						DateLoc: common.Location{3, 4},
+						Loc:     common.Location{From: 3, To: 4},
+						DateLoc: common.Location{From: 3, To: 4},
 					}},
 				},
 			},
@@ -92,8 +92,8 @@ func TestReadMessages(t *testing.T) {
 					FileMessage: common.FileMessage{
 						File: testFile1,
 						Message: common.Message{MessageLayout: common.MessageLayout{
-							Loc:     common.Location{0, 2},
-							DateLoc: common.Location{0, 1},
+							Loc:     common.Location{To: 2},
+							DateLoc: common.Location{To: 1},
 						}},
 					},
 					Body: []byte("AB"),
@@ -102,8 +102,8 @@ func TestReadMessages(t *testing.T) {
 					FileMessage: common.FileMessage{
 						File: testFile1,
 						Message: common.Message{MessageLayout: common.MessageLayout{
-							Loc:     common.Location{2, 3},
-							DateLoc: common.Location{2, 3},
+							Loc:     common.Location{From: 2, To: 3},
+							DateLoc: common.Location{From: 2, To: 3},
 						}},
 					},
 					Body: []byte("C"),
@@ -112,8 +112,8 @@ func TestReadMessages(t *testing.T) {
 					FileMessage: common.FileMessage{
 						File: testFile2,
 						Message: common.Message{MessageLayout: common.MessageLayout{
-							Loc:     common.Location{3, 4},
-							DateLoc: common.Location{3, 4},
+							Loc:     common.Location{From: 3, To: 4},
+							DateLoc: common.Location{From: 3, To: 4},
 						}},
 					},
 					Body: []byte("4"),
