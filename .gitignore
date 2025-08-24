@@ -1,0 +1,7 @@
+_local
+.idea
+dev
+vendor
+ug
+.env
+tmp

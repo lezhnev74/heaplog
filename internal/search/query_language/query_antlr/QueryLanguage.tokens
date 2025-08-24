@@ -1,0 +1,12 @@
+T__0=1
+T__1=2
+T__2=3
+OR=4
+AND=5
+RE_LITERAL_CS=6
+RE_LITERAL=7
+LITERAL=8
+WS=9
+'!'=1
+'('=2
+')'=3
