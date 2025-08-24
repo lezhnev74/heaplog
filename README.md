@@ -4,14 +4,21 @@
 
 [![Go](https://github.com/lezhnev74/heaplog/actions/workflows/go.yml/badge.svg)](https://github.com/lezhnev74/heaplog/actions/workflows/go.yml)
 
-Heaplog is a program that runs in the background, scans and indexes your log files, and allows to search it via Web UI.
-It aims to take small disk space and allow fast searches using its query language (see below).
+# What is Heaplog?
 
-It builds a small separate index (in its storage directory) from your files.
-It does not contain your log messages, only some meta information to help find where the messages are,
-using your logs as "heapfiles" (hence the name).
+Heaplog is a helper tool that makes searching through your app's log files easy. It works like this:
 
-**[📌 Watch a quickstart video on Youtube](http://www.youtube.com/watch?v=fxMeAP41btY)**
+1. It runs quietly in the background and keeps track of your log files
+2. It creates a small index (like a table of contents) to help find things quickly
+3. You can search through your logs using a simple web interface and powerful query language
+
+The cool part is that Heaplog is very efficient:
+
+- It only stores the index information, not copies of your actual logs
+- Searches are fast thanks to the index
+- It takes up very little disk space
+
+The name "Heaplog" comes from how it treats your log files as "heaps" of data that it can quickly search through.
 
 **Table of content:**
 
@@ -25,29 +32,29 @@ using your logs as "heapfiles" (hence the name).
 
 ## Features
 
-- Modest on disk space (uses [DuckDB](https://duckdb.org/) + [FST](https://blog.burntsushi.net/transducers/) for terms).
+- Modest on disk space (uses [DuckDB](https://duckdb.org/) + [FST](https://blog.burntsushi.net/transducers/) for terms)
 - [Inverted index](https://github.com/lezhnev74/inverted_index_2)
-- Powerful query language (prefix match, regular expressions, AND-, OR-, NOT-operators).
-- Supports append-only files (logs and such).
-- Supports multi-line log messages.
-- Runs as a background service: exposes Web UI, runs indexing workers.
-- Deploys as docker container
+- Powerful query language (prefix match, regular expressions, AND-, OR-, NOT-operators)
+- Works best with append-only files (logs and such)
+- Supports multi-line free-text log messages
+- Runs as a background service: exposes Web UI, runs indexing workers in the background
+- Deploys as a docker container
 
 ![](Heaplog_components.png)
 
 ## Query Language
 
-Query language supports prefix match, regular expressions, and AND-OR-NOT operators. Note that prefix match uses the
-index to speed up the query,
-while regular expression does full scan of all files. To have the best performance always add at least one prefix match
-term to the query to help it narrow down the search area.
+Query language supports prefix matching, regular expressions, and AND-OR-NOT operators. Note that prefix match uses the
+index to speed up the query, while regular expression does the full-scan of all files.
+To have the best performance, always add at least one prefix match term to the query to help it narrow down the search
+area.
 
-**What is prefix match?**
+**What is the Prefix Match?**
 Each message is split in terms, and the beginning of each term is indexed.
 Example:
 `Error at locahost.domain` will be split in `Error`, `at`, `locahost`, `domain`.
-We can find this message by the query line `local` but not `host`. In the latter case we should use regular expression `~host`
-which won't use the index, but does full-scan.
+Using the prefix match, it can find this message by the query line `local` but not `host`.
+In the latter case we should use regular expression `~host`.
 
 Samples:
 
@@ -60,6 +67,8 @@ Samples:
 | `(error failure) OR success`                                                  | Supports parenthesis to group literals.                                                                                                                 |
 | `!error`, `!(error OR failure)`                                               | Inversion of the expression.                                                                                                                            |
 | `~.*`, `~error`, `~(error \d+)`, `~"error \d+"`                               | `~` - **Regular Expression** operator. Everything after `~` is used as a regular expression. Matches against every messaged. It does not use the index. |
+| `~error`                                                                      | Case-insensitive regular expression                                                                                                                     
+| `@error`                                                                      | Case-sensitive regular expression                                                                                                                       
 | `report ~report\d+`                                                           | Combine prefix match with the RE to use the index and improve search performance.                                                                       |
 
 ## Installation
@@ -78,7 +87,7 @@ services:
       - /host/path/to/storage:/storage:rw
       - /host/path/to/heaplog.yml:/heaplog.yml:ro
     entrypoint: [ "/heaplog" ]
-    command: ["run"]
+    command: [ "run" ]
     ports:
       - 8393:8393
 ```
@@ -87,8 +96,8 @@ Now you can run `docker compose up heaplog` and access the UI at `http://localho
 
 ## Configuration
 
-Configuration can be provided as a Yaml file, as well as command arguments (where the latter overwrite the former).
-Configurable keys and values can be seen in [config.go](https://github.com/lezhnev74/heaplog/blob/main/ui/config.go).
+Configuration can be provided as Yaml file, as well as command arguments (where the latter override the former).
+Configurable keys and values can be seen in [config.go](https://github.com/lezhnev74/heaplog/blob/main/internal/ui/config.go).
 To populate a new empty file run `docker compose run heaplog gen > heaplog.yml`.
 
 Since there are many formats of log files, you have to provide two settings:
@@ -97,48 +106,30 @@ Since there are many formats of log files, you have to provide two settings:
 2. Go Date Format(config key `DateFormat`) to parse timestamps. See [Syntax docs](https://go.dev/src/time/format.go).
 
 **Example Config For PHP App Based On Laravel Framework**
+
 ```yaml
 # where to look for log files? example: "./*.log"
-filesglobpattern: /logs/*.log
+files_glob_pattern: /logs/*.log
 # where to store the index and other data (relative to cwd supported)
-storagepath: ./storage
+storage_path: ./storage
 # a regular expression to find the start of messages in a heap file,
 # it must contain the date pattern in the first matching group
 # example: "^\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\]"
-messagestartre: ^\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}[+-]\d{2}:\d{2})\]
+message_start_re: ^\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}[+-]\d{2}:\d{2})\]
 # the pattern of a date in a message
 # see https://go.dev/src/time/format.go
-dateformat: "2006-01-02T15:04:05.000000-07:00"
+date_format: "2006-01-02T15:04:05.000000-07:00"
 # sets the degree of concurrency in the service (affects ingestion and search),
 # defaults to the number of cores if omitted or <1.
 concurrency: 8
 # Terms are extracted from messages and indexed.
 # These control how fast ingestion goes (and space taken for the inverted index),
 # as well as how fast search goes (as shorter terms may duplicate in the index).
-mintermlen: 4
-maxtermlen: 8
+min_term_len: 4
+max_term_len: 8
 # Max memory the duckdb instance is allowed to allocate in Mb.
 # Increase if you see related errors on big data sets. (default: 500)
-duckdbmaxmemmb: 1000
-```
-
-### Automatic Format Detection Command
-
-This command `docker compose run --rm heaplog detect` will ask you to give it a sample log message. 
-It will try to detect the date format automatically.
-If it succeeds, you can copy the output config values and paste into your config.
-
-Sample output:
-```
-$ docker compose run --rm heaplog detect
-Enter a sample message line:
-[2023-12-31T00:00:03.448201+00:00] production.DEBUG: My message
- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
- Yay, the date detected above!
-
-Config values:
-MessageStartRE: "(?m)^\[(\d{4}\-\d{2}\-\d{2}\w\d{2}:\d{2}:\d{2}\.\d{6}[+-]\d{2}:\d{2})"
-DateFormat: "2006-01-02T15:04:05.000000-07:00"
+duckdb_max_mem_mb: 1000
 ```
 
 ### Use ChatGPT To Detect Format
@@ -152,23 +143,6 @@ Write the regular expression for the date.
 Write Go time layout for that date that can be used in time.Parse function.
 
 [2023-12-31T00:00:03.448201+00:00] production.DEBUG: My message
-```
-
-The answers can vary, for example the regular expression should be in multi-line mode, so we can detect many messages.
-To do that make sure it is prefixed with `(?m)`.
-
-### Provide Format Manually
-
-The program needs a regular expression that detects the beginning of each message (
-see [re docs](https://pkg.go.dev/regexp/syntax)) and a date format.
-In the first matching group it must contain the full date of the message.
-Below is the regular expression that can recognize messages and dates of this format:
-
-```
-[2023-12-31T00:00:03.448201+00:00] production.DEBUG: My message
-
-MessageStartRE: "^\[([^\]]+)"
-DateFormat: "2006-01-02T15:04:05.000000-07:00"
 ```
 
 ### Test Your Config

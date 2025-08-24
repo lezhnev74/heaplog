@@ -52,7 +52,6 @@ func NewConsole(c context.Context, logger *zap.Logger, frontendPublic fs.FS) *cl
 		if err != nil {
 			return cfg, err
 		}
-		logger.Debug("Loaded config", zap.Any("config", cfg))
 		cfg = overrideConfig(cfg, cmd)
 		return cfg, cfg.Validate()
 	}
@@ -241,7 +240,7 @@ func NewConsole(c context.Context, logger *zap.Logger, frontendPublic fs.FS) *cl
 					if err != nil {
 						return err
 					}
-					logger.Info(fmt.Sprintf("Great! Found a message in %s\n", file))
+					fmt.Printf("Great! Found a message in %s\n", file)
 					return nil
 				},
 			},
