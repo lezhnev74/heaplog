@@ -65,6 +65,36 @@ func TestIngestionDryRun(t *testing.T) {
 	require.NotEmpty(t, segments[fileName])
 }
 
+func TestIngestionSegmentSizeChange(t *testing.T) {
+	fileName, contents := common.MakeTestFile(t)
+	ingestor, duck := makeTestIngestor(t, []string{fileName})
+	ingestor.segmentLen = 100_000_000
+
+	// Put misaligned segment
+	_, err := duck.PutSegment(
+		fileName, []common.Message{
+			{MessageLayout: common.MessageLayout{Loc: common.Location{From: 0, To: len(contents) / 2}}, Date: common.MakeTimeV("2024-01-01T00:00:00.000000+00:00")},
+			{MessageLayout: common.MessageLayout{Loc: common.Location{From: len(contents) / 2, To: len(contents)}}, Date: common.MakeTimeV("2024-01-02T00:00:00.000000+00:00")},
+		},
+	)
+	require.NoError(t, err)
+	require.NoError(t, ingestor.Run())
+
+	// make sure it did not wiped the indexed segment
+	segments, err := duck.GetSegments()
+	require.NoError(t, err)
+	require.NotEmpty(t, segments[fileName])
+
+	// new segment size
+	ingestor.segmentLen = 1
+	require.NoError(t, ingestor.Run())
+
+	// make sure it did not wiped the indexed segment
+	segments, err = duck.GetSegments()
+	require.NoError(t, err)
+	require.NotEmpty(t, segments[fileName])
+}
+
 func TestIngesting(t *testing.T) {
 	fileName, _ := common.MakeTestFile(t)
 	ingestor, duck := makeTestIngestor(t, []string{fileName})
