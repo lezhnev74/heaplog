@@ -17,9 +17,9 @@ import (
 
 type ReadableIndex interface {
 	// GetRelevantSegments uses Inverted Index to get potential segments
-	GetRelevantSegments(terms [][]byte) (map[string][]int, error)
+	GetRelevantSegments(ctx context.Context, terms [][]byte) (map[string][]int, error)
 	// GetMessages streams all messages within given segments
-	GetMessages(segments []int, minDate, maxDate *time.Time) (iter.Seq[common.FileMessage], error)
+	GetMessages(ctx context.Context, segments []int, minDate, maxDate *time.Time) (iter.Seq[common.FileMessage], error)
 }
 
 type Search struct {
@@ -66,7 +66,7 @@ func (s *Search) Search(expr *query_language.Expression, minDate, maxDate *time.
 		slices.SortFunc(terms, bytes.Compare)
 		slices.CompactFunc(terms, bytes.Equal)
 
-		termSegments, err := s.index.GetRelevantSegments(terms)
+		termSegments, err := s.index.GetRelevantSegments(s.ctx, terms)
 		if err != nil {
 			return nil, fmt.Errorf("get segments by terms: %w", err)
 		}
@@ -85,19 +85,42 @@ func (s *Search) Search(expr *query_language.Expression, minDate, maxDate *time.
 		s.logger.Debug("Selected segments\n", zap.Int("len", len(segments)), zap.String("query", expr.String()))
 	}
 
-	fileMessages, err := s.index.GetMessages(segments, minDate, maxDate)
+	fileMessages, err := s.index.GetMessages(s.ctx, segments, minDate, maxDate)
 	if err != nil {
 		return nil, fmt.Errorf("get messages: %w", err)
 	}
 
-	return func(yield func(body common.FileMessageBody) bool) {
-		for mfb := range common.ReadMessages(s.ctx, fileMessages) {
-			if !matcher(mfb) {
-				continue
+	// for the optimization purposes, matching is done in a pool of goroutines as it is quite CPU intensive (tokenize, match)
+	needsMatching := make(chan common.FileMessageBody, 100)
+	// run a pool of workers
+	matchedMessages := NewMatchPool(s.ctx, matcher, needsMatching, 4)
+	go func() {
+		// close the pool (when exhausted)
+		defer close(needsMatching)
+		// provide tasks for the pool
+		for m, err := range common.ReadMessages(s.ctx, fileMessages) {
+			if err != nil {
+				break
 			}
-			if !yield(mfb) {
+			needsMatching <- m
+		}
+	}()
+	return func(yield func(body common.FileMessageBody) bool) {
+		for matched := range matchedMessages {
+			if !yield(matched) {
 				break
 			}
 		}
 	}, nil
+
+	//return func(yield func(body common.FileMessageBody) bool) {
+	//	for mfb := range common.ReadMessages(s.ctx, fileMessages) {
+	//		if !matcher(mfb) {
+	//			continue
+	//		}
+	//		if !yield(mfb) {
+	//			break
+	//		}
+	//	}
+	//}, nil
 }

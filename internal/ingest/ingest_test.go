@@ -71,7 +71,7 @@ func TestIngesting(t *testing.T) {
 	require.NoError(t, ingestor.Run())
 
 	// Analyze the state
-	messagesSeq, err := duck.GetMessages(nil, nil, nil)
+	messagesSeq, err := duck.GetMessages(context.Background(), nil, nil, nil)
 	require.NoError(t, err)
 	messages := slices.Collect(messagesSeq)
 	require.Equal(t, len(common.LayoutsSampleLog1), len(messages))
@@ -175,7 +175,7 @@ func TestReconcileMissing(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
-	messagesSeq1, err := duck.GetMessages(nil, nil, nil)
+	messagesSeq1, err := duck.GetMessages(context.Background(), nil, nil, nil)
 	require.NoError(t, err)
 	messages1 := slices.Collect(messagesSeq1)
 	require.Equal(
@@ -195,7 +195,7 @@ func TestReconcileMissing(t *testing.T) {
 	require.NoError(t, ingestor.Run())
 
 	// Analyze the state
-	messagesSeq, err := duck.GetMessages(nil, nil, nil)
+	messagesSeq, err := duck.GetMessages(context.Background(), nil, nil, nil)
 	require.NoError(t, err)
 	messages := slices.Collect(messagesSeq)
 	require.Equal(t, len(common.LayoutsSampleLog1), len(messages))

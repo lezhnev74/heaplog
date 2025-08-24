@@ -1,6 +1,7 @@
 package persistence
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/lezhnev74/inverted_index_2"
@@ -21,7 +22,7 @@ func NewPersistentIndex(duck *DuckDB, ii *inverted_index_2.InvertedIndex) (*Inde
 	}, nil
 }
 
-func (i Index) GetRelevantSegments(terms [][]byte) (map[string][]int, error) {
+func (i Index) GetRelevantSegments(ctx context.Context, terms [][]byte) (map[string][]int, error) {
 	r, err := i.ii.PrefixSearch(terms)
 	if err != nil {
 		return nil, fmt.Errorf("inverted index lookup: %w", err)

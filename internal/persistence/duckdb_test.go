@@ -339,7 +339,7 @@ func TestGetMessages(t *testing.T) {
 					}
 				}
 
-				messagesSeq, err := db.GetMessages(segmentIds, tt.minDate, tt.maxDate)
+				messagesSeq, err := db.GetMessages(context.Background(), segmentIds, tt.minDate, tt.maxDate)
 				require.NoError(t, err)
 				messages := slices.Collect(messagesSeq)
 

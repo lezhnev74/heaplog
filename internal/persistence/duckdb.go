@@ -521,7 +521,11 @@ func (duck *DuckDB) WipeFile(file string) error {
 }
 
 // Main gateway for getting messages from the database.
-func (duck *DuckDB) GetMessages(segments []int, minDate, maxDate *time.Time) (iter.Seq[common.FileMessage], error) {
+func (duck *DuckDB) GetMessages(
+	ctx context.Context,
+	segments []int,
+	minDate, maxDate *time.Time,
+) (iter.Seq[common.FileMessage], error) {
 
 	minMicro, maxMicro := int64(0), int64(math.MaxInt64)
 	if minDate != nil {
@@ -574,6 +578,13 @@ func (duck *DuckDB) GetMessages(segments []int, minDate, maxDate *time.Time) (it
 			segmentId, segmentFrom, segmentTo, dateMicro int
 		)
 		for rows.Next() {
+
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
 			cur := common.FileMessage{}
 			err = rows.Scan(
 				&cur.File,

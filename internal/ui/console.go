@@ -142,7 +142,7 @@ func NewConsole(c context.Context, logger *zap.Logger, frontendPublic fs.FS) *cl
 					httpApp := NewHttpApp(c, http.FS(frontendPublic), heaplog)
 					go func() {
 						<-ctx.Done()
-						httpApp.Shutdown()
+						httpApp.ShutdownWithTimeout(3 * time.Second)
 					}()
 					return httpApp.Listen(":3000")
 				},

@@ -9,6 +9,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"golang.org/x/exp/mmap"
 )
 
 var (
@@ -38,9 +40,14 @@ func RepeatEvery(ctx context.Context, interval time.Duration, f func()) {
 // It efficiently reads message contents from files by reusing file handles when possible.
 func ReadMessages(ctx context.Context, messages iter.Seq[FileMessage]) iter.Seq2[FileMessageBody, error] {
 	var (
-		stream *os.File
-		err    error
+		stream     *mmap.ReaderAt
+		streamName string
+		err        error
+
+		counter           int
+		shouldReleaseMmap bool
 	)
+
 	return func(yield func(FileMessageBody, error) bool) {
 		defer func() {
 			if stream != nil {
@@ -53,11 +60,15 @@ func ReadMessages(ctx context.Context, messages iter.Seq[FileMessage]) iter.Seq2
 				return
 			}
 
-			if stream == nil || stream.Name() != m.File {
+			counter++
+			shouldReleaseMmap = counter%1000 == 0
+
+			if streamName != m.File || shouldReleaseMmap {
 				if stream != nil {
 					stream.Close()
 				}
-				stream, err = os.Open(m.File)
+				streamName = m.File
+				stream, err = mmap.Open(streamName)
 				if err != nil {
 					yield(FileMessageBody{}, fmt.Errorf("file open %s: %w", m.File, err))
 					return
@@ -81,6 +92,7 @@ func ReadMessages(ctx context.Context, messages iter.Seq[FileMessage]) iter.Seq2
 			}
 		}
 	}
+
 }
 func ToFileMessages(messages iter.Seq[FileMessageBody]) iter.Seq[FileMessage] {
 	return func(yield func(FileMessage) bool) {
