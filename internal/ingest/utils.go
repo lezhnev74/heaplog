@@ -89,44 +89,52 @@ func appendTermsUnique(all map[string]struct{}, terms [][]byte) {
 	}
 }
 
-// findMisalignedSegments checks misalignment of indexed segments with actual message boundaries found in the file.
-func findMisalignedSegments(
+// findMisalignedSegmentsForFiles checks misalignment of indexed segments with actual message boundaries found in the file.
+func findMisalignedSegmentsForFiles(
 	indexedSegments map[string][]common.Location,
 	foundFilesLayouts map[string][]common.MessageLayout,
 ) iter.Seq[string] {
 	return func(yield func(string) bool) {
 		reportedFiles := make(map[string]struct{})
-	indexFileLoop:
 		for file, indexedLocs := range indexedSegments {
-			if len(indexedLocs) == 0 {
-				continue // no point in comparing, no indexed data available
+			fileMisaligned := findMisalignedSegmentsForFile(indexedLocs, foundFilesLayouts[file])
+			if !fileMisaligned {
+				continue
 			}
-
-			// map indexedLocs to actual messages in the file
-			for _, s := range indexedLocs {
-				leftMatched, rightMatched := false, false
-				for _, m := range foundFilesLayouts[file] {
-					if s.From == m.Loc.From {
-						leftMatched = true
-					}
-					if s.To == m.Loc.To {
-						rightMatched = true
-					}
-				}
-				if leftMatched && rightMatched {
-					continue
-				}
-
-				if _, ok := reportedFiles[file]; !ok {
-					reportedFiles[file] = struct{}{}
-					if !yield(file) {
-						return
-					}
-					continue indexFileLoop
+			if _, ok := reportedFiles[file]; !ok {
+				reportedFiles[file] = struct{}{}
+				if !yield(file) {
+					return
 				}
 			}
 		}
 	}
+}
+
+// findMisalignedSegmentsForFiles checks misalignment of indexed segments with actual message boundaries found in the file.
+func findMisalignedSegmentsForFile(indexedSegments []common.Location, foundFilesLayouts []common.MessageLayout) bool {
+	if len(indexedSegments) == 0 {
+		return false // no point in comparing, no indexed data available
+	}
+
+	// map indexedLocs to actual messages in the file
+	for _, s := range indexedSegments {
+		leftMatched, rightMatched := false, false
+		for _, m := range foundFilesLayouts {
+			if s.From == m.Loc.From {
+				leftMatched = true
+			}
+			if s.To == m.Loc.To {
+				rightMatched = true
+			}
+		}
+		if leftMatched && rightMatched {
+			continue
+		}
+		return true
+	}
+
+	return false
 }
 
 // filesWithIncompleteTrailingSegments identifies files where the last indexed segment is incomplete
@@ -141,15 +149,20 @@ func filesWithIncompleteTrailingSegments(
 			if len(segments) == 0 {
 				continue
 			}
-
-			lastSegment := segments[len(segments)-1]
 			size := accessibleFiles[file]
-
-			if lastSegment.Len() < segmentLen && lastSegment.To < size {
+			if hasIncompleteTrailingSegment(segmentLen, size, segments) {
 				if !yield(file) {
 					return
 				}
 			}
 		}
 	}
+}
+
+func hasIncompleteTrailingSegment(segmentLen, fileSize int, indexedSegments []common.Location) bool {
+	if len(indexedSegments) == 0 {
+		return false
+	}
+	trailingSegment := indexedSegments[len(indexedSegments)-1]
+	return trailingSegment.Len() < segmentLen && trailingSegment.To < fileSize
 }

@@ -202,13 +202,13 @@ func TestFindMisalignedSegments(t *testing.T) {
 		t.Run(
 			tt.name, func(t *testing.T) {
 				var got []string
-				for v := range findMisalignedSegments(tt.indexedSegments, tt.foundFilesLayouts) {
+				for v := range findMisalignedSegmentsForFiles(tt.indexedSegments, tt.foundFilesLayouts) {
 					got = append(got, v)
 				}
 				slices.Sort(got)
 				slices.Sort(tt.want)
 				if !slices.Equal(got, tt.want) {
-					t.Errorf("findMisalignedSegments() = %v, want %v", got, tt.want)
+					t.Errorf("findMisalignedSegmentsForFiles() = %v, want %v", got, tt.want)
 				}
 			},
 		)

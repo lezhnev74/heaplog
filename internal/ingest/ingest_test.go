@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lezhnev74/inverted_index_2"
 	"github.com/stretchr/testify/require"
 
 	"heaplog_2024/internal"
@@ -267,4 +268,50 @@ func makeTestIngestor(t *testing.T, globs []string) (*Ingestor, *persistence.Duc
 		indexer,
 	)
 	return ingestor, duck
+}
+
+func _TestManual(t *testing.T) {
+	logger, err := internal.NewLogger("testing")
+	require.NoError(t, err)
+	duck, err := persistence.NewDuckDB(context.Background(), "", logger)
+	require.NoError(t, err)
+	ii, err := inverted_index_2.NewInvertedIndex(".", false)
+	require.NoError(t, err)
+	tokenize := func(b []byte) [][]byte { return common.Tokenize(b, 4, 8) }
+	indexer := NewIndexer(
+		context.Background(),
+		logger,
+		tokenize,
+		func(b []byte) (time.Time, error) {
+			return time.Parse(common.TimeFormat, string(b))
+		},
+	)
+	persistentIndex, err := persistence.NewPersistentIndex(duck, ii)
+	require.NoError(t, err)
+	ingestor := NewIngestor(
+		[]string{"./logs/*.log"},
+		regexp.MustCompile(common.MessageStartPattern),
+		5_000_000,
+		1,
+		persistentIndex,
+		logger,
+		indexer,
+	)
+
+	cancel, err := common.Profile()
+	require.NoError(t, err)
+	defer cancel()
+
+	_, err = ingestor.scanFiles(
+		map[string]int{
+			"/home/dmitry/Code/go/src/heaplog/heaplog_2024/tmp/logs/laravel-2025-02-20 (Copy 11).log": 3098087273,
+			"/home/dmitry/Code/go/src/heaplog/heaplog_2024/tmp/logs/laravel-2025-02-20 (Copy 5).log":  3098087273,
+			"/home/dmitry/Code/go/src/heaplog/heaplog_2024/tmp/logs/laravel-2025-02-21 (Copy 11).log": 1935629630,
+			"/home/dmitry/Code/go/src/heaplog/heaplog_2024/tmp/logs/laravel-2025-02-21 (Copy 3).log":  1935629630,
+			"/home/dmitry/Code/go/src/heaplog/heaplog_2024/tmp/logs/laravel-2025-02-21 (Copy 5).log":  1935629630,
+		},
+	)
+
+	//err = ingestor.Run()
+	require.NoError(t, err)
 }

@@ -120,65 +120,99 @@ func (i *Ingestor) Run() error {
 		}
 	}
 
-	// 5. Build messages' layouts for each file
-	layouts, err := i.scanFiles(files)
-	if err != nil {
-		return fmt.Errorf("build file layouts: %w", err)
-	}
-
-	// 6. Validate index alignment; wipe segments if misaligned
-	// as a result it re-indexes files that somehow changed already indexed data.
-	for file := range findMisalignedSegments(indexedSegments, layouts) {
-		i.logger.Warn("indexed misalignment: re-index required", zap.String("file", file))
-		err = i.db.WipeSegments(file)
-		if err != nil {
-			return fmt.Errorf("wipe segments for %s: %w", file, err)
+	// Spread work across workers
+	fileCh := make(chan string)
+	go func() {
+		for file := range files {
+			fileCh <- file
 		}
-		delete(indexedSegments, file)
-	}
+		close(fileCh)
+	}()
 
-	// 7. Validate last file segments.
-	// If the last layout is not full and does not end at the end of the file,
-	// it is considered to be incomplete and needs to be re-indexed.
-	for file := range filesWithIncompleteTrailingSegments(i.segmentLen, indexedSegments, files) {
-		i.logger.Debug("re-index trailing segment", zap.String("file", file))
-		// here it wipes trailing index data, which can briefly affect searches that are currently running.
-		// past searches won't be affected as they keep found messages in a separate results storage.
-		err = i.db.WipeSegment(file, indexedSegments[file][len(indexedSegments[file])-1])
-		if err != nil {
-			return fmt.Errorf("wipe trailing segment for %s: %w", file, err)
-		}
-		indexedSegments[file] = indexedSegments[file][:len(indexedSegments[file])-1]
-	}
+	wg := sync.WaitGroup{}
+	wg.Add(i.workers)
+	for j := 0; j < i.workers; j++ {
+		go func() {
+			defer wg.Done()
 
-	// 8. Plan segments for indexing
-	plan := make(map[string][][]common.MessageLayout)
-	for file := range layouts {
-		filesize := layouts[file][len(layouts[file])-1].Loc.To
-		loc := common.Location{To: filesize}
-		unindexedLocations := loc.RemoveAll(indexedSegments[file])
-		segments := alignSegmentsByMessageBoundaries(i.segmentLen, unindexedLocations, layouts[file])
-		plan[file] = segments
-	}
+			for f := range fileCh {
+				// PER-FILE WORKER:
 
-	// 9. Perform indexing
-	for r := range i.indexer.indexSegments(plan) {
-		_, err = i.db.PutSegment(r.task.file, r.tokens, r.messages)
-		if err != nil {
-			return fmt.Errorf("put segment for %s: %w", r.task.file, err)
-		}
-		i.logger.Debug(
-			fmt.Sprintf(
-				"indexed segment %s [%d:%d] %d messages, %d tokens in %s",
-				r.task.file,
-				r.task.layouts[0].Loc.From,
-				r.task.layouts[len(r.task.layouts)-1].Loc.To,
-				len(r.messages),
-				len(r.tokens),
-				time.Since(r.task.at).String(),
-			),
-		)
+				size := files[f]
+				fileIndexedSegments := indexedSegments[f]
+
+				// 1. Build messages' layouts for each file
+				msgCount, layoutsIt, err := Scan(f, size, i.messageRE.String(), nil)
+				if err != nil {
+					i.logger.Error("Scan file", zap.String("file", f), zap.Error(err))
+					continue
+				}
+				// allocate enough memory in one pass
+				layouts := make([]common.MessageLayout, 0, msgCount)
+				for scannedMessage := range layoutsIt {
+					layouts = append(layouts, scannedMessage.MessageLayout)
+				}
+
+				// 2. Validate index alignment; wipe segments if misaligned
+				// as a result it re-indexes files that somehow changed already indexed data.
+				if findMisalignedSegmentsForFile(fileIndexedSegments, layouts) {
+					i.logger.Warn("indexed misalignment: re-index required", zap.String("file", f))
+					err = i.db.WipeSegments(f)
+					if err != nil {
+						i.logger.Error("wipe segments", zap.String("file", f), zap.Error(err))
+						return
+					}
+
+					// remove last segment from the list as it is re-indexed
+					fileIndexedSegments = fileIndexedSegments[:len(fileIndexedSegments)-1]
+				}
+
+				// 3. Validate last file segments.
+				// If the last layout is not full and does not end at the end of the file,
+				// it is considered to be incomplete and needs to be re-indexed.
+				if hasIncompleteTrailingSegment(i.segmentLen, size, fileIndexedSegments) {
+					i.logger.Debug("re-index trailing segment", zap.String("file", f))
+					// here it wipes trailing index data, which can briefly affect searches that are currently running.
+					// past searches won't be affected as they keep found messages in a separate results storage.
+					err = i.db.WipeSegment(f, fileIndexedSegments[len(fileIndexedSegments)-1])
+					if err != nil {
+						i.logger.Error("wipe segment", zap.String("file", f), zap.Error(err))
+						return
+					}
+					fileIndexedSegments = fileIndexedSegments[:len(fileIndexedSegments)-1]
+				}
+
+				// 4. Plan segments for indexing
+				plan := make(map[string][][]common.MessageLayout, 0)
+				loc := common.Location{To: size}
+				unindexedLocations := loc.RemoveAll(fileIndexedSegments)
+				segments := alignSegmentsByMessageBoundaries(i.segmentLen, unindexedLocations, layouts)
+				plan[f] = segments
+
+				// 5. Perform indexing
+				for r := range i.indexer.indexSegments(plan) {
+					_, err = i.db.PutSegment(r.task.file, r.tokens, r.messages)
+					if err != nil {
+						i.logger.Error("put segment", zap.String("file", r.task.file), zap.Error(err))
+						return
+					}
+					i.logger.Debug(
+						fmt.Sprintf(
+							"indexed segment %s [%d:%d] %d messages, %d tokens in %s",
+							r.task.file,
+							r.task.layouts[0].Loc.From,
+							r.task.layouts[len(r.task.layouts)-1].Loc.To,
+							len(r.messages),
+							len(r.tokens),
+							time.Since(r.task.at).String(),
+						),
+					)
+				}
+			}
+
+		}()
 	}
+	wg.Wait()
 
 	return nil
 }
@@ -199,17 +233,17 @@ func (i *Ingestor) scanFiles(files map[string]int) (map[string][]common.MessageL
 		go func() {
 			defer wg.Done()
 			for _, f := range filesPerWorker[j] {
-				layouts, err := Scan(f, files[f], i.messageRE.String(), nil)
+				msgCount, layouts, err := Scan(f, files[f], i.messageRE.String(), nil)
 				if err != nil {
 					i.logger.Error("Scan file", zap.String("file", f), zap.Error(err))
 					continue
 				}
+				// allocate enough memory in one pass
+				_layouts := make([]common.MessageLayout, 0, msgCount)
 				for sl := range layouts {
-					fileLayouts[slices.Index(filePaths, f)] = append(
-						fileLayouts[slices.Index(filePaths, f)],
-						sl.MessageLayout,
-					)
+					_layouts = append(_layouts, sl.MessageLayout)
 				}
+				fileLayouts[slices.Index(filePaths, f)] = _layouts
 			}
 		}()
 	}

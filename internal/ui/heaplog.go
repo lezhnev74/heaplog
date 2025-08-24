@@ -51,7 +51,7 @@ func TestConfig(cfg Config) (string, error) {
 	}
 	fileSize := fileInfo.Size()
 
-	scannedMessages, err := ingest.Scan(
+	_, scannedMessages, err := ingest.Scan(
 		file,
 		int(fileSize),
 		cfg.MessageStartRE,

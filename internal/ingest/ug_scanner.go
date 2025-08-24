@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"iter"
 	"log"
+	"os"
 	"os/exec"
 	"strconv"
 	"unsafe"
@@ -38,18 +39,40 @@ func toMessageLayouts(in []ScannedMessage) []common.MessageLayout {
 // Returns NoMessageStartFound error if no messages are found in the stream.
 // Returns error if there are issues executing ug or accessing the file.
 func Scan(file string, fileSize int, re string, locations []common.Location) (
+	count int,
 	layouts iter.Seq[ScannedMessage],
 	err error,
 ) {
 	ctx := context.Background()
 	cmd := exec.CommandContext(ctx, "ug", "-P", `--format=%[0]b,%[1]b:%[1]d%~`, re, file)
-	stdout, err := cmd.StdoutPipe()
+
+	tmpFile, err := os.CreateTemp("", "ug-output-*.txt")
 	if err != nil {
-		return nil, fmt.Errorf("ug stdout err: %w", err)
+		return 0, nil, fmt.Errorf("create temp file: %w", err)
 	}
-	err = cmd.Start()
+	defer os.Remove(tmpFile.Name())
+
+	cmd.Stdout = tmpFile
+	err = cmd.Run()
 	if err != nil {
-		return nil, fmt.Errorf("ug exec: %w", err)
+		return 0, nil, fmt.Errorf("ug exec: %w", err)
+	}
+
+	_, err = tmpFile.Seek(0, 0)
+	if err != nil {
+		return 0, nil, fmt.Errorf("seek temp file: %w", err)
+	}
+
+	// use a linux command to count new lines in the ug layouts file
+	cmd = exec.CommandContext(ctx, "wc", "-l", tmpFile.Name())
+	out, err := cmd.Output()
+	if err != nil {
+		return 0, nil, fmt.Errorf("wc exec: %w", err)
+	}
+	fields := bytes.Fields(out)
+	count, err = strconv.Atoi(string(fields[0]))
+	if err != nil {
+		return 0, nil, fmt.Errorf("parse wc output: %w", err)
 	}
 
 	// When a new layout is scanned from the file,
@@ -66,25 +89,20 @@ func Scan(file string, fileSize int, re string, locations []common.Location) (
 		return false
 	}
 
-	scanner := bufio.NewScanner(stdout)
+	scanner := bufio.NewScanner(tmpFile)
 	if !scanner.Scan() {
-		return nil, NoMessageStartFound
+		return 0, nil, NoMessageStartFound
 	}
 
 	lastLine := scanner.Text()
 	m, d, dl := parseLine(lastLine)
 
 	if err != nil {
-		return nil, fmt.Errorf("parse line: %w", err)
+		return 0, nil, fmt.Errorf("parse line: %w", err)
 	}
 
-	return func(yield func(ScannedMessage) bool) {
-		defer func() {
-			err = cmd.Wait()
-			if err != nil {
-				panic(fmt.Errorf("ug finish: %w", err))
-			}
-		}()
+	return count, func(yield func(ScannedMessage) bool) {
+		defer tmpFile.Close()
 
 		for {
 			l := ScannedMessage{}
