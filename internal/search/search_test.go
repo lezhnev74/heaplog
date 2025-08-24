@@ -122,10 +122,11 @@ func TestReadMessages(t *testing.T) {
 		},
 	}
 
+	bufPool := common.NewBufferPool([]int{1000})
 	for i, tt := range tests {
 		t.Run(
 			fmt.Sprintf("test %d", i), func(t *testing.T) {
-				fullMessages := common.ReadMessages(context.Background(), slices.Values(tt.messages))
+				fullMessages := common.ReadMessages(context.Background(), bufPool, slices.Values(tt.messages))
 				actualMessages := make([]common.FileMessageBody, 0)
 				for msg, err := range fullMessages {
 					require.NoError(t, err)

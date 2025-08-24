@@ -38,7 +38,11 @@ func RepeatEvery(ctx context.Context, interval time.Duration, f func()) {
 
 // ReadMessages converts a sequence of file messages into a sequence of message bodies with their content.
 // It efficiently reads message contents from files by reusing file handles when possible.
-func ReadMessages(ctx context.Context, messages iter.Seq[FileMessage]) iter.Seq2[FileMessageBody, error] {
+func ReadMessages(
+	ctx context.Context,
+	bufPool *BufferPool,
+	messages iter.Seq[FileMessage],
+) iter.Seq2[FileMessageBody, error] {
 	var (
 		stream     *mmap.ReaderAt
 		streamName string
@@ -80,14 +84,13 @@ func ReadMessages(ctx context.Context, messages iter.Seq[FileMessage]) iter.Seq2
 				yield(FileMessageBody{}, fmt.Errorf("invalid message location: %d-%d", m.Loc.From, m.Loc.To))
 				return
 			}
-			buf := make([]byte, mLen) // alloc memory for the message
-			_, err = stream.ReadAt(buf, int64(m.Loc.From))
+			buf := bufPool.Get(mLen) // alloc memory for the message
+			_, err = stream.ReadAt(buf.Buf, int64(m.Loc.From))
 			if err != nil {
 				yield(FileMessageBody{}, fmt.Errorf("read file %s: %w", m.File, err))
 				return
 			}
-
-			if !yield(FileMessageBody{FileMessage: m, Body: buf}, nil) {
+			if !yield(FileMessageBody{FileMessage: m, Body: buf.Buf}, nil) {
 				return
 			}
 		}

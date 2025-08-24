@@ -42,7 +42,7 @@ func NewBufferPool(sizes []int) *BufferPool {
 func (bp *BufferPool) Get(minSize int) Buffer {
 	for _, sz := range bp.sizes {
 		if sz >= minSize {
-			return Buffer{Buf: bp.pools[sz].Get().([]byte), pool: bp}
+			return Buffer{Buf: bp.pools[sz].Get().([]byte)[:minSize], pool: bp}
 		}
 	}
 	// fallback: exact size
@@ -52,10 +52,9 @@ func (bp *BufferPool) Get(minSize int) Buffer {
 // Put returns a buffer to the pool if its capacity matches one of the predefined sizes.
 // Buffers with non-matching sizes are discarded.
 func (bp *BufferPool) Put(buf []byte) {
-	capBuf := cap(buf)
 	for _, sz := range bp.sizes {
-		if sz == capBuf {
-			bp.pools[sz].Put(buf[:sz])
+		if sz == cap(buf) {
+			bp.pools[sz].Put(buf[:cap(buf)])
 			return
 		}
 	}

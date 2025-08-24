@@ -90,19 +90,27 @@ func (s *Search) Search(expr *query_language.Expression, minDate, maxDate *time.
 		return nil, fmt.Errorf("get messages: %w", err)
 	}
 
+	sizeGroups := []int{1_024, 2 * 1_024, 3 * 1_024, 4 * 1_024, 5 * 1_024, 10 * 1_024, 20 * 1_024}
+	messageBuf := common.NewBufferPool(sizeGroups)
 	// for the optimization purposes, matching is done in a pool of goroutines as it is quite CPU intensive (tokenize, match)
 	needsMatching := make(chan common.FileMessageBody, 100)
 	// run a pool of workers
-	matchedMessages := NewMatchPool(s.ctx, matcher, needsMatching, 4)
+	matchedMessages, unmatchedMessages := NewMatchPool(s.ctx, matcher, needsMatching, 4)
 	go func() {
 		// close the pool (when exhausted)
 		defer close(needsMatching)
 		// provide tasks for the pool
-		for m, err := range common.ReadMessages(s.ctx, fileMessages) {
+		for m, err := range common.ReadMessages(s.ctx, messageBuf, fileMessages) {
 			if err != nil {
 				break
 			}
 			needsMatching <- m
+		}
+	}()
+	go func() {
+		for m := range unmatchedMessages {
+			messageBuf.Put(m.Body) // release the buffer
+			m.Body = nil
 		}
 	}()
 	return func(yield func(body common.FileMessageBody) bool) {

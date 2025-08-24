@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+	"os"
+	"runtime/pprof"
 	"time"
 
 	"github.com/urfave/cli/v3"
@@ -96,6 +98,11 @@ func NewConsole(c context.Context, logger *zap.Logger, frontendPublic fs.FS) *cl
 			Aliases: []string{"duckdb"},
 			Usage:   "Max memory the duckdb instance is allowed to allocate (Mb)",
 		},
+		&cli.BoolFlag{
+			Name:    "Profile",
+			Aliases: []string{"profile"},
+			Usage:   "Dump mem profile to heaplog.pprof",
+		},
 	}
 
 	cmd := &cli.Command{
@@ -152,6 +159,29 @@ func NewConsole(c context.Context, logger *zap.Logger, frontendPublic fs.FS) *cl
 				Flags:       flags,
 				Description: "Search via the console",
 				Action: func(ctx context.Context, cmd *cli.Command) error {
+					if cmd.Bool("Profile") {
+						cpuProfile, err := os.Create("heaplog.cpu.pprof")
+						if err != nil {
+							return fmt.Errorf("could not create CPU profile: %v", err)
+						}
+						defer cpuProfile.Close()
+						if err := pprof.StartCPUProfile(cpuProfile); err != nil {
+							return fmt.Errorf("could not start CPU profile: %v", err)
+						}
+						defer pprof.StopCPUProfile()
+
+						memProfile, err := os.Create("heaplog.mem.pprof")
+						if err != nil {
+							return fmt.Errorf("could not create memory profile: %v", err)
+						}
+						defer memProfile.Close()
+						defer func() {
+							if err := pprof.WriteHeapProfile(memProfile); err != nil {
+								logger.Error("could not write memory profile", zap.Error(err))
+							}
+						}()
+					}
+
 					cfg, err := LoadConfig()
 					if err != nil && errors.Is(err, errNoConfigFile) {
 						logger.Info("No config file found, using default config")

@@ -192,8 +192,9 @@ func NewHttpApp(ctx context.Context, frontendPublic http.FileSystem, heaplog Hea
 				)
 			}
 
+			pool := common.NewBufferPool([]int{1000})
 			bodies := func(yield func(string) bool) {
-				for mf, err := range common.ReadMessages(ctx, results) {
+				for mf, err := range common.ReadMessages(ctx, pool, results) {
 					if err != nil {
 						yield("read message failed:" + err.Error())
 						break

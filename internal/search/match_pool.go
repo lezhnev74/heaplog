@@ -12,11 +12,14 @@ func NewMatchPool(
 	matcher func(body common.FileMessageBody) bool,
 	in <-chan common.FileMessageBody,
 	workers int,
-) <-chan common.FileMessageBody {
+) (<-chan common.FileMessageBody, <-chan common.FileMessageBody) {
 	if workers < 1 {
 		panic("empty matching pool (no workers)")
 	}
+
 	matched := make(chan common.FileMessageBody, 100)
+	unmatched := make(chan common.FileMessageBody, 100)
+
 	wg := sync.WaitGroup{}
 	wg.Add(workers)
 	for i := 0; i < workers; i++ {
@@ -30,6 +33,8 @@ func NewMatchPool(
 				}
 				if matcher(m) {
 					matched <- m
+				} else {
+					unmatched <- m
 				}
 			}
 		}()
@@ -38,5 +43,5 @@ func NewMatchPool(
 		wg.Wait()
 		close(matched)
 	}()
-	return matched
+	return matched, unmatched
 }
