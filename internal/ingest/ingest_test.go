@@ -302,16 +302,16 @@ func _TestManual(t *testing.T) {
 	require.NoError(t, err)
 	defer cancel()
 
-	_, err = ingestor.scanFiles(
-		map[string]int{
-			"/home/dmitry/Code/go/src/heaplog/heaplog_2024/tmp/logs/laravel-2025-02-20 (Copy 11).log": 3098087273,
-			"/home/dmitry/Code/go/src/heaplog/heaplog_2024/tmp/logs/laravel-2025-02-20 (Copy 5).log":  3098087273,
-			"/home/dmitry/Code/go/src/heaplog/heaplog_2024/tmp/logs/laravel-2025-02-21 (Copy 11).log": 1935629630,
-			"/home/dmitry/Code/go/src/heaplog/heaplog_2024/tmp/logs/laravel-2025-02-21 (Copy 3).log":  1935629630,
-			"/home/dmitry/Code/go/src/heaplog/heaplog_2024/tmp/logs/laravel-2025-02-21 (Copy 5).log":  1935629630,
-		},
-	)
+	//_, err = ingestor.scanFiles(
+	//	map[string]int{
+	//		"/home/dmitry/Code/go/src/heaplog/heaplog_2024/tmp/logs/laravel-2025-02-20 (Copy 11).log": 3098087273,
+	//		"/home/dmitry/Code/go/src/heaplog/heaplog_2024/tmp/logs/laravel-2025-02-20 (Copy 5).log":  3098087273,
+	//		"/home/dmitry/Code/go/src/heaplog/heaplog_2024/tmp/logs/laravel-2025-02-21 (Copy 11).log": 1935629630,
+	//		"/home/dmitry/Code/go/src/heaplog/heaplog_2024/tmp/logs/laravel-2025-02-21 (Copy 3).log":  1935629630,
+	//		"/home/dmitry/Code/go/src/heaplog/heaplog_2024/tmp/logs/laravel-2025-02-21 (Copy 5).log":  1935629630,
+	//	},
+	//)
 
-	//err = ingestor.Run()
+	err = ingestor.Run()
 	require.NoError(t, err)
 }

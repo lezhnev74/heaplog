@@ -139,7 +139,7 @@ func NewConsole(c context.Context, logger *zap.Logger, frontendPublic fs.FS) *cl
 					common.RepeatEvery(
 						ctx, 60*time.Second, func() {
 							for {
-								merged, err := heaplog.II.Merge(20, 40, 4)
+								merged, err := heaplog.II.Merge(20, 40, cfg.Concurrency)
 								if err != nil {
 									heaplog.Logger.Error("II merging failed", zap.Error(err))
 								}
