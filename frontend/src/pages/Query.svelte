@@ -16,7 +16,7 @@
 
     let page = $state(1)
     let perPage = $state(localStorage.getItem('perPage') ? parseInt(localStorage.getItem('perPage')) : 100)
-    let pages = $derived(Math.floor(messages / perPage))
+    let pages = $derived(Math.ceil(messages / perPage))
     let pageMessages = $state([])
     let truncatedMessages = $state([])
     // derived: page is incomplete if not enough messages yet

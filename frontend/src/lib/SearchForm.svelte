@@ -6,8 +6,8 @@
 
     let {
         query = "",
-        fromDate = 0,
-        toDate = 0,
+        fromDate = null,
+        toDate = null,
     } = $props()
 
     let isLoading = $state(false);
@@ -42,6 +42,25 @@
         isLoading = false;
     }
 
+    $effect(() => {
+        query
+        fromDate
+        toDate
+        if (fromPicker) {
+            if (!fromDate) {
+                fromPicker.clear();
+            } else {
+                fromPicker.setDate(fromDate, false);
+            }
+        }
+        if (toPicker) {
+            if (!toDate) {
+                toPicker.clear();
+            } else {
+                toPicker.setDate(toDate, false);
+            }
+        }
+    })
 
     onMount(() => {
         const conf = {
