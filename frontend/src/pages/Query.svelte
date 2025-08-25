@@ -123,10 +123,8 @@
                          title="Expand">
                         <div
                                 class="hide_icon cursor-pointer"
-                                class:hidden={!truncatedMessages.includes(i)}
                                 onclick={(e) => {
-                                   document.querySelector(`#msg_${i} .message_content`).classList.remove('truncate');
-                                   e.currentTarget.closest('.hide_icon').classList.add('hidden');
+                                   document.querySelector(`#msg_${i} .message_content`).classList.toggle('truncate');
                                 }}
                         >
                             <ArrowDownFromLine class="w-3"/>

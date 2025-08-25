@@ -125,9 +125,17 @@ func NewConsole(c context.Context, logger *zap.Logger, frontendPublic fs.FS) *cl
 					}
 
 					heaplog := NewHeaplog(c, logger, cfg)
+
 					// INGESTION
+					ingestionInFlight := false
 					common.RepeatEvery(
 						ctx, 60*time.Second, func() {
+							if ingestionInFlight {
+								return
+							}
+							ingestionInFlight = true
+							defer func() { ingestionInFlight = false }()
+
 							err := heaplog.Ingestor.Run()
 							if err != nil {
 								heaplog.Logger.Error("Ingestor failed", zap.Error(err))
@@ -136,8 +144,15 @@ func NewConsole(c context.Context, logger *zap.Logger, frontendPublic fs.FS) *cl
 					)
 
 					// II MERGING
+					mergingInFlight := false
 					common.RepeatEvery(
 						ctx, 60*time.Second, func() {
+							if mergingInFlight {
+								return
+							}
+							mergingInFlight = true
+							defer func() { mergingInFlight = false }()
+
 							for {
 								merged, err := heaplog.II.Merge(20, 40, cfg.Concurrency)
 								if err != nil {
