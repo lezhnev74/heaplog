@@ -89,7 +89,7 @@ services:
     entrypoint: [ "/heaplog" ]
     command: [ "run" ]
     ports:
-      - 8393:8393
+      - 3000:3000
 ```
 
 Now you can run `docker compose up heaplog` and access the UI at `http://localhost:8393`.
